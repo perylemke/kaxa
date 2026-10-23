@@ -18,12 +18,15 @@ func TestBinaryHelpAndVersion(t *testing.T) {
 		t.Fatalf("help missing sbx: %q", help.stdout)
 	}
 
-	version := run(t, bin, "--version")
+	version := run(t, bin, "version")
 	if version.exitCode != 0 {
 		t.Fatalf("version exit = %d", version.exitCode)
 	}
-	if !strings.Contains(version.stdout, "dev") && !strings.Contains(version.stdout, "0.") {
+	if !strings.Contains(version.stdout, "sbx ") {
 		t.Fatalf("unexpected version: %q", version.stdout)
+	}
+	if !strings.Contains(version.stdout, "on ") {
+		t.Fatalf("version should include platform line: %q", version.stdout)
 	}
 }
 

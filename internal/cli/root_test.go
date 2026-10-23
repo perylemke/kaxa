@@ -43,20 +43,36 @@ func TestRootHelp(t *testing.T) {
 	}
 }
 
-func TestRootVersion(t *testing.T) {
+func TestVersionCommand(t *testing.T) {
 	t.Parallel()
 
 	reg := testRegistry(t)
 	cmd := cli.NewRootCmd(reg)
 	out := new(bytes.Buffer)
 	cmd.SetOut(out)
-	cmd.SetArgs([]string{"--version"})
+	cmd.SetArgs([]string{"version"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
-	if !strings.Contains(out.String(), "dev") {
-		t.Fatalf("version output = %q", out.String())
+	got := out.String()
+	if !strings.Contains(got, "sbx dev") {
+		t.Fatalf("version output = %q", got)
+	}
+	if !strings.Contains(got, "on ") {
+		t.Fatalf("version should include platform line: %q", got)
+	}
+}
+
+func TestVersionSkipsConfigValidation(t *testing.T) {
+	reg := testRegistry(t)
+	cmd := cli.NewRootCmd(reg)
+	cmd.SetOut(new(bytes.Buffer))
+	cmd.SetErr(new(bytes.Buffer))
+	cmd.SetArgs([]string{"--provider", "nope", "version"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("version should not validate provider: %v", err)
 	}
 }
 

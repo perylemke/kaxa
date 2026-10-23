@@ -43,7 +43,7 @@ See [config.example.yaml](config.example.yaml). Never commit real tokens.
 
 ```bash
 sbx --help
-sbx --version
+sbx version
 sbx --provider sprites --help
 ```
 

@@ -9,7 +9,6 @@ import (
 
 	"github.com/perylemke/sbx/internal/config"
 	"github.com/perylemke/sbx/internal/registry"
-	"github.com/perylemke/sbx/internal/version"
 )
 
 // Execute runs the root command and returns an exit code.
@@ -40,7 +39,7 @@ See config.example.yaml in the repository root.`),
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			if cmd.Name() == "help" || cmd.Name() == "completion" {
+			if cmd.Name() == "help" || cmd.Name() == "completion" || cmd.Name() == "version" {
 				return nil
 			}
 			_, err := config.Load(config.LoadOptions{
@@ -54,11 +53,10 @@ See config.example.yaml in the repository root.`),
 		},
 	}
 
-	root.Version = version.String()
-	root.SetVersionTemplate("{{.Version}}\n")
-
 	root.PersistentFlags().StringVar(&configPath, "config", "", "config file path")
 	root.PersistentFlags().StringVar(&provider, "provider", "", "sandbox provider (sprites, modal)")
+
+	root.AddCommand(newVersionCmd())
 
 	return root
 }
