@@ -27,6 +27,7 @@ go.work.sum
 
 # Release artifacts
 dist/
+bin/
 
 # env file
 .env

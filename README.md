@@ -49,9 +49,17 @@ sbx --provider sprites --help
 
 ## Development
 
+Run `make help` for all targets. Quick local build:
+
+```bash
+make build
+./bin/sbx --help
+```
+
 ```bash
 # Unit tests (default)
 go test -race -shuffle=on ./...
+# or: make test
 
 # Integration tests
 go test -race -count=1 -tags=integration ./internal/config/...
