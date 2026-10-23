@@ -1,3 +1,4 @@
+// Package sandbox defines the provider contract shared by sandbox backends.
 package sandbox
 
 import (

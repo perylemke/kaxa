@@ -1,3 +1,4 @@
+// Package config loads sbx settings from flags, environment, and files.
 package config
 
 import (
@@ -14,7 +15,7 @@ import (
 
 // Config holds resolved CLI settings (secrets are never logged via String).
 type Config struct {
-	Provider string       `mapstructure:"provider"`
+	Provider string        `mapstructure:"provider"`
 	Sprites  SpritesConfig `mapstructure:"sprites"`
 	Modal    ModalConfig   `mapstructure:"modal"`
 }
@@ -104,8 +105,7 @@ func readConfigFile(v *viper.Viper, explicitPath string) error {
 		}
 		v.SetConfigFile(path)
 		if err := v.ReadInConfig(); err != nil {
-			var notFound viper.ConfigFileNotFoundError
-			if errors.As(err, &notFound) {
+			if _, ok := errors.AsType[viper.ConfigFileNotFoundError](err); ok {
 				continue
 			}
 			return fmt.Errorf("read config: %w", err)

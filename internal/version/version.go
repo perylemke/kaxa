@@ -21,9 +21,12 @@ func String() string {
 }
 
 // Write prints version information in a Terraform-like format to w.
-func Write(w io.Writer) {
-	fmt.Fprintf(w, "sbx %s\n", label())
-	fmt.Fprintf(w, "on %s_%s\n", runtime.GOOS, runtime.GOARCH)
+func Write(w io.Writer) error {
+	if _, err := fmt.Fprintf(w, "sbx %s\n", label()); err != nil {
+		return err
+	}
+	_, err := fmt.Fprintf(w, "on %s_%s\n", runtime.GOOS, runtime.GOARCH)
+	return err
 }
 
 func label() string {

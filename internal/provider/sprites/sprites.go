@@ -1,3 +1,4 @@
+// Package sprites is the Fly.io Sprites sandbox provider.
 package sprites
 
 import (
@@ -21,21 +22,21 @@ func (p *Provider) Name() string {
 }
 
 // Create is not implemented yet.
-func (p *Provider) Create(ctx context.Context, spec sandbox.Spec) (sandbox.ID, error) {
+func (p *Provider) Create(_ context.Context, _ sandbox.Spec) (sandbox.ID, error) {
 	return "", fmt.Errorf("%w: sprites create", sandbox.ErrNotImplemented)
 }
 
 // List is not implemented yet.
-func (p *Provider) List(ctx context.Context) ([]sandbox.Info, error) {
+func (p *Provider) List(_ context.Context) ([]sandbox.Info, error) {
 	return nil, fmt.Errorf("%w: sprites list", sandbox.ErrNotImplemented)
 }
 
 // Exec is not implemented yet.
-func (p *Provider) Exec(ctx context.Context, id sandbox.ID, command []string) error {
+func (p *Provider) Exec(_ context.Context, _ sandbox.ID, _ []string) error {
 	return fmt.Errorf("%w: sprites exec", sandbox.ErrNotImplemented)
 }
 
 // Destroy is not implemented yet.
-func (p *Provider) Destroy(ctx context.Context, id sandbox.ID) error {
+func (p *Provider) Destroy(_ context.Context, _ sandbox.ID) error {
 	return fmt.Errorf("%w: sprites destroy", sandbox.ErrNotImplemented)
 }

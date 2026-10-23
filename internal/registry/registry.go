@@ -1,6 +1,8 @@
+// Package registry maps sandbox provider names to implementations.
 package registry
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"sync"
@@ -24,11 +26,11 @@ func New() *Registry {
 // Register adds a provider. Duplicate names return an error.
 func (r *Registry) Register(p sandbox.Provider) error {
 	if p == nil {
-		return fmt.Errorf("register provider: nil")
+		return errors.New("register provider: nil")
 	}
 	name := p.Name()
 	if name == "" {
-		return fmt.Errorf("register provider: empty name")
+		return errors.New("register provider: empty name")
 	}
 
 	r.mu.Lock()

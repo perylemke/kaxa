@@ -11,9 +11,8 @@ func newVersionCmd() *cobra.Command {
 		Use:   "version",
 		Short: "Print the sbx version",
 		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			version.Write(cmd.OutOrStdout())
-			return nil
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return version.Write(cmd.OutOrStdout())
 		},
 	}
 }

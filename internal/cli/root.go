@@ -1,3 +1,4 @@
+// Package cli builds the sbx command tree.
 package cli
 
 import (
@@ -38,7 +39,7 @@ Configure Sprites or Modal credentials via config file or SBX_* environment vari
 See config.example.yaml in the repository root.`),
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			if cmd.Name() == "help" || cmd.Name() == "completion" || cmd.Name() == "version" {
 				return nil
 			}
@@ -48,7 +49,7 @@ See config.example.yaml in the repository root.`),
 			}, reg)
 			return err
 		},
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			return cmd.Help()
 		},
 	}

@@ -1,3 +1,4 @@
+// Package main is the sbx CLI entrypoint.
 package main
 
 import (
