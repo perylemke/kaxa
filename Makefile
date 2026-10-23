@@ -62,6 +62,10 @@ vet: ## go vet
 tidy: ## go mod tidy
 	$(GO) mod tidy
 
+.PHONY: fmt
+fmt: ## Format Go code with gofmt and gofumpt
+	golangci-lint fmt ./...
+
 .PHONY: lint
 lint: ## golangci-lint
 	golangci-lint run ./...
