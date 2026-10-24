@@ -22,6 +22,7 @@ type fakeProvider struct {
 	name           string
 	configureToken string
 	createID       sandbox.ID
+	lastCreate     sandbox.Spec
 	list           []sandbox.Info
 	lastExec       sandbox.ExecOptions
 	destroyed      sandbox.ID
@@ -39,6 +40,7 @@ func (f *fakeProvider) Configure(token string) error {
 }
 
 func (f *fakeProvider) Create(_ context.Context, spec sandbox.Spec) (sandbox.ID, error) {
+	f.lastCreate = spec
 	if f.createID != "" {
 		return f.createID, nil
 	}
@@ -69,23 +71,46 @@ func spritesRegistry(t *testing.T, p sandbox.Provider) *registry.Registry {
 }
 
 func TestCreatePrintsName(t *testing.T) {
-	fp := &fakeProvider{name: testSpritesName, createID: "my-box"}
+	fp := &fakeProvider{name: testSpritesName, createID: testBoxName}
 	reg := spritesRegistry(t, fp)
 	cmd := cli.NewRootCmd(reg)
 	out := new(bytes.Buffer)
 	cmd.SetOut(out)
 	cmd.SetErr(new(bytes.Buffer))
-	cmd.SetArgs([]string{testProviderFlag, testSpritesName, "create", "my-box"})
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdCreate, testBoxName})
 	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
-	if got := strings.TrimSpace(out.String()); got != "my-box" {
+	got := out.String()
+	if !strings.Contains(got, "created") || !strings.Contains(got, testBoxName) || !strings.Contains(got, "ready") {
 		t.Fatalf("output = %q", got)
 	}
 	if fp.configureToken != "tok" {
 		t.Fatalf("token = %q", fp.configureToken)
+	}
+	if fp.lastCreate.Labels == nil || fp.lastCreate.Labels[0] != "sbox" {
+		t.Fatalf("create labels = %v", fp.lastCreate.Labels)
+	}
+}
+
+func TestCreateNoSpinnerOnNonTTYStderr(t *testing.T) {
+	fp := &fakeProvider{name: testSpritesName, createID: testBoxName}
+	reg := spritesRegistry(t, fp)
+	cmd := cli.NewRootCmd(reg)
+	out := new(bytes.Buffer)
+	errOut := new(bytes.Buffer)
+	cmd.SetOut(out)
+	cmd.SetErr(errOut)
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdCreate, testBoxName})
+	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if errOut.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty without TTY", errOut.String())
 	}
 }
 
@@ -156,8 +181,6 @@ func TestDestroyCommands(t *testing.T) {
 		})
 	}
 }
-
-
 
 func TestExecReturnsExitError(t *testing.T) {
 	fp := &fakeProvider{

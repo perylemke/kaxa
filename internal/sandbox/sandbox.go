@@ -16,7 +16,8 @@ type ID string
 
 // Spec describes a sandbox to create.
 type Spec struct {
-	Name string
+	Name   string
+	Labels []string
 }
 
 // Info summarizes an existing sandbox.

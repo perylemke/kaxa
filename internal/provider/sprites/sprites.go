@@ -52,11 +52,15 @@ func (p *Provider) Create(ctx context.Context, spec sandbox.Spec) (sandbox.ID, e
 	if err != nil {
 		return "", err
 	}
-	sp, err := c.CreateSprite(ctx, spec.Name)
+	sp, err := c.CreateSprite(ctx, spec.Name, spec.Labels)
 	if err != nil {
 		return "", redactErr(err, token)
 	}
-	return sandbox.ID(sp.Name()), nil
+	name := sp.Name()
+	if err := waitForWarm(ctx, c, name, token); err != nil {
+		return "", err
+	}
+	return sandbox.ID(name), nil
 }
 
 // List returns all sprites in the organization.
@@ -128,7 +132,7 @@ func (p *Provider) clientAndToken() (sdkClient, string, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.client == nil {
-		return nil, "", ErrMissingToken
+		return nil, "", missingTokenErr()
 	}
 	return p.client, p.token, nil
 }

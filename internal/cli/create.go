@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -8,6 +9,8 @@ import (
 	"github.com/perylemke/sbox/internal/registry"
 	"github.com/perylemke/sbox/internal/sandbox"
 )
+
+var sboxCreateLabels = []string{"sbox"}
 
 func newCreateCmd(reg *registry.Registry) *cobra.Command {
 	return &cobra.Command{
@@ -19,12 +22,15 @@ func newCreateCmd(reg *registry.Registry) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			id, err := p.Create(cmd.Context(), sandbox.Spec{Name: args[0]})
+			name := args[0]
+			spec := sandbox.Spec{Name: name, Labels: sboxCreateLabels}
+			id, err := runCreateWithSpinner(cmd.Context(), cmd.ErrOrStderr(), name, func(ctx context.Context) (sandbox.ID, error) {
+				return p.Create(ctx, spec)
+			})
 			if err != nil {
 				return err
 			}
-			_, err = fmt.Fprintln(cmd.OutOrStdout(), id)
-			return err
+			return WriteSuccess(cmd.OutOrStdout(), fmt.Sprintf("sandbox %s is ready", id))
 		},
 	}
 }

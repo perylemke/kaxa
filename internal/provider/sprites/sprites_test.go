@@ -13,17 +13,25 @@ import (
 )
 
 type fakeSDKClient struct {
-	create  func(ctx context.Context, name string) (*spritesdk.Sprite, error)
+	create  func(ctx context.Context, name string, labels []string) (*spritesdk.Sprite, error)
+	get     func(ctx context.Context, name string) (*spritesdk.Sprite, error)
 	list    func(ctx context.Context, prefix string) ([]sprites.SpriteListEntry, error)
 	destroy func(ctx context.Context, name string) error
 	sprite  func(name string) *spritesdk.Sprite
 }
 
-func (f *fakeSDKClient) CreateSprite(ctx context.Context, name string) (*spritesdk.Sprite, error) {
+func (f *fakeSDKClient) CreateSprite(ctx context.Context, name string, labels []string) (*spritesdk.Sprite, error) {
 	if f.create != nil {
-		return f.create(ctx, name)
+		return f.create(ctx, name, labels)
 	}
 	return nil, errors.New("create not stubbed")
+}
+
+func (f *fakeSDKClient) GetSprite(ctx context.Context, name string) (*spritesdk.Sprite, error) {
+	if f.get != nil {
+		return f.get(ctx, name)
+	}
+	return &spritesdk.Sprite{Status: spriteStatusWarm}, nil
 }
 
 func (f *fakeSDKClient) ListEntries(ctx context.Context, prefix string) ([]sprites.SpriteListEntry, error) {
@@ -101,7 +109,7 @@ func TestRedactTokenInError(t *testing.T) {
 
 	const token = "leak-me-please" // #nosec G101 -- test fixture
 	client := &fakeSDKClient{
-		create: func(_ context.Context, _ string) (*spritesdk.Sprite, error) {
+		create: func(_ context.Context, _ string, _ []string) (*spritesdk.Sprite, error) {
 			return nil, errors.New("auth failed: " + token)
 		},
 	}
