@@ -16,4 +16,4 @@
 
 ## Security
 
-Do not paste Sprites or Modal tokens in this PR. Use placeholders in config examples only.
+Do not paste Sprites or Modal tokens in this PR.

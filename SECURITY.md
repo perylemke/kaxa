@@ -65,7 +65,7 @@ When using **sbx**:
 
 1. Keep **sbx** and Go up to date.
 2. Use [Go modules](https://go.dev/blog/using-go-modules) for builds.
-3. Store Sprites and Modal credentials in environment variables or a local config file with restrictive permissions—never commit tokens or paste them into issues or PRs.
+3. Store Sprites and Modal credentials in environment variables—never commit tokens or paste them into issues or PRs.
 4. Prefer the latest documented provider APIs and tokens with least privilege.
 
 ## Security Best Practices for Contributors
