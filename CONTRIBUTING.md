@@ -40,6 +40,6 @@ Use the PR template and confirm you did not include real API tokens in the descr
 ## Development prerequisites
 
 - Go 1.27+ (see [go.mod](go.mod))
-- `golangci-lint` and `govulncheck` for local CI parity (`make lint`, `make vuln`)
+- `golangci-lint`, `govulncheck`, and `gosec` v2.30.0 for local CI parity (`make lint`, `make vuln`, `make gosec`)
 
 Run `make help` for all Makefile targets.

@@ -7,6 +7,8 @@ SHELL := /usr/bin/env bash
 GO ?= go
 BIN ?= bin/sbx
 CMD := ./cmd/sbx
+GOSEC ?= gosec
+GOSEC_SARIF ?= gosec.sarif
 
 VERSION ?= dev
 COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
@@ -74,13 +76,17 @@ lint: ## golangci-lint
 vuln: ## govulncheck
 	govulncheck ./...
 
+.PHONY: gosec
+gosec: ## gosec SAST; SARIF in gosec.sarif; fails on findings
+	$(GOSEC) -fmt sarif -out $(GOSEC_SARIF) -stdout -verbose=text ./...
+
 .PHONY: goreleaser-check
 goreleaser-check: ## Validate .goreleaser.yml
 	goreleaser check
 
 .PHONY: ci
-ci: tidy vet test test-integration test-e2e test-acceptance lint vuln goreleaser-check ## Run CI-equivalent checks locally
+ci: tidy vet test test-integration test-e2e test-acceptance lint vuln gosec goreleaser-check ## Run CI-equivalent checks locally
 
 .PHONY: clean
 clean: ## Remove build artifacts
-	rm -rf bin/ dist/
+	rm -rf bin/ dist/ $(GOSEC_SARIF)
