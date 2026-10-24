@@ -1,8 +1,6 @@
 package cli
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 
 	"github.com/perylemke/sbox/internal/registry"
@@ -22,12 +20,11 @@ func newListCmd(reg *registry.Registry) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			for _, info := range infos {
-				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "%s\t%s\n", info.ID, info.Status); err != nil {
-					return err
-				}
+			out := cmd.OutOrStdout()
+			if listOutputIsTTY(out) {
+				return writeListTTY(out, infos)
 			}
-			return nil
+			return writeListPlain(out, infos)
 		},
 	}
 }

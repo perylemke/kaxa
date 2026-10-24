@@ -14,7 +14,7 @@ import (
 
 type fakeSDKClient struct {
 	create  func(ctx context.Context, name string) (*spritesdk.Sprite, error)
-	list    func(ctx context.Context, prefix string) ([]*spritesdk.Sprite, error)
+	list    func(ctx context.Context, prefix string) ([]sprites.SpriteListEntry, error)
 	destroy func(ctx context.Context, name string) error
 	sprite  func(name string) *spritesdk.Sprite
 }
@@ -26,7 +26,7 @@ func (f *fakeSDKClient) CreateSprite(ctx context.Context, name string) (*sprites
 	return nil, errors.New("create not stubbed")
 }
 
-func (f *fakeSDKClient) ListAllSprites(ctx context.Context, prefix string) ([]*spritesdk.Sprite, error) {
+func (f *fakeSDKClient) ListEntries(ctx context.Context, prefix string) ([]sprites.SpriteListEntry, error) {
 	if f.list != nil {
 		return f.list(ctx, prefix)
 	}

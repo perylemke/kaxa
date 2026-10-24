@@ -108,7 +108,7 @@ func TestListFormatsOutput(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
-	want := "a\tcold\nb\twarm\n"
+	want := "name\tstatus\tversion\tlabels\na\tcold\t\t\nb\twarm\t\t\n"
 	if out.String() != want {
 		t.Fatalf("output = %q, want %q", out.String(), want)
 	}

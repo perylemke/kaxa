@@ -8,7 +8,7 @@ import (
 
 type sdkClient interface {
 	CreateSprite(ctx context.Context, name string) (*spritesdk.Sprite, error)
-	ListAllSprites(ctx context.Context, prefix string) ([]*spritesdk.Sprite, error)
+	ListEntries(ctx context.Context, prefix string) ([]SpriteListEntry, error)
 	DestroySprite(ctx context.Context, name string) error
 	Sprite(name string) *spritesdk.Sprite
 	Close() error
@@ -25,10 +25,6 @@ func newSDKClient(token string, opts ...spritesdk.Option) *realSDKClient {
 
 func (r *realSDKClient) CreateSprite(ctx context.Context, name string) (*spritesdk.Sprite, error) {
 	return r.c.CreateSprite(ctx, name, nil)
-}
-
-func (r *realSDKClient) ListAllSprites(ctx context.Context, prefix string) ([]*spritesdk.Sprite, error) {
-	return r.c.ListAllSprites(ctx, prefix)
 }
 
 func (r *realSDKClient) DestroySprite(ctx context.Context, name string) error {

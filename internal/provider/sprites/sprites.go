@@ -65,19 +65,11 @@ func (p *Provider) List(ctx context.Context) ([]sandbox.Info, error) {
 	if err != nil {
 		return nil, err
 	}
-	sprites, err := c.ListAllSprites(ctx, "")
+	entries, err := c.ListEntries(ctx, "")
 	if err != nil {
 		return nil, redactErr(err, token)
 	}
-	out := make([]sandbox.Info, 0, len(sprites))
-	for _, sp := range sprites {
-		out = append(out, sandbox.Info{
-			ID:       sandbox.ID(sp.Name()),
-			Provider: p.Name(),
-			Status:   sp.Status,
-		})
-	}
-	return out, nil
+	return entriesToSandboxInfo(entries, p.Name()), nil
 }
 
 // Exec runs a command or interactive shell on a sprite.

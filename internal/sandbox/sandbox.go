@@ -24,6 +24,8 @@ type Info struct {
 	ID       ID
 	Provider string
 	Status   string
+	Version  string
+	Labels   []string
 }
 
 // TermSize is terminal dimensions in rows and columns.
