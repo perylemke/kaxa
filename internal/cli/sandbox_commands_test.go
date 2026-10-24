@@ -134,22 +134,30 @@ func TestExecWithArgsNoTTY(t *testing.T) {
 	}
 }
 
-func TestDestroyCallsProvider(t *testing.T) {
-	fp := &fakeProvider{name: testSpritesName}
-	reg := spritesRegistry(t, fp)
-	cmd := cli.NewRootCmd(reg)
-	cmd.SetOut(new(bytes.Buffer))
-	cmd.SetErr(new(bytes.Buffer))
-	cmd.SetArgs([]string{testProviderFlag, testSpritesName, "destroy", "gone"})
-	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+func TestDestroyCommands(t *testing.T) {
+	const sandboxName = "gone"
 
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("execute: %v", err)
-	}
-	if fp.destroyed != "gone" {
-		t.Fatalf("destroyed = %q", fp.destroyed)
+	for _, sub := range []string{"destroy", "rm"} {
+		t.Run(sub, func(t *testing.T) {
+			fp := &fakeProvider{name: testSpritesName}
+			reg := spritesRegistry(t, fp)
+			cmd := cli.NewRootCmd(reg)
+			cmd.SetOut(new(bytes.Buffer))
+			cmd.SetErr(new(bytes.Buffer))
+			cmd.SetArgs([]string{testProviderFlag, testSpritesName, sub, sandboxName})
+			t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+
+			if err := cmd.Execute(); err != nil {
+				t.Fatalf("execute: %v", err)
+			}
+			if fp.destroyed != sandboxName {
+				t.Fatalf("destroyed = %q", fp.destroyed)
+			}
+		})
 	}
 }
+
+
 
 func TestExecReturnsExitError(t *testing.T) {
 	fp := &fakeProvider{
