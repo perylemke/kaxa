@@ -41,9 +41,19 @@ func TestRootHelp(t *testing.T) {
 	if !strings.Contains(help, "sprites") || !strings.Contains(help, "modal") {
 		t.Fatalf("help should list providers: %s", help)
 	}
-	for _, sub := range []string{testCmdCreate, "list", "exec", "destroy"} {
+	for _, sub := range []string{"create", "list", "exec", "destroy"} {
 		if !strings.Contains(help, sub) {
-			t.Fatalf("help should list %q subcommand: %s", sub, help)
+			t.Fatalf("help should list %q: %s", sub, help)
+		}
+	}
+	for _, unwanted := range []string{"create, new", "list, ls", "destroy, rm", "(alias:"} {
+		if strings.Contains(help, unwanted) {
+			t.Fatalf("help should not include %q in command descriptions: %s", unwanted, help)
+		}
+	}
+	for _, alias := range []string{"  new create", "  ls  list", "  rm  destroy"} {
+		if !strings.Contains(help, alias) {
+			t.Fatalf("help should list alias %q: %s", alias, help)
 		}
 	}
 }

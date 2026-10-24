@@ -34,7 +34,7 @@ func (p *Provider) Configure(token string) error {
 		_ = p.client.Close()
 	}
 	p.token = token
-	p.client = newSDKClient(token)
+	p.client = newSDKClient(token, defaultAPIBase)
 	return nil
 }
 
@@ -60,6 +60,11 @@ func (p *Provider) Create(ctx context.Context, spec sandbox.Spec) (sandbox.ID, e
 	if err := waitForWarm(ctx, c, name, token); err != nil {
 		return "", err
 	}
+	if spec.Running {
+		if err := configureRunning(ctx, c, name, token); err != nil {
+			return "", redactErr(err, token)
+		}
+	}
 	return sandbox.ID(name), nil
 }
 
@@ -74,6 +79,21 @@ func (p *Provider) List(ctx context.Context) ([]sandbox.Info, error) {
 		return nil, redactErr(err, token)
 	}
 	return entriesToSandboxInfo(entries, p.Name()), nil
+}
+
+// Upgrade upgrades a sprite to the latest platform version.
+func (p *Provider) Upgrade(ctx context.Context, id sandbox.ID) error {
+	if err := validateName(string(id)); err != nil {
+		return err
+	}
+	c, token, err := p.clientAndToken()
+	if err != nil {
+		return err
+	}
+	if err := c.UpgradeSprite(ctx, string(id)); err != nil {
+		return redactErr(err, token)
+	}
+	return nil
 }
 
 // Exec runs a command or interactive shell on a sprite.
@@ -157,7 +177,7 @@ func NewWithClient(client sdkClient, token string) *Provider {
 }
 
 // ConfigureWithOptions sets token and SDK options (tests against httptest).
-func (p *Provider) ConfigureWithOptions(token string, opts ...spritesdk.Option) error {
+func (p *Provider) ConfigureWithOptions(token string, apiBase string, opts ...spritesdk.Option) error {
 	if token == "" {
 		return missingTokenErr()
 	}
@@ -167,6 +187,6 @@ func (p *Provider) ConfigureWithOptions(token string, opts ...spritesdk.Option) 
 		_ = p.client.Close()
 	}
 	p.token = token
-	p.client = newSDKClient(token, opts...)
+	p.client = newSDKClient(token, apiBase, opts...)
 	return nil
 }

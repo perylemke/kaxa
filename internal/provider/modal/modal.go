@@ -30,6 +30,21 @@ func (p *Provider) List(_ context.Context) ([]sandbox.Info, error) {
 	return nil, errNotImplemented("list")
 }
 
+// Inspect is not implemented yet.
+func (p *Provider) Inspect(_ context.Context, _ sandbox.ID) (sandbox.Detail, error) {
+	return sandbox.Detail{}, errNotImplemented("inspect")
+}
+
+// Restart is not implemented yet.
+func (p *Provider) Restart(_ context.Context, _ sandbox.ID) error {
+	return errNotImplemented("restart")
+}
+
+// Upgrade is not implemented yet.
+func (p *Provider) Upgrade(_ context.Context, _ sandbox.ID) error {
+	return errNotImplemented("upgrade")
+}
+
 // Exec is not implemented yet.
 func (p *Provider) Exec(_ context.Context, _ sandbox.ID, _ sandbox.ExecOptions) error {
 	return errNotImplemented("exec")

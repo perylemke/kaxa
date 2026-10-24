@@ -38,7 +38,7 @@ func TestWriteSuccessIncludesReadyMessage(t *testing.T) {
 	t.Parallel()
 
 	buf := new(bytes.Buffer)
-	if err := WriteSuccess(buf, "sandbox my-box is ready"); err != nil {
+	if err := WriteSuccess(buf, "created", "sandbox my-box is ready"); err != nil {
 		t.Fatalf("WriteSuccess: %v", err)
 	}
 	plain := stripANSI(buf.String())

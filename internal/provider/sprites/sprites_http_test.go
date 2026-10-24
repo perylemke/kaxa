@@ -27,8 +27,6 @@ func lifecycleTestHandler(page, createdGets *int) http.HandlerFunc {
 			handleLifecycleCreate(w, r)
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/sprites/"+lifecycleSpriteName:
 			handleLifecycleGetCreated(w, createdGets)
-		case r.Method == http.MethodHead && strings.HasSuffix(r.URL.Path, "/exec"):
-			writeSpriteVersion(w, r.URL.Path)
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/sprites":
 			writeListPage(w, page)
 		case r.Method == http.MethodDelete && r.URL.Path == "/v1/sprites/alpha":
@@ -75,21 +73,11 @@ func handleLifecycleGetCreated(w http.ResponseWriter, createdGets *int) {
 	})
 }
 
-func writeSpriteVersion(w http.ResponseWriter, path string) {
-	switch {
-	case strings.Contains(path, "/alpha/"):
-		w.Header().Set("Sprite-Version", "0.0.4")
-	case strings.Contains(path, "/beta/"):
-		w.Header().Set("Sprite-Version", "0.0.5")
-	}
-	w.WriteHeader(http.StatusOK)
-}
-
 func writeListPage(w http.ResponseWriter, page *int) {
 	*page++
 	if *page == 1 {
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"sprites": []map[string]any{
+			spritesName: []map[string]any{
 				{spriteJSONFieldName: "alpha", "status": spriteStatusCold, "organization": "org", "id": "1", "labels": []string{"team=a"}},
 			},
 			"has_more":                true,
@@ -98,7 +86,7 @@ func writeListPage(w http.ResponseWriter, page *int) {
 		return
 	}
 	_ = json.NewEncoder(w).Encode(map[string]any{
-		"sprites": []map[string]string{
+		spritesName: []map[string]string{
 			{spriteJSONFieldName: "beta", "status": spriteStatusWarm, "organization": "org", "id": "2"},
 		},
 		"has_more": false,
@@ -113,8 +101,8 @@ func assertLifecycleList(t *testing.T, list []sandbox.Info) {
 	if list[0].Status != spriteStatusCold || list[1].Status != spriteStatusWarm {
 		t.Fatalf("statuses = %q, %q", list[0].Status, list[1].Status)
 	}
-	if list[0].Version != "0.0.4" || list[1].Version != "0.0.5" {
-		t.Fatalf("version = %q, %q", list[0].Version, list[1].Version)
+	if list[0].Provider != spritesName || list[1].Provider != spritesName {
+		t.Fatalf("provider = %q, %q", list[0].Provider, list[1].Provider)
 	}
 	if len(list[0].Labels) != 1 || list[0].Labels[0] != "team=a" {
 		t.Fatalf("labels[0] = %v", list[0].Labels)
@@ -130,10 +118,7 @@ func TestHTTPLifecycle(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	p := sprites.New()
-	if err := p.ConfigureWithOptions(token,
-		spritesdk.WithBaseURL(srv.URL),
-		spritesdk.WithDisableControl(),
-	); err != nil {
+	if err := p.ConfigureWithOptions(token, srv.URL, spritesdk.WithDisableControl()); err != nil {
 		t.Fatalf("configure: %v", err)
 	}
 
@@ -170,10 +155,7 @@ func TestHTTPErrorRedactsToken(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	p := sprites.New()
-	if err := p.ConfigureWithOptions(token,
-		spritesdk.WithBaseURL(srv.URL),
-		spritesdk.WithDisableControl(),
-	); err != nil {
+	if err := p.ConfigureWithOptions(token, srv.URL, spritesdk.WithDisableControl()); err != nil {
 		t.Fatalf("configure: %v", err)
 	}
 

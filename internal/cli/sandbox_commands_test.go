@@ -24,8 +24,16 @@ type fakeProvider struct {
 	createID       sandbox.ID
 	lastCreate     sandbox.Spec
 	list           []sandbox.Info
+	detail         sandbox.Detail
+	inspectErr     error
+	restarted      sandbox.ID
+	restartErr     error
+	upgraded       sandbox.ID
+	upgradeErr     error
 	lastExec       sandbox.ExecOptions
 	destroyed      sandbox.ID
+	destroyedIDs   []sandbox.ID
+	destroyErr     error
 	execErr        error
 }
 
@@ -51,6 +59,26 @@ func (f *fakeProvider) List(context.Context) ([]sandbox.Info, error) {
 	return f.list, nil
 }
 
+func (f *fakeProvider) Inspect(_ context.Context, id sandbox.ID) (sandbox.Detail, error) {
+	if f.inspectErr != nil {
+		return sandbox.Detail{}, f.inspectErr
+	}
+	if f.detail.ID != "" {
+		return f.detail, nil
+	}
+	return sandbox.Detail{ID: id, Provider: f.name, Status: "warm"}, nil
+}
+
+func (f *fakeProvider) Restart(_ context.Context, id sandbox.ID) error {
+	f.restarted = id
+	return f.restartErr
+}
+
+func (f *fakeProvider) Upgrade(_ context.Context, id sandbox.ID) error {
+	f.upgraded = id
+	return f.upgradeErr
+}
+
 func (f *fakeProvider) Exec(_ context.Context, _ sandbox.ID, opts sandbox.ExecOptions) error {
 	f.lastExec = opts
 	return f.execErr
@@ -58,7 +86,8 @@ func (f *fakeProvider) Exec(_ context.Context, _ sandbox.ID, opts sandbox.ExecOp
 
 func (f *fakeProvider) Destroy(_ context.Context, id sandbox.ID) error {
 	f.destroyed = id
-	return nil
+	f.destroyedIDs = append(f.destroyedIDs, id)
+	return f.destroyErr
 }
 
 func spritesRegistry(t *testing.T, p sandbox.Provider) *registry.Registry {
@@ -95,6 +124,113 @@ func TestCreatePrintsName(t *testing.T) {
 	}
 }
 
+func TestCreateInteractiveForm(t *testing.T) {
+	fp := &fakeProvider{name: testSpritesName, createID: testBoxName}
+	reg := spritesRegistry(t, fp)
+	cmd := cli.NewRootCmd(reg)
+	out := new(bytes.Buffer)
+	errOut := new(bytes.Buffer)
+	cmd.SetOut(out)
+	cmd.SetErr(errOut)
+	cmd.SetIn(strings.NewReader("demo\n1\ny\n"))
+	cmd.SetArgs([]string{testCmdCreate})
+	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if fp.lastCreate.Name != "demo" || !fp.lastCreate.Running {
+		t.Fatalf("create = %+v", fp.lastCreate)
+	}
+	if fp.configureToken != "tok" {
+		t.Fatalf("token = %q", fp.configureToken)
+	}
+}
+
+func TestCreateRunningSetsSpec(t *testing.T) {
+	const spriteURL = "https://my-box-bpcxj.sprites.app"
+	fp := &fakeProvider{
+		name:     testSpritesName,
+		createID: testBoxName,
+		detail:   sandbox.Detail{ID: testBoxName, URL: spriteURL},
+	}
+	reg := spritesRegistry(t, fp)
+	cmd := cli.NewRootCmd(reg)
+	out := new(bytes.Buffer)
+	cmd.SetOut(out)
+	cmd.SetErr(new(bytes.Buffer))
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdCreate, testBoxName, "--running"})
+	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if !fp.lastCreate.Running {
+		t.Fatalf("Running = false, want true")
+	}
+	got := out.String()
+	if !strings.Contains(got, "stay running for 1 hour") || !strings.Contains(got, spriteURL) {
+		t.Fatalf("output = %q", got)
+	}
+}
+
+func TestCreateWithoutRunningFlag(t *testing.T) {
+	fp := &fakeProvider{name: testSpritesName, createID: testBoxName}
+	reg := spritesRegistry(t, fp)
+	cmd := cli.NewRootCmd(reg)
+	out := new(bytes.Buffer)
+	cmd.SetOut(out)
+	cmd.SetErr(new(bytes.Buffer))
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdCreate, testBoxName})
+	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if fp.lastCreate.Running {
+		t.Fatal("Running should be false by default")
+	}
+	if strings.Contains(out.String(), "stay running") {
+		t.Fatalf("output = %q", out.String())
+	}
+}
+
+func TestCreateAliasNew(t *testing.T) {
+	fp := &fakeProvider{name: testSpritesName, createID: testBoxName}
+	reg := spritesRegistry(t, fp)
+	cmd := cli.NewRootCmd(reg)
+	out := new(bytes.Buffer)
+	cmd.SetOut(out)
+	cmd.SetErr(new(bytes.Buffer))
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, "new", testBoxName})
+	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if fp.lastCreate.Name != testBoxName {
+		t.Fatalf("created = %q", fp.lastCreate.Name)
+	}
+}
+
+func TestListAliasLs(t *testing.T) {
+	fp := &fakeProvider{name: testSpritesName}
+	reg := spritesRegistry(t, fp)
+	cmd := cli.NewRootCmd(reg)
+	out := new(bytes.Buffer)
+	cmd.SetOut(out)
+	cmd.SetErr(new(bytes.Buffer))
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, "ls"})
+	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if !strings.Contains(out.String(), "no sandboxes created") {
+		t.Fatalf("output = %q", out.String())
+	}
+}
+
 func TestCreateNoSpinnerOnNonTTYStderr(t *testing.T) {
 	fp := &fakeProvider{name: testSpritesName, createID: testBoxName}
 	reg := spritesRegistry(t, fp)
@@ -118,8 +254,8 @@ func TestListFormatsOutput(t *testing.T) {
 	fp := &fakeProvider{
 		name: testSpritesName,
 		list: []sandbox.Info{
-			{ID: "a", Status: "cold"},
-			{ID: "b", Status: "warm"},
+			{ID: "a", Status: "cold", Provider: testSpritesName},
+			{ID: "b", Status: "warm", Provider: testSpritesName},
 		},
 	}
 	reg := spritesRegistry(t, fp)
@@ -133,9 +269,27 @@ func TestListFormatsOutput(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
-	want := "name\tstatus\tversion\tlabels\na\tcold\t\t\nb\twarm\t\t\n"
+	want := "name\tstatus\tprovider\tlabels\na\tcold\tsprites\t\nb\twarm\tsprites\t\n"
 	if out.String() != want {
 		t.Fatalf("output = %q, want %q", out.String(), want)
+	}
+}
+
+func TestListEmptyPrintsMessage(t *testing.T) {
+	fp := &fakeProvider{name: testSpritesName}
+	reg := spritesRegistry(t, fp)
+	cmd := cli.NewRootCmd(reg)
+	out := new(bytes.Buffer)
+	cmd.SetOut(out)
+	cmd.SetErr(new(bytes.Buffer))
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, "list"})
+	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if out.String() != "no sandboxes created\n" {
+		t.Fatalf("output = %q", out.String())
 	}
 }
 
@@ -162,13 +316,15 @@ func TestExecWithArgsNoTTY(t *testing.T) {
 func TestDestroyCommands(t *testing.T) {
 	const sandboxName = "gone"
 
-	for _, sub := range []string{"destroy", "rm"} {
+	for _, sub := range []string{testCmdDestroy, "rm"} {
 		t.Run(sub, func(t *testing.T) {
 			fp := &fakeProvider{name: testSpritesName}
 			reg := spritesRegistry(t, fp)
 			cmd := cli.NewRootCmd(reg)
-			cmd.SetOut(new(bytes.Buffer))
+			out := new(bytes.Buffer)
+			cmd.SetOut(out)
 			cmd.SetErr(new(bytes.Buffer))
+			cmd.SetIn(strings.NewReader("y\n"))
 			cmd.SetArgs([]string{testProviderFlag, testSpritesName, sub, sandboxName})
 			t.Setenv("SBOX_SPRITES_TOKEN", "tok")
 
@@ -178,7 +334,309 @@ func TestDestroyCommands(t *testing.T) {
 			if fp.destroyed != sandboxName {
 				t.Fatalf("destroyed = %q", fp.destroyed)
 			}
+			if !strings.Contains(out.String(), "destroyed") || !strings.Contains(out.String(), sandboxName) {
+				t.Fatalf("output = %q", out.String())
+			}
 		})
+	}
+}
+
+func TestDestroyNoSkipsProvider(t *testing.T) {
+	fp := &fakeProvider{name: testSpritesName}
+	reg := spritesRegistry(t, fp)
+	cmd := cli.NewRootCmd(reg)
+	out := new(bytes.Buffer)
+	cmd.SetOut(out)
+	cmd.SetErr(new(bytes.Buffer))
+	cmd.SetIn(strings.NewReader("n\n"))
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdDestroy, "gone"})
+	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if fp.destroyed != "" {
+		t.Fatalf("destroyed = %q", fp.destroyed)
+	}
+	if !strings.Contains(out.String(), "cancelled") {
+		t.Fatalf("output = %q", out.String())
+	}
+}
+
+func TestDestroyAll(t *testing.T) {
+	fp := &fakeProvider{
+		name: testSpritesName,
+		list: []sandbox.Info{{ID: "a"}, {ID: "b"}},
+	}
+	reg := spritesRegistry(t, fp)
+	cmd := cli.NewRootCmd(reg)
+	out := new(bytes.Buffer)
+	cmd.SetOut(out)
+	cmd.SetErr(new(bytes.Buffer))
+	cmd.SetIn(strings.NewReader("yes\n"))
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdDestroy, "--all"})
+	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if len(fp.destroyedIDs) != 2 || fp.destroyedIDs[0] != "a" || fp.destroyedIDs[1] != "b" {
+		t.Fatalf("destroyed = %v", fp.destroyedIDs)
+	}
+	got := out.String()
+	if !strings.Contains(got, "2 sandboxes were destroyed") || !strings.Contains(got, "  a") || !strings.Contains(got, "  b") {
+		t.Fatalf("output = %q", got)
+	}
+}
+
+func TestDestroyChooseFromList(t *testing.T) {
+	fp := &fakeProvider{
+		name: testSpritesName,
+		list: []sandbox.Info{{ID: "a", Status: "cold"}, {ID: "b", Status: "warm"}},
+	}
+	reg := spritesRegistry(t, fp)
+	cmd := cli.NewRootCmd(reg)
+	out := new(bytes.Buffer)
+	errOut := new(bytes.Buffer)
+	cmd.SetOut(out)
+	cmd.SetErr(errOut)
+	cmd.SetIn(strings.NewReader("2\ny\n"))
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdDestroy})
+	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if fp.destroyed != "b" {
+		t.Fatalf("destroyed = %q", fp.destroyed)
+	}
+	if !strings.Contains(errOut.String(), "a") || !strings.Contains(errOut.String(), "b") {
+		t.Fatalf("choices = %q", errOut.String())
+	}
+	if !strings.Contains(out.String(), "sandbox b was destroyed") {
+		t.Fatalf("output = %q", out.String())
+	}
+}
+
+func TestDestroyAllEmpty(t *testing.T) {
+	fp := &fakeProvider{name: testSpritesName}
+	reg := spritesRegistry(t, fp)
+	cmd := cli.NewRootCmd(reg)
+	out := new(bytes.Buffer)
+	cmd.SetOut(out)
+	cmd.SetErr(new(bytes.Buffer))
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdDestroy, "--all"})
+	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if fp.destroyed != "" {
+		t.Fatalf("destroyed = %q", fp.destroyed)
+	}
+	if !strings.Contains(out.String(), "no sandboxes to destroy") {
+		t.Fatalf("output = %q", out.String())
+	}
+}
+
+func TestRestartCancelledWithoutConfirm(t *testing.T) {
+	fp := &fakeProvider{name: testSpritesName}
+	reg := spritesRegistry(t, fp)
+	cmd := cli.NewRootCmd(reg)
+	out := new(bytes.Buffer)
+	cmd.SetOut(out)
+	cmd.SetErr(new(bytes.Buffer))
+	cmd.SetIn(strings.NewReader("n\n"))
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdRestart, testBoxName})
+	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if fp.restarted != "" {
+		t.Fatalf("restarted = %q", fp.restarted)
+	}
+	if !strings.Contains(out.String(), "cancelled") {
+		t.Fatalf("output = %q", out.String())
+	}
+}
+
+func TestRestartWithConfirm(t *testing.T) {
+	fp := &fakeProvider{name: testSpritesName}
+	reg := spritesRegistry(t, fp)
+	cmd := cli.NewRootCmd(reg)
+	out := new(bytes.Buffer)
+	cmd.SetOut(out)
+	cmd.SetErr(new(bytes.Buffer))
+	cmd.SetIn(strings.NewReader("y\n"))
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdRestart, testBoxName})
+	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if fp.restarted != testBoxName {
+		t.Fatalf("restarted = %q", fp.restarted)
+	}
+	if !strings.Contains(out.String(), "restarted") {
+		t.Fatalf("output = %q", out.String())
+	}
+}
+
+func TestRestartWithoutNameChoosesFromList(t *testing.T) {
+	fp := &fakeProvider{
+		name: testSpritesName,
+		list: []sandbox.Info{{ID: "a", Status: "cold"}, {ID: "b", Status: "warm"}},
+	}
+	reg := spritesRegistry(t, fp)
+	cmd := cli.NewRootCmd(reg)
+	out := new(bytes.Buffer)
+	errOut := new(bytes.Buffer)
+	cmd.SetOut(out)
+	cmd.SetErr(errOut)
+	cmd.SetIn(strings.NewReader("2\ny\n"))
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdRestart})
+	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if fp.restarted != "b" {
+		t.Fatalf("restarted = %q", fp.restarted)
+	}
+	if !strings.Contains(errOut.String(), "Restart which sandbox?") {
+		t.Fatalf("choices = %q", errOut.String())
+	}
+	if !strings.Contains(out.String(), "sandbox b was restarted") {
+		t.Fatalf("output = %q", out.String())
+	}
+}
+
+func TestRestartWithoutNameEmpty(t *testing.T) {
+	fp := &fakeProvider{name: testSpritesName}
+	reg := spritesRegistry(t, fp)
+	cmd := cli.NewRootCmd(reg)
+	out := new(bytes.Buffer)
+	cmd.SetOut(out)
+	cmd.SetErr(new(bytes.Buffer))
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdRestart})
+	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if fp.restarted != "" {
+		t.Fatalf("restarted = %q", fp.restarted)
+	}
+	if !strings.Contains(out.String(), "no sandboxes to restart") {
+		t.Fatalf("output = %q", out.String())
+	}
+}
+
+func TestUpgradeCancelledWithoutConfirm(t *testing.T) {
+	fp := &fakeProvider{name: testSpritesName}
+	reg := spritesRegistry(t, fp)
+	cmd := cli.NewRootCmd(reg)
+	out := new(bytes.Buffer)
+	cmd.SetOut(out)
+	cmd.SetErr(new(bytes.Buffer))
+	cmd.SetIn(strings.NewReader("n\n"))
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdUpgrade, testBoxName})
+	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if fp.upgraded != "" {
+		t.Fatalf("upgraded = %q", fp.upgraded)
+	}
+}
+
+func TestUpgradeWithoutNameChoosesFromList(t *testing.T) {
+	fp := &fakeProvider{
+		name: testSpritesName,
+		list: []sandbox.Info{{ID: "a", Status: "cold"}, {ID: "b", Status: "warm"}},
+	}
+	reg := spritesRegistry(t, fp)
+	cmd := cli.NewRootCmd(reg)
+	out := new(bytes.Buffer)
+	errOut := new(bytes.Buffer)
+	cmd.SetOut(out)
+	cmd.SetErr(errOut)
+	cmd.SetIn(strings.NewReader("2\ny\n"))
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdUpgrade})
+	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if fp.upgraded != "b" {
+		t.Fatalf("upgraded = %q", fp.upgraded)
+	}
+	if !strings.Contains(errOut.String(), "Upgrade which sandbox?") {
+		t.Fatalf("choices = %q", errOut.String())
+	}
+	if !strings.Contains(out.String(), "sandbox b was upgraded") {
+		t.Fatalf("output = %q", out.String())
+	}
+}
+
+func TestUpgradeWithoutNameEmpty(t *testing.T) {
+	fp := &fakeProvider{name: testSpritesName}
+	reg := spritesRegistry(t, fp)
+	cmd := cli.NewRootCmd(reg)
+	out := new(bytes.Buffer)
+	cmd.SetOut(out)
+	cmd.SetErr(new(bytes.Buffer))
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdUpgrade})
+	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if fp.upgraded != "" {
+		t.Fatalf("upgraded = %q", fp.upgraded)
+	}
+	if !strings.Contains(out.String(), "no sandboxes to upgrade") {
+		t.Fatalf("output = %q", out.String())
+	}
+}
+
+func TestUpgradeWithConfirm(t *testing.T) {
+	fp := &fakeProvider{name: testSpritesName}
+	reg := spritesRegistry(t, fp)
+	cmd := cli.NewRootCmd(reg)
+	out := new(bytes.Buffer)
+	cmd.SetOut(out)
+	cmd.SetErr(new(bytes.Buffer))
+	cmd.SetIn(strings.NewReader("y\n"))
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdUpgrade, testBoxName})
+	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if fp.upgraded != testBoxName {
+		t.Fatalf("upgraded = %q", fp.upgraded)
+	}
+	if !strings.Contains(out.String(), "upgraded") {
+		t.Fatalf("output = %q", out.String())
+	}
+}
+
+func TestDestroyReturnsProviderError(t *testing.T) {
+	fp := &fakeProvider{name: testSpritesName, destroyErr: errors.New("delete failed")}
+	reg := spritesRegistry(t, fp)
+	cmd := cli.NewRootCmd(reg)
+	cmd.SetOut(new(bytes.Buffer))
+	cmd.SetErr(new(bytes.Buffer))
+	cmd.SetIn(strings.NewReader("y\n"))
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdDestroy, "gone"})
+	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+
+	err := cmd.Execute()
+	if err == nil || !strings.Contains(err.Error(), "delete failed") {
+		t.Fatalf("err = %v", err)
 	}
 }
 

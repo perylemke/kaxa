@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 )
 
 // ErrNotImplemented indicates a provider method is not yet implemented.
@@ -16,8 +17,9 @@ type ID string
 
 // Spec describes a sandbox to create.
 type Spec struct {
-	Name   string
-	Labels []string
+	Name    string
+	Labels  []string
+	Running bool
 }
 
 // Info summarizes an existing sandbox.
@@ -25,8 +27,21 @@ type Info struct {
 	ID       ID
 	Provider string
 	Status   string
-	Version  string
 	Labels   []string
+}
+
+// Detail is a full sandbox record for inspect and TUI detail views.
+type Detail struct {
+	ID           ID
+	Provider     string
+	Status       string
+	Labels       []string
+	SpriteUUID   string
+	Organization string
+	URL          string
+	Auth         string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 // TermSize is terminal dimensions in rows and columns.
@@ -60,6 +75,9 @@ type Provider interface {
 	Name() string
 	Create(ctx context.Context, spec Spec) (ID, error)
 	List(ctx context.Context) ([]Info, error)
+	Inspect(ctx context.Context, id ID) (Detail, error)
+	Restart(ctx context.Context, id ID) error
+	Upgrade(ctx context.Context, id ID) error
 	Exec(ctx context.Context, id ID, opts ExecOptions) error
 	Destroy(ctx context.Context, id ID) error
 }

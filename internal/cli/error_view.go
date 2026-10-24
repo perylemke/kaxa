@@ -62,7 +62,7 @@ func WriteError(w io.Writer, err error) error {
 }
 
 // WriteSuccess renders a confirmation after a command finishes.
-func WriteSuccess(w io.Writer, message string) error {
+func WriteSuccess(w io.Writer, title, message string) error {
 	r := lipgloss.NewRenderer(w)
 	if !colorEnabled(w) {
 		r.SetColorProfile(termenv.Ascii)
@@ -75,7 +75,7 @@ func WriteSuccess(w io.Writer, message string) error {
 	border.BottomLeft = "╰"
 	border.BottomRight = "╯"
 
-	inner := titleStyle.Render("created") + "\n\n  " + message
+	inner := titleStyle.Render(title) + "\n\n  " + message
 	box := lipgloss.NewStyle().
 		Border(border, true).
 		BorderForeground(lipgloss.Color("2")).

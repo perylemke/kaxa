@@ -6,4 +6,5 @@ const (
 	spriteStatusWarm    = "warm"
 	spriteStatusCold    = "cold"
 	spriteJSONFieldName = "name"
+	spritesName         = "sprites"
 )

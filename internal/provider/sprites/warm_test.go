@@ -3,6 +3,7 @@ package sprites
 import (
 	"context"
 	"errors"
+	"io"
 	"testing"
 	"time"
 
@@ -35,6 +36,14 @@ func (s *warmStubClient) GetSprite(_ context.Context, _ string) (*spritesdk.Spri
 
 func (s *warmStubClient) ListEntries(context.Context, string) ([]SpriteListEntry, error) {
 	return nil, nil
+}
+
+func (s *warmStubClient) UpgradeSprite(context.Context, string) error { return nil }
+
+func (s *warmStubClient) RestartSprite(context.Context, string) error { return nil }
+
+func (s *warmStubClient) Run(context.Context, string, []string, io.Writer, io.Writer) error {
+	return nil
 }
 
 func (s *warmStubClient) DestroySprite(context.Context, string) error { return nil }

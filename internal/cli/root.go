@@ -60,12 +60,15 @@ Configure Sprites or Modal credentials via SBOX_* environment variables (see REA
 	}
 
 	root.PersistentFlags().StringVar(&provider, "provider", "", "sandbox provider (sprites, modal)")
+	root.SetUsageTemplate(usageTemplate)
 
 	root.AddCommand(newVersionCmd())
 	root.AddCommand(newCreateCmd(reg))
 	root.AddCommand(newListCmd(reg))
 	root.AddCommand(newExecCmd(reg))
 	root.AddCommand(newDestroyCmd(reg))
+	root.AddCommand(newRestartCmd(reg))
+	root.AddCommand(newUpgradeCmd(reg))
 
 	return root
 }

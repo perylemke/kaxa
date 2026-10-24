@@ -13,23 +13,23 @@ import (
 )
 
 const (
-	listColName    = "Name"
-	listColStatus  = "Status"
-	listColVersion = "Version"
-	listColLabels  = "Labels"
+	listColName     = "Name"
+	listColStatus   = "Status"
+	listColProvider = "Provider"
+	listColLabels   = "Labels"
 )
 
 type listModel struct {
 	table table.Model
 }
 
-func newListModel(infos []sandbox.Info) listModel {
+func newListTable(infos []sandbox.Info, focused bool, height int) table.Model {
 	rows := make([]table.Row, 0, len(infos))
 	for _, info := range infos {
 		rows = append(rows, table.Row{
 			string(info.ID),
 			info.Status,
-			info.Version,
+			info.Provider,
 			joinListLabels(info.Labels),
 		})
 	}
@@ -37,43 +37,44 @@ func newListModel(infos []sandbox.Info) listModel {
 	columns := []table.Column{
 		{Title: listColName, Width: 24},
 		{Title: listColStatus, Width: 12},
-		{Title: listColVersion, Width: 16},
+		{Title: listColProvider, Width: 16},
 		{Title: listColLabels, Width: 32},
 	}
 
-	// Total height = header + all data rows (see bubbles table WithHeight).
-	tableHeight := max(2, len(rows)+2)
+	if height < 2 {
+		height = max(2, len(rows)+2)
+	}
 
 	t := table.New(
 		table.WithColumns(columns),
 		table.WithRows(rows),
-		table.WithFocused(false),
-		table.WithHeight(tableHeight),
+		table.WithFocused(focused),
+		table.WithHeight(height),
 	)
 	s := table.DefaultStyles()
 	s.Header = s.Header.Bold(true)
 	t.SetStyles(s)
 
-	return listModel{table: t}
+	return t
+}
+
+func newListModel(infos []sandbox.Info) listModel {
+	tableHeight := max(2, len(infos)+2)
+	return listModel{table: newListTable(infos, false, tableHeight)}
 }
 
 func (m listModel) View() string {
 	return m.table.View() + "\n"
 }
 
-func writeListTTY(w io.Writer, infos []sandbox.Info) error {
-	_, err := fmt.Fprint(w, newListModel(infos).View())
-	return err
-}
-
 func writeListPlain(w io.Writer, infos []sandbox.Info) error {
-	header := strings.Join([]string{"name", "status", "version", "labels"}, "\t")
+	header := strings.Join([]string{"name", "status", "provider", "labels"}, "\t")
 	if _, err := fmt.Fprintln(w, header); err != nil {
 		return err
 	}
 	for _, info := range infos {
 		labels := joinListLabels(info.Labels)
-		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", info.ID, info.Status, info.Version, labels); err != nil {
+		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", info.ID, info.Status, info.Provider, labels); err != nil {
 			return err
 		}
 	}

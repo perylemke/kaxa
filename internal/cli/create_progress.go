@@ -12,18 +12,23 @@ import (
 )
 
 func runCreateWithSpinner(ctx context.Context, errOut io.Writer, name string, create func(context.Context) (sandbox.ID, error)) (sandbox.ID, error) {
+	var id sandbox.ID
+	err := runTaskWithSpinner(ctx, errOut, "creating "+name+"…", func(ctx context.Context) error {
+		var createErr error
+		id, createErr = create(ctx)
+		return createErr
+	})
+	return id, err
+}
+
+func runTaskWithSpinner(ctx context.Context, errOut io.Writer, label string, task func(context.Context) error) error {
 	if !listOutputIsTTY(errOut) {
-		return create(ctx)
+		return task(ctx)
 	}
 
-	type result struct {
-		id  sandbox.ID
-		err error
-	}
-	done := make(chan result, 1)
+	done := make(chan error, 1)
 	go func() {
-		id, err := create(ctx)
-		done <- result{id: id, err: err}
+		done <- task(ctx)
 	}()
 
 	frames := spinner.Line.Frames
@@ -41,17 +46,17 @@ func runCreateWithSpinner(ctx context.Context, errOut io.Writer, name string, cr
 
 	for {
 		select {
-		case res := <-done:
+		case err := <-done:
 			clearLine()
-			return res.id, res.err
+			return err
 		case <-ctx.Done():
 			clearLine()
-			return "", ctx.Err()
+			return ctx.Err()
 		case <-ticker.C:
 			if len(frames) == 0 {
 				continue
 			}
-			_, _ = fmt.Fprintf(errOut, "\r%s creating %s…", frames[frame], name)
+			_, _ = fmt.Fprintf(errOut, "\r%s %s", frames[frame], label)
 			frame = (frame + 1) % len(frames)
 		}
 	}
