@@ -37,7 +37,7 @@ func TestLoadFlagOverridesEnv(t *testing.T) {
 
 func TestLoadFromEnv(t *testing.T) {
 	reg := testRegistry(t)
-	const token = "sprites-env-token"
+	const token = "sprites-env-token" // #nosec G101 -- test fixture, not a real credential
 	t.Setenv("SBX_DEFAULT_PROVIDER", "sprites")
 	t.Setenv("SBX_SPRITES_TOKEN", token)
 	t.Setenv("SBX_MODAL_TOKEN_ID", "modal-id")
