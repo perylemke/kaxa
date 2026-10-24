@@ -71,6 +71,10 @@ go test -race -count=1 -tags=e2e ./test/e2e/...
 go test -race -count=1 -tags=acceptance ./test/acceptance/...
 ```
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Security reports: [SECURITY.md](SECURITY.md).
+
 ## License
 
 Apache License 2.0 — see [LICENSE](LICENSE).
