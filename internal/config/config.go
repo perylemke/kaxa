@@ -1,65 +1,59 @@
-// Package config loads sbx settings from flags, environment, and files.
+// Package config loads sbx settings from environment variables and CLI flags.
 package config
 
 import (
-	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
-
-	"github.com/spf13/viper"
 
 	"github.com/perylemke/sbx/internal/registry"
 )
 
+const (
+	envDefaultProvider  = "SBX_DEFAULT_PROVIDER"
+	envSpritesToken     = "SBX_SPRITES_TOKEN"      // #nosec G101 -- env var name, not a credential value
+	envModalTokenID     = "SBX_MODAL_TOKEN_ID"     // #nosec G101 -- env var name, not a credential value
+	envModalTokenSecret = "SBX_MODAL_TOKEN_SECRET" // #nosec G101 -- env var name, not a credential value
+)
+
 // Config holds resolved CLI settings (secrets are never logged via String).
 type Config struct {
-	Provider string        `mapstructure:"provider"`
-	Sprites  SpritesConfig `mapstructure:"sprites"`
-	Modal    ModalConfig   `mapstructure:"modal"`
+	Provider string
+	Sprites  SpritesConfig
+	Modal    ModalConfig
 }
 
 // SpritesConfig holds Fly.io Sprites credentials.
 type SpritesConfig struct {
-	Token string `mapstructure:"token"`
+	Token string
 }
 
 // ModalConfig holds Modal API credentials.
 type ModalConfig struct {
-	TokenID     string `mapstructure:"token_id"`
-	TokenSecret string `mapstructure:"token_secret"`
+	TokenID     string
+	TokenSecret string
 }
 
 // LoadOptions are flag overrides passed from the CLI.
 type LoadOptions struct {
-	ConfigPath string
-	Provider   string
+	Provider string
 }
 
-// Load reads configuration from file, environment, and flags.
+// Load reads configuration from environment variables and applies flag overrides.
 func Load(opts LoadOptions, reg *registry.Registry) (Config, error) {
-	v := viper.New()
-	v.SetEnvPrefix("SBX")
-	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	v.AutomaticEnv()
-
-	v.SetDefault("provider", "")
-	v.SetDefault("sprites.token", "")
-	v.SetDefault("modal.token_id", "")
-	v.SetDefault("modal.token_secret", "")
-
-	if err := readConfigFile(v, opts.ConfigPath); err != nil {
-		return Config{}, err
+	cfg := Config{
+		Provider: os.Getenv(envDefaultProvider),
+		Sprites: SpritesConfig{
+			Token: os.Getenv(envSpritesToken),
+		},
+		Modal: ModalConfig{
+			TokenID:     os.Getenv(envModalTokenID),
+			TokenSecret: os.Getenv(envModalTokenSecret),
+		},
 	}
 
 	if opts.Provider != "" {
-		v.Set("provider", opts.Provider)
-	}
-
-	var cfg Config
-	if err := v.Unmarshal(&cfg); err != nil {
-		return Config{}, fmt.Errorf("unmarshal config: %w", err)
+		cfg.Provider = opts.Provider
 	}
 
 	if err := Validate(&cfg, reg); err != nil {
@@ -78,50 +72,4 @@ func Validate(cfg *Config, reg *registry.Registry) error {
 		return fmt.Errorf("unknown provider %q (supported: %s)", cfg.Provider, strings.Join(reg.Names(), ", "))
 	}
 	return nil
-}
-
-func readConfigFile(v *viper.Viper, explicitPath string) error {
-	if explicitPath != "" {
-		if _, err := os.Stat(explicitPath); err != nil {
-			if os.IsNotExist(err) {
-				return fmt.Errorf("config file not found: %s", explicitPath)
-			}
-			return fmt.Errorf("config file: %w", err)
-		}
-		v.SetConfigFile(explicitPath)
-		if err := v.ReadInConfig(); err != nil {
-			return fmt.Errorf("read config: %w", err)
-		}
-		return nil
-	}
-
-	for _, dir := range searchDirs() {
-		path := filepath.Join(dir, "config.yaml")
-		if _, err := os.Stat(path); err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
-			return fmt.Errorf("config file: %w", err)
-		}
-		v.SetConfigFile(path)
-		if err := v.ReadInConfig(); err != nil {
-			if _, ok := errors.AsType[viper.ConfigFileNotFoundError](err); ok {
-				continue
-			}
-			return fmt.Errorf("read config: %w", err)
-		}
-		return nil
-	}
-	return nil
-}
-
-func searchDirs() []string {
-	var dirs []string
-	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-		dirs = append(dirs, filepath.Join(xdg, "sbx"))
-	}
-	if home, err := os.UserHomeDir(); err == nil {
-		dirs = append(dirs, filepath.Join(home, ".config", "sbx"))
-	}
-	return dirs
 }

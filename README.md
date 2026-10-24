@@ -19,24 +19,18 @@ go install ./cmd/sbx
 
 ## Configuration
 
-Configuration is layered (highest priority first):
+Configuration is loaded from environment variables. CLI flags override environment when set (highest priority first):
 
-1. CLI flags (`--provider`, `--config`)
-2. Environment variables with prefix `SBX_` (dots become underscores, e.g. `SBX_SPRITES_TOKEN`)
-3. Config file
+1. CLI flags (`--provider`)
+2. Environment variables with prefix `SBX_`
 
-Default config file locations (first existing file wins):
-
-- `$XDG_CONFIG_HOME/sbx/config.yaml`
-- `$HOME/.config/sbx/config.yaml`
-
-See [config.example.yaml](config.example.yaml). Never commit real tokens.
+Never commit real tokens.
 
 ### Environment variables
 
 | Variable | Description |
 | --- | --- |
-| `SBX_PROVIDER` | Default provider (`sprites` or `modal`) |
+| `SBX_DEFAULT_PROVIDER` | Default provider (`sprites` or `modal`) |
 | `SBX_SPRITES_TOKEN` | Sprites API token |
 | `SBX_MODAL_TOKEN_ID` | Modal token ID |
 | `SBX_MODAL_TOKEN_SECRET` | Modal token secret |

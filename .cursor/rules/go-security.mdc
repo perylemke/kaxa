@@ -7,7 +7,6 @@ alwaysApply: false
 # Security
 
 - Never log, print, or include tokens in error messages (`sprites.token`, `modal.token_id`, `modal.token_secret`).
-- Example config files must use empty placeholders, not real credentials.
 - Do not execute user input via shell (`sh -c`); when exec is implemented, pass argv slices only.
-- Prefer env and config file for secrets; avoid long-lived secrets in command-line flags.
-- Validate provider names and paths before use; reject traversal in explicit `--config` paths when validating existence.
+- Store secrets in environment variables only; avoid long-lived secrets in command-line flags.
+- Validate provider names before use.

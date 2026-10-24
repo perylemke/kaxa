@@ -24,7 +24,6 @@ func Execute(reg *registry.Registry) int {
 
 // NewRootCmd builds the sbx CLI root command.
 func NewRootCmd(reg *registry.Registry) *cobra.Command {
-	var configPath string
 	var provider string
 
 	root := &cobra.Command{
@@ -35,8 +34,7 @@ sbx aggregates sandbox providers behind one CLI.
 
 Supported providers: ` + strings.Join(reg.Names(), ", ") + `.
 
-Configure Sprites or Modal credentials via config file or SBX_* environment variables.
-See config.example.yaml in the repository root.`),
+Configure Sprites or Modal credentials via SBX_* environment variables (see README).`),
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
@@ -44,8 +42,7 @@ See config.example.yaml in the repository root.`),
 				return nil
 			}
 			_, err := config.Load(config.LoadOptions{
-				ConfigPath: configPath,
-				Provider:   provider,
+				Provider: provider,
 			}, reg)
 			return err
 		},
@@ -54,7 +51,6 @@ See config.example.yaml in the repository root.`),
 		},
 	}
 
-	root.PersistentFlags().StringVar(&configPath, "config", "", "config file path")
 	root.PersistentFlags().StringVar(&provider, "provider", "", "sandbox provider (sprites, modal)")
 
 	root.AddCommand(newVersionCmd())
