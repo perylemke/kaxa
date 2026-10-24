@@ -3,7 +3,6 @@ package modal
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/perylemke/sbox/internal/sandbox"
 )
@@ -23,20 +22,20 @@ func (p *Provider) Name() string {
 
 // Create is not implemented yet.
 func (p *Provider) Create(_ context.Context, _ sandbox.Spec) (sandbox.ID, error) {
-	return "", fmt.Errorf("%w: modal create", sandbox.ErrNotImplemented)
+	return "", errNotImplemented("create")
 }
 
 // List is not implemented yet.
 func (p *Provider) List(_ context.Context) ([]sandbox.Info, error) {
-	return nil, fmt.Errorf("%w: modal list", sandbox.ErrNotImplemented)
+	return nil, errNotImplemented("list")
 }
 
 // Exec is not implemented yet.
 func (p *Provider) Exec(_ context.Context, _ sandbox.ID, _ sandbox.ExecOptions) error {
-	return fmt.Errorf("%w: modal exec", sandbox.ErrNotImplemented)
+	return errNotImplemented("exec")
 }
 
 // Destroy is not implemented yet.
 func (p *Provider) Destroy(_ context.Context, _ sandbox.ID) error {
-	return fmt.Errorf("%w: modal destroy", sandbox.ErrNotImplemented)
+	return errNotImplemented("destroy")
 }

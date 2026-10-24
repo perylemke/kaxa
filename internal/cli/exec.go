@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"os"
 	"os/signal"
 	"syscall"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/perylemke/sbox/internal/registry"
 	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/sbox/internal/usererr"
 )
 
 func newExecCmd(reg *registry.Registry) *cobra.Command {
@@ -62,7 +62,10 @@ func newExecCmd(reg *registry.Registry) *cobra.Command {
 
 func wrapInteractive(ctx context.Context, opts *sandbox.ExecOptions) (context.Context, func(), error) {
 	if !term.IsTerminal(int(os.Stdin.Fd())) {
-		return ctx, func() {}, errors.New("interactive shell requires a terminal (run from a TTY)")
+		return ctx, func() {}, usererr.New(
+			"interactive shell requires a terminal",
+			"pass a command, or run sbox exec from a terminal",
+		)
 	}
 
 	fd := int(os.Stdin.Fd())

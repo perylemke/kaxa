@@ -21,7 +21,7 @@ func main() {
 		{"modal", func() error { return reg.Register(modal.New()) }},
 	} {
 		if err := p.reg(); err != nil {
-			fmt.Fprintf(os.Stderr, "register %s: %v\n", p.name, err)
+			_ = cli.WriteError(os.Stderr, fmt.Errorf("register %s: %w", p.name, err))
 			os.Exit(1)
 		}
 	}

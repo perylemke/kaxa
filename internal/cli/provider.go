@@ -1,13 +1,13 @@
 package cli
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/spf13/cobra"
 
 	"github.com/perylemke/sbox/internal/registry"
 	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/sbox/internal/usererr"
 )
 
 type tokenConfigurer interface {
@@ -20,7 +20,10 @@ func providerFromCmd(cmd *cobra.Command, reg *registry.Registry) (sandbox.Provid
 		return nil, err
 	}
 	if cfg.Provider == "" {
-		return nil, errors.New("missing provider: pass --provider or set SBOX_DEFAULT_PROVIDER")
+		return nil, usererr.New(
+			"missing sandbox provider",
+			"pass --provider or set SBOX_DEFAULT_PROVIDER",
+		)
 	}
 
 	p, err := reg.Get(cfg.Provider)

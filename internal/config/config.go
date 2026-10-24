@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/perylemke/sbox/internal/registry"
+	"github.com/perylemke/sbox/internal/usererr"
 )
 
 const (
@@ -69,7 +70,10 @@ func Validate(cfg *Config, reg *registry.Registry) error {
 		return nil
 	}
 	if !reg.Has(cfg.Provider) {
-		return fmt.Errorf("unknown provider %q (supported: %s)", cfg.Provider, strings.Join(reg.Names(), ", "))
+		return usererr.New(
+			fmt.Sprintf("unknown provider %q", cfg.Provider),
+			"supported: "+strings.Join(reg.Names(), ", "),
+		)
 	}
 	return nil
 }

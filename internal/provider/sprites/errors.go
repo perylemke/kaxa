@@ -3,10 +3,16 @@ package sprites
 import (
 	"errors"
 	"strings"
+
+	"github.com/perylemke/sbox/internal/usererr"
 )
 
 // ErrMissingToken indicates Sprites credentials were not configured.
-var ErrMissingToken = errors.New("sprites: missing API token (set SBOX_SPRITES_TOKEN)")
+var ErrMissingToken = errors.New("sprites: missing API token")
+
+func missingTokenErr() error {
+	return usererr.Wrap(ErrMissingToken, "missing Sprites API token", "set SBOX_SPRITES_TOKEN")
+}
 
 func redactErr(err error, token string) error {
 	if err == nil {

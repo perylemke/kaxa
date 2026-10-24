@@ -3,7 +3,6 @@ package cli
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"strings"
 
@@ -21,7 +20,7 @@ func Execute(reg *registry.Registry) int {
 		if exitErr, ok := errors.AsType[*sandbox.ExitError](err); ok {
 			return remoteExitCode(exitErr.Code)
 		}
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		_ = WriteError(os.Stderr, err)
 		return 1
 	}
 	return 0

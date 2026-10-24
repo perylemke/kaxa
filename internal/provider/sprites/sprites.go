@@ -26,7 +26,7 @@ func New() *Provider {
 // Configure sets the Sprites API token and builds the SDK client.
 func (p *Provider) Configure(token string) error {
 	if token == "" {
-		return ErrMissingToken
+		return missingTokenErr()
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -163,7 +163,7 @@ func NewWithClient(client sdkClient, token string) *Provider {
 // ConfigureWithOptions sets token and SDK options (tests against httptest).
 func (p *Provider) ConfigureWithOptions(token string, opts ...spritesdk.Option) error {
 	if token == "" {
-		return ErrMissingToken
+		return missingTokenErr()
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
