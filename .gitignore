@@ -29,6 +29,9 @@ go.work.sum
 dist/
 bin/
 
+# Security scan reports
+*.sarif
+
 # env file
 .env
 

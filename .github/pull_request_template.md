@@ -12,6 +12,7 @@
 - [ ] Acceptance: `go test -race -count=1 -tags=acceptance ./test/acceptance/...`
 - [ ] Lint: `golangci-lint run ./...`
 - [ ] Vulnerabilities: `govulncheck ./...`
+- [ ] SAST: `make gosec`
 
 ## Security
 
