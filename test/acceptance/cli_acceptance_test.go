@@ -21,14 +21,11 @@ func TestHelpMentionsProviders(t *testing.T) {
 
 func TestUnknownProviderNonZeroExit(t *testing.T) {
 	bin := buildBinary(t)
-	dir := t.TempDir()
-	cfg := filepath.Join(dir, "config.yaml")
 	const secret = "acceptance-test-secret-token"
-	if err := os.WriteFile(cfg, []byte("provider: modal\nsprites:\n  token: "+secret+"\n"), 0o600); err != nil {
-		t.Fatalf("write config: %v", err)
-	}
 
-	res := run(t, bin, "--config", cfg, "--provider", "unknown")
+	res := runWithEnv(t, bin, map[string]string{
+		"SBX_SPRITES_TOKEN": secret,
+	}, "--provider", "unknown")
 	if res.exitCode == 0 {
 		t.Fatal("expected non-zero exit for unknown provider")
 	}
@@ -73,6 +70,32 @@ type runResult struct {
 	stdout   string
 	stderr   string
 	exitCode int
+}
+
+func runWithEnv(t *testing.T, bin string, env map[string]string, args ...string) runResult {
+	t.Helper()
+	cmd := exec.Command(bin, args...)
+	cmd.Env = os.Environ()
+	for k, v := range env {
+		cmd.Env = append(cmd.Env, k+"="+v)
+	}
+	var stdout, stderr strings.Builder
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	exitCode := 0
+	if err != nil {
+		if ee, ok := err.(*exec.ExitError); ok {
+			exitCode = ee.ExitCode()
+		} else {
+			t.Fatalf("run %v: %v", args, err)
+		}
+	}
+	return runResult{
+		stdout:   stdout.String(),
+		stderr:   stderr.String(),
+		exitCode: exitCode,
+	}
 }
 
 func run(t *testing.T, bin string, args ...string) runResult {

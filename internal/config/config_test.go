@@ -1,8 +1,7 @@
 package config_test
 
 import (
-	"os"
-	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/perylemke/sbx/internal/config"
@@ -25,18 +24,9 @@ func testRegistry(t *testing.T) *registry.Registry {
 
 func TestLoadFlagOverridesEnv(t *testing.T) {
 	reg := testRegistry(t)
-	dir := t.TempDir()
-	cfgPath := filepath.Join(dir, "config.yaml")
-	if err := os.WriteFile(cfgPath, []byte("provider: modal\n"), 0o600); err != nil {
-		t.Fatalf("write config: %v", err)
-	}
+	t.Setenv("SBX_DEFAULT_PROVIDER", "sprites")
 
-	t.Setenv("SBX_PROVIDER", "sprites")
-
-	cfg, err := config.Load(config.LoadOptions{
-		ConfigPath: cfgPath,
-		Provider:   "modal",
-	}, reg)
+	cfg, err := config.Load(config.LoadOptions{Provider: "modal"}, reg)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
@@ -45,22 +35,39 @@ func TestLoadFlagOverridesEnv(t *testing.T) {
 	}
 }
 
-func TestValidateUnknownProvider(t *testing.T) {
-	t.Parallel()
-
+func TestLoadFromEnv(t *testing.T) {
 	reg := testRegistry(t)
+	const token = "sprites-env-token"
+	t.Setenv("SBX_DEFAULT_PROVIDER", "sprites")
+	t.Setenv("SBX_SPRITES_TOKEN", token)
+	t.Setenv("SBX_MODAL_TOKEN_ID", "modal-id")
+	t.Setenv("SBX_MODAL_TOKEN_SECRET", "modal-secret")
+
+	cfg, err := config.Load(config.LoadOptions{}, reg)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.Provider != "sprites" {
+		t.Fatalf("provider = %q, want sprites", cfg.Provider)
+	}
+	if cfg.Sprites.Token != token {
+		t.Fatalf("sprites token = %q, want %q", cfg.Sprites.Token, token)
+	}
+	if cfg.Modal.TokenID != "modal-id" || cfg.Modal.TokenSecret != "modal-secret" {
+		t.Fatalf("modal credentials not loaded from env")
+	}
+}
+
+func TestValidateUnknownProvider(t *testing.T) {
+	reg := testRegistry(t)
+	const secret = "must-not-leak-token"
+	t.Setenv("SBX_SPRITES_TOKEN", secret)
+
 	_, err := config.Load(config.LoadOptions{Provider: "unknown"}, reg)
 	if err == nil {
 		t.Fatal("expected unknown provider error")
 	}
-}
-
-func TestLoadMissingExplicitConfig(t *testing.T) {
-	t.Parallel()
-
-	reg := testRegistry(t)
-	_, err := config.Load(config.LoadOptions{ConfigPath: "/no/such/config.yaml"}, reg)
-	if err == nil {
-		t.Fatal("expected missing config error")
+	if strings.Contains(err.Error(), secret) {
+		t.Fatal("error message must not contain token")
 	}
 }
