@@ -7,14 +7,14 @@ import (
 )
 
 func TestCreateFormAccessibleAnswers(t *testing.T) {
-	in := strings.NewReader("demo\n1\nn\n")
+	in := strings.NewReader(fixtureDemo + "\n1\nn\n")
 	out := new(bytes.Buffer)
 
-	got, err := collectCreateForm(in, out, []string{"modal", "sprites"}, "sprites", false)
+	got, err := collectCreateForm(in, out, []string{"modal", spritesProviderName}, spritesProviderName, false)
 	if err != nil {
 		t.Fatalf("form: %v", err)
 	}
-	if got.Name != "demo" || got.Provider != "modal" || got.Running {
+	if got.Name != fixtureDemo || got.Provider != "modal" || got.Running {
 		t.Fatalf("result = %+v", got)
 	}
 	view := out.String()
@@ -27,11 +27,11 @@ func TestCreateFormAccessibleUsesDefaults(t *testing.T) {
 	in := strings.NewReader("box\n\n\n")
 	out := new(bytes.Buffer)
 
-	got, err := collectCreateForm(in, out, []string{"modal", "sprites"}, "sprites", true)
+	got, err := collectCreateForm(in, out, []string{"modal", spritesProviderName}, spritesProviderName, true)
 	if err != nil {
 		t.Fatalf("form: %v", err)
 	}
-	if got.Name != "box" || got.Provider != "sprites" || !got.Running {
+	if got.Name != "box" || got.Provider != spritesProviderName || !got.Running {
 		t.Fatalf("result = %+v", got)
 	}
 }

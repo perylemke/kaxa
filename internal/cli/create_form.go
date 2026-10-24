@@ -89,7 +89,7 @@ func (o *oneLineReader) Read(p []byte) (int, error) {
 			return 0, err
 		}
 		o.rest = append([]byte(nil), line...)
-		if err != nil && err != bufio.ErrBufferFull {
+		if err != nil && !errors.Is(err, bufio.ErrBufferFull) {
 			n := copy(p, o.rest)
 			o.rest = o.rest[n:]
 			if len(o.rest) == 0 {

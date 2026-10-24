@@ -12,9 +12,9 @@ func TestListModelViewShowsColumnsAndRow(t *testing.T) {
 
 	m := newListModel([]sandbox.Info{
 		{
-			ID:       "demo",
-			Status:   "warm",
-			Provider: "sprites",
+			ID:       fixtureDemo,
+			Status:   fixtureWarm,
+			Provider: spritesProviderName,
 			Labels:   []string{"a", "b"},
 		},
 	})
@@ -26,7 +26,7 @@ func TestListModelViewShowsColumnsAndRow(t *testing.T) {
 			t.Fatalf("view missing column %q: %q", title, plain)
 		}
 	}
-	if !strings.Contains(plain, "demo") || !strings.Contains(plain, "warm") || !strings.Contains(plain, "sprites") {
+	if !strings.Contains(plain, fixtureDemo) || !strings.Contains(plain, fixtureWarm) || !strings.Contains(plain, spritesProviderName) {
 		t.Fatalf("view missing row data: %q", plain)
 	}
 	if !strings.Contains(plain, "a,b") {

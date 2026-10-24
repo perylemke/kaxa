@@ -13,8 +13,8 @@ func TestDestroyCheckTogglesAndConfirms(t *testing.T) {
 	t.Parallel()
 
 	m := newDestroyCheckModel([]sandbox.Info{
-		{ID: "pery", Status: "warm"},
-		{ID: "other", Status: "cold"},
+		{ID: fixturePery, Status: fixtureWarm},
+		{ID: fixtureOther, Status: fixtureCold},
 	})
 	m = press(t, m, tea.KeyMsg{Type: tea.KeySpace})
 	m = press(t, m, tea.KeyMsg{Type: tea.KeyDown})
@@ -25,11 +25,11 @@ func TestDestroyCheckTogglesAndConfirms(t *testing.T) {
 		t.Fatal("expected confirmation")
 	}
 	got := m.selected()
-	if len(got) != 2 || got[0] != "pery" || got[1] != "other" {
+	if len(got) != 2 || got[0] != fixturePery || got[1] != fixtureOther {
 		t.Fatalf("selected = %v", got)
 	}
 	view := m.View()
-	if !strings.Contains(view, "[x] pery") || !strings.Contains(view, "[x] other") {
+	if !strings.Contains(view, "[x] "+fixturePery) || !strings.Contains(view, "[x] "+fixtureOther) {
 		t.Fatalf("view = %q", view)
 	}
 }
@@ -37,7 +37,7 @@ func TestDestroyCheckTogglesAndConfirms(t *testing.T) {
 func TestDestroyCheckCancel(t *testing.T) {
 	t.Parallel()
 
-	m := newDestroyCheckModel([]sandbox.Info{{ID: "pery", Status: "warm"}})
+	m := newDestroyCheckModel([]sandbox.Info{{ID: fixturePery, Status: fixtureWarm}})
 	m = press(t, m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
 	if !m.cancelled || len(m.selected()) != 0 {
 		t.Fatalf("cancelled=%v selected=%v", m.cancelled, m.selected())

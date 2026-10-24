@@ -41,6 +41,7 @@ func formatSpriteAuth(settings *spritesdk.URLSettings) string {
 	return strings.TrimSpace(auth + access)
 }
 
+// Inspect returns the full sprite record.
 func (p *Provider) Inspect(ctx context.Context, id sandbox.ID) (sandbox.Detail, error) {
 	if err := validateName(string(id)); err != nil {
 		return sandbox.Detail{}, err

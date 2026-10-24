@@ -66,7 +66,7 @@ func (f *fakeProvider) Inspect(_ context.Context, id sandbox.ID) (sandbox.Detail
 	if f.detail.ID != "" {
 		return f.detail, nil
 	}
-	return sandbox.Detail{ID: id, Provider: f.name, Status: "warm"}, nil
+	return sandbox.Detail{ID: id, Provider: f.name, Status: testStatusWarm}, nil
 }
 
 func (f *fakeProvider) Restart(_ context.Context, id sandbox.ID) error {
@@ -148,6 +148,9 @@ func TestCreateInteractiveForm(t *testing.T) {
 }
 
 func TestCreateRunningSetsSpec(t *testing.T) {
+	restore := cli.SetOpenBrowserForTest(nil)
+	t.Cleanup(restore)
+
 	const spriteURL = "https://my-box-bpcxj.sprites.app"
 	fp := &fakeProvider{
 		name:     testSpritesName,
@@ -254,8 +257,8 @@ func TestListFormatsOutput(t *testing.T) {
 	fp := &fakeProvider{
 		name: testSpritesName,
 		list: []sandbox.Info{
-			{ID: "a", Status: "cold", Provider: testSpritesName},
-			{ID: "b", Status: "warm", Provider: testSpritesName},
+			{ID: "a", Status: testStatusCold, Provider: testSpritesName},
+			{ID: "b", Status: testStatusWarm, Provider: testSpritesName},
 		},
 	}
 	reg := spritesRegistry(t, fp)
@@ -263,7 +266,7 @@ func TestListFormatsOutput(t *testing.T) {
 	out := new(bytes.Buffer)
 	cmd.SetOut(out)
 	cmd.SetErr(new(bytes.Buffer))
-	cmd.SetArgs([]string{testProviderFlag, testSpritesName, "list"})
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdList})
 	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
@@ -282,7 +285,7 @@ func TestListEmptyPrintsMessage(t *testing.T) {
 	out := new(bytes.Buffer)
 	cmd.SetOut(out)
 	cmd.SetErr(new(bytes.Buffer))
-	cmd.SetArgs([]string{testProviderFlag, testSpritesName, "list"})
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdList})
 	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
@@ -392,7 +395,7 @@ func TestDestroyAll(t *testing.T) {
 func TestDestroyChooseFromList(t *testing.T) {
 	fp := &fakeProvider{
 		name: testSpritesName,
-		list: []sandbox.Info{{ID: "a", Status: "cold"}, {ID: "b", Status: "warm"}},
+		list: []sandbox.Info{{ID: "a", Status: testStatusCold}, {ID: "b", Status: testStatusWarm}},
 	}
 	reg := spritesRegistry(t, fp)
 	cmd := cli.NewRootCmd(reg)
@@ -462,75 +465,21 @@ func TestRestartCancelledWithoutConfirm(t *testing.T) {
 }
 
 func TestRestartWithConfirm(t *testing.T) {
-	fp := &fakeProvider{name: testSpritesName}
-	reg := spritesRegistry(t, fp)
-	cmd := cli.NewRootCmd(reg)
-	out := new(bytes.Buffer)
-	cmd.SetOut(out)
-	cmd.SetErr(new(bytes.Buffer))
-	cmd.SetIn(strings.NewReader("y\n"))
-	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdRestart, testBoxName})
-	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
-
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("execute: %v", err)
-	}
-	if fp.restarted != testBoxName {
-		t.Fatalf("restarted = %q", fp.restarted)
-	}
-	if !strings.Contains(out.String(), "restarted") {
-		t.Fatalf("output = %q", out.String())
-	}
+	testNamedActionConfirm(t, testCmdRestart, "restarted", func(fp *fakeProvider) sandbox.ID {
+		return fp.restarted
+	})
 }
 
 func TestRestartWithoutNameChoosesFromList(t *testing.T) {
-	fp := &fakeProvider{
-		name: testSpritesName,
-		list: []sandbox.Info{{ID: "a", Status: "cold"}, {ID: "b", Status: "warm"}},
-	}
-	reg := spritesRegistry(t, fp)
-	cmd := cli.NewRootCmd(reg)
-	out := new(bytes.Buffer)
-	errOut := new(bytes.Buffer)
-	cmd.SetOut(out)
-	cmd.SetErr(errOut)
-	cmd.SetIn(strings.NewReader("2\ny\n"))
-	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdRestart})
-	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
-
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("execute: %v", err)
-	}
-	if fp.restarted != "b" {
-		t.Fatalf("restarted = %q", fp.restarted)
-	}
-	if !strings.Contains(errOut.String(), "Restart which sandbox?") {
-		t.Fatalf("choices = %q", errOut.String())
-	}
-	if !strings.Contains(out.String(), "sandbox b was restarted") {
-		t.Fatalf("output = %q", out.String())
-	}
+	testActionFromList(t, testCmdRestart, "Restart which sandbox?", "sandbox b was restarted", func(fp *fakeProvider) sandbox.ID {
+		return fp.restarted
+	})
 }
 
 func TestRestartWithoutNameEmpty(t *testing.T) {
-	fp := &fakeProvider{name: testSpritesName}
-	reg := spritesRegistry(t, fp)
-	cmd := cli.NewRootCmd(reg)
-	out := new(bytes.Buffer)
-	cmd.SetOut(out)
-	cmd.SetErr(new(bytes.Buffer))
-	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdRestart})
-	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
-
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("execute: %v", err)
-	}
-	if fp.restarted != "" {
-		t.Fatalf("restarted = %q", fp.restarted)
-	}
-	if !strings.Contains(out.String(), "no sandboxes to restart") {
-		t.Fatalf("output = %q", out.String())
-	}
+	testActionWhenEmpty(t, testCmdRestart, "no sandboxes to restart", func(fp *fakeProvider) sandbox.ID {
+		return fp.restarted
+	})
 }
 
 func TestUpgradeCancelledWithoutConfirm(t *testing.T) {
@@ -553,9 +502,51 @@ func TestUpgradeCancelledWithoutConfirm(t *testing.T) {
 }
 
 func TestUpgradeWithoutNameChoosesFromList(t *testing.T) {
+	testActionFromList(t, testCmdUpgrade, "Upgrade which sandbox?", "sandbox b was upgraded", func(fp *fakeProvider) sandbox.ID {
+		return fp.upgraded
+	})
+}
+
+func TestUpgradeWithoutNameEmpty(t *testing.T) {
+	testActionWhenEmpty(t, testCmdUpgrade, "no sandboxes to upgrade", func(fp *fakeProvider) sandbox.ID {
+		return fp.upgraded
+	})
+}
+
+func TestUpgradeWithConfirm(t *testing.T) {
+	testNamedActionConfirm(t, testCmdUpgrade, "upgraded", func(fp *fakeProvider) sandbox.ID {
+		return fp.upgraded
+	})
+}
+
+func testNamedActionConfirm(t *testing.T, subcmd, needle string, acted func(*fakeProvider) sandbox.ID) {
+	t.Helper()
+	fp := &fakeProvider{name: testSpritesName}
+	reg := spritesRegistry(t, fp)
+	cmd := cli.NewRootCmd(reg)
+	out := new(bytes.Buffer)
+	cmd.SetOut(out)
+	cmd.SetErr(new(bytes.Buffer))
+	cmd.SetIn(strings.NewReader("y\n"))
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, subcmd, testBoxName})
+	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if acted(fp) != testBoxName {
+		t.Fatalf("acted = %q", acted(fp))
+	}
+	if !strings.Contains(out.String(), needle) {
+		t.Fatalf("output = %q", out.String())
+	}
+}
+
+func testActionFromList(t *testing.T, subcmd, prompt, success string, acted func(*fakeProvider) sandbox.ID) {
+	t.Helper()
 	fp := &fakeProvider{
 		name: testSpritesName,
-		list: []sandbox.Info{{ID: "a", Status: "cold"}, {ID: "b", Status: "warm"}},
+		list: []sandbox.Info{{ID: "a", Status: testStatusCold}, {ID: "b", Status: testStatusWarm}},
 	}
 	reg := spritesRegistry(t, fp)
 	cmd := cli.NewRootCmd(reg)
@@ -564,62 +555,41 @@ func TestUpgradeWithoutNameChoosesFromList(t *testing.T) {
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
 	cmd.SetIn(strings.NewReader("2\ny\n"))
-	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdUpgrade})
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, subcmd})
 	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
-	if fp.upgraded != "b" {
-		t.Fatalf("upgraded = %q", fp.upgraded)
+	if acted(fp) != "b" {
+		t.Fatalf("acted = %q", acted(fp))
 	}
-	if !strings.Contains(errOut.String(), "Upgrade which sandbox?") {
+	if !strings.Contains(errOut.String(), prompt) {
 		t.Fatalf("choices = %q", errOut.String())
 	}
-	if !strings.Contains(out.String(), "sandbox b was upgraded") {
+	if !strings.Contains(out.String(), success) {
 		t.Fatalf("output = %q", out.String())
 	}
 }
 
-func TestUpgradeWithoutNameEmpty(t *testing.T) {
+func testActionWhenEmpty(t *testing.T, subcmd, emptyMsg string, acted func(*fakeProvider) sandbox.ID) {
+	t.Helper()
 	fp := &fakeProvider{name: testSpritesName}
 	reg := spritesRegistry(t, fp)
 	cmd := cli.NewRootCmd(reg)
 	out := new(bytes.Buffer)
 	cmd.SetOut(out)
 	cmd.SetErr(new(bytes.Buffer))
-	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdUpgrade})
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, subcmd})
 	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
-	if fp.upgraded != "" {
-		t.Fatalf("upgraded = %q", fp.upgraded)
+	if acted(fp) != "" {
+		t.Fatalf("acted = %q", acted(fp))
 	}
-	if !strings.Contains(out.String(), "no sandboxes to upgrade") {
-		t.Fatalf("output = %q", out.String())
-	}
-}
-
-func TestUpgradeWithConfirm(t *testing.T) {
-	fp := &fakeProvider{name: testSpritesName}
-	reg := spritesRegistry(t, fp)
-	cmd := cli.NewRootCmd(reg)
-	out := new(bytes.Buffer)
-	cmd.SetOut(out)
-	cmd.SetErr(new(bytes.Buffer))
-	cmd.SetIn(strings.NewReader("y\n"))
-	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdUpgrade, testBoxName})
-	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
-
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("execute: %v", err)
-	}
-	if fp.upgraded != testBoxName {
-		t.Fatalf("upgraded = %q", fp.upgraded)
-	}
-	if !strings.Contains(out.String(), "upgraded") {
+	if !strings.Contains(out.String(), emptyMsg) {
 		t.Fatalf("output = %q", out.String())
 	}
 }

@@ -25,7 +25,7 @@ func openBrowserURL(url string) error {
 		name = "xdg-open"
 		args = []string{url}
 	}
-	cmd := exec.Command(name, args...)
+	cmd := exec.Command(name, args...) // #nosec G204 -- launcher is a fixed OS binary; only the URL varies
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("open browser: %w", err)
 	}

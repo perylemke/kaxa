@@ -34,9 +34,10 @@ const (
 	listModeDetail
 )
 
+const keyInterrupt = "ctrl+c"
+
 type listInteractiveModel struct {
-	ctx        context.Context
-	provider   sandbox.Provider
+	inspect    func(sandbox.ID) tea.Cmd
 	infos      []sandbox.Info
 	table      table.Model
 	mode       int
@@ -53,22 +54,20 @@ type detailLoadedMsg struct {
 
 func newListInteractiveModel(ctx context.Context, p sandbox.Provider, infos []sandbox.Info) listInteractiveModel {
 	return listInteractiveModel{
-		ctx:      ctx,
-		provider: p,
-		infos:    infos,
-		table:    newListTable(infos, true, listTableHeight(len(infos))),
-		mode:     listModeTable,
+		inspect: func(id sandbox.ID) tea.Cmd {
+			return inspectCmd(ctx, p, id)
+		},
+		infos: infos,
+		table: newListTable(infos, true, listTableHeight(len(infos))),
+		mode:  listModeTable,
 	}
 }
 
 func listTableHeight(rowCount int) int {
 	const maxRows = 20
-	h := rowCount + 2
-	if h < 4 {
-		h = 4
-	}
+	h := max(rowCount+2, 4)
 	if h > maxRows {
-		h = maxRows
+		return maxRows
 	}
 	return h
 }
@@ -78,73 +77,95 @@ func (m listInteractiveModel) Init() tea.Cmd { return nil }
 func (m listInteractiveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case detailLoadedMsg:
-		m.mode = listModeDetail
-		if msg.err != nil {
-			m.detailErr = msg.err
+		return m.applyDetail(msg), nil
+	case tea.KeyMsg:
+		return m.updateKey(msg)
+	default:
+		return m, nil
+	}
+}
+
+func (m listInteractiveModel) applyDetail(msg detailLoadedMsg) listInteractiveModel {
+	m.mode = listModeDetail
+	m.detailErr = msg.err
+	if msg.err == nil {
+		m.detail = msg.detail
+	}
+	return m
+}
+
+func (m listInteractiveModel) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch m.mode {
+	case listModeTable:
+		return m.updateTableKey(msg)
+	case listModeDetailLoading:
+		if msg.String() == "q" || msg.String() == keyInterrupt {
+			return m, tea.Quit
+		}
+		return m, nil
+	case listModeDetail:
+		return m.updateDetailKey(msg)
+	default:
+		return m, nil
+	}
+}
+
+func (m listInteractiveModel) updateTableKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "enter":
+		if len(m.infos) == 0 {
 			return m, nil
 		}
-		m.detail = msg.detail
+		row := m.table.Cursor()
+		if row < 0 || row >= len(m.infos) {
+			return m, nil
+		}
+		m.mode = listModeDetailLoading
+		return m, m.inspect(m.infos[row].ID)
+	case "q", keyInterrupt:
+		return m, tea.Quit
+	default:
+		var cmd tea.Cmd
+		m.table, cmd = m.table.Update(msg)
+		return m, cmd
+	}
+}
+
+func (m listInteractiveModel) updateDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	id := m.detailID()
+	switch msg.String() {
+	case "esc":
+		m.mode = listModeTable
 		m.detailErr = nil
 		return m, nil
-	case tea.KeyMsg:
-		switch m.mode {
-		case listModeTable:
-			switch msg.String() {
-			case "enter":
-				if len(m.infos) == 0 {
-					return m, nil
-				}
-				row := m.table.Cursor()
-				if row < 0 || row >= len(m.infos) {
-					return m, nil
-				}
-				id := m.infos[row].ID
-				m.mode = listModeDetailLoading
-				return m, inspectCmd(m.ctx, m.provider, id)
-			case "q", "ctrl+c":
-				return m, tea.Quit
-			}
-			var cmd tea.Cmd
-			m.table, cmd = m.table.Update(msg)
-			return m, cmd
-		case listModeDetailLoading:
-			if msg.String() == "q" || msg.String() == "ctrl+c" {
-				return m, tea.Quit
-			}
-			return m, nil
-		case listModeDetail:
-			id := m.detail.ID
-			if m.detailErr != nil && id == "" {
-				if len(m.infos) > 0 {
-					row := m.table.Cursor()
-					if row >= 0 && row < len(m.infos) {
-						id = m.infos[row].ID
-					}
-				}
-			}
-			switch msg.String() {
-			case "esc":
-				m.mode = listModeTable
-				m.detailErr = nil
-				return m, nil
-			case "q", "ctrl+c":
-				return m, tea.Quit
-			case "r":
-				m.postAction = listPostRestart
-				m.postID = id
-				return m, tea.Quit
-			case "u":
-				m.postAction = listPostUpgrade
-				m.postID = id
-				return m, tea.Quit
-			case "d":
-				m.postAction = listPostDestroy
-				m.postID = id
-				return m, tea.Quit
-			}
-		}
+	case "q", keyInterrupt:
+		return m, tea.Quit
+	case "r":
+		m.postAction = listPostRestart
+		m.postID = id
+		return m, tea.Quit
+	case "u":
+		m.postAction = listPostUpgrade
+		m.postID = id
+		return m, tea.Quit
+	case "d":
+		m.postAction = listPostDestroy
+		m.postID = id
+		return m, tea.Quit
+	default:
+		return m, nil
 	}
-	return m, nil
+}
+
+func (m listInteractiveModel) detailID() sandbox.ID {
+	if m.detail.ID != "" || m.detailErr == nil || len(m.infos) == 0 {
+		return m.detail.ID
+	}
+	row := m.table.Cursor()
+	if row < 0 || row >= len(m.infos) {
+		return m.detail.ID
+	}
+	return m.infos[row].ID
 }
 
 func inspectCmd(ctx context.Context, p sandbox.Provider, id sandbox.ID) tea.Cmd {
@@ -229,6 +250,8 @@ func handleListPostAction(cmd *cobra.Command, p sandbox.Provider, res listTUIRes
 	out := cmd.OutOrStdout()
 
 	switch res.postAction {
+	case listPostNone:
+		return nil
 	case listPostRestart:
 		return runConfirmedSandboxAction(ctx, in, errOut, out,
 			fmt.Sprintf("Restart sandbox %s?", name),

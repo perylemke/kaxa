@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/subtle"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -96,7 +97,7 @@ func installWebtmux(ctx context.Context, c sdkClient, name, token string) error 
 	}
 	if !checksumMatches(sumOut, asset.sha256) {
 		_ = removeWebtmuxArchive(ctx, c, name, token)
-		return fmt.Errorf("checksum webtmux: archive hash does not match")
+		return errors.New("checksum webtmux: archive hash does not match")
 	}
 	if _, err := runRemote(ctx, c, name, token, []string{"tar", "-xzf", webtmuxArchive, "-C", "/tmp"}); err != nil {
 		_ = removeWebtmuxArchive(ctx, c, name, token)

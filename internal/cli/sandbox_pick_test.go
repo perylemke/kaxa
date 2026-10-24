@@ -14,17 +14,17 @@ func TestSandboxPickMovesAndConfirms(t *testing.T) {
 
 	spec := sandboxActionSpec{verb: "restart", title: "Restart"}
 	m := newSandboxPickModel(spec, []sandbox.Info{
-		{ID: "pery", Status: "warm"},
-		{ID: "other", Status: "cold"},
+		{ID: fixturePery, Status: fixtureWarm},
+		{ID: fixtureOther, Status: fixtureCold},
 	})
 	m = pressSandboxPick(t, m, tea.KeyMsg{Type: tea.KeyDown})
 	m = pressSandboxPick(t, m, tea.KeyMsg{Type: tea.KeyEnter})
 
-	if m.cancelled || m.selected != "other" {
+	if m.cancelled || m.selected != fixtureOther {
 		t.Fatalf("cancelled=%v selected=%q", m.cancelled, m.selected)
 	}
 	view := m.View()
-	if !strings.Contains(view, "Restart sandbox") || !strings.Contains(view, "other") || !strings.Contains(view, "enter restart") {
+	if !strings.Contains(view, "Restart sandbox") || !strings.Contains(view, fixtureOther) || !strings.Contains(view, "enter restart") {
 		t.Fatalf("view = %q", view)
 	}
 }
@@ -33,7 +33,7 @@ func TestSandboxPickCancel(t *testing.T) {
 	t.Parallel()
 
 	m := newSandboxPickModel(sandboxActionSpec{verb: "upgrade", title: "Upgrade"}, []sandbox.Info{
-		{ID: "pery", Status: "warm"},
+		{ID: fixturePery, Status: fixtureWarm},
 	})
 	m = pressSandboxPick(t, m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
 	if !m.cancelled || m.selected != "" {

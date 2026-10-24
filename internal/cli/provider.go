@@ -11,6 +11,8 @@ import (
 	"github.com/perylemke/sbox/internal/usererr"
 )
 
+const spritesProviderName = "sprites"
+
 type tokenConfigurer interface {
 	Configure(token string) error
 }
@@ -36,7 +38,7 @@ func providerFromConfig(reg *registry.Registry, cfg config.Config) (sandbox.Prov
 		return nil, err
 	}
 
-	if cfg.Provider == "sprites" {
+	if cfg.Provider == spritesProviderName {
 		c, ok := p.(tokenConfigurer)
 		if !ok {
 			return nil, fmt.Errorf("sprites provider %T does not support Configure", p)

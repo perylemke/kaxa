@@ -141,7 +141,7 @@ func (m sandboxPickModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.selected = m.infos[m.cursor].ID
 		return m, tea.Quit
-	case "q", "esc", "ctrl+c":
+	case "q", "esc", keyInterrupt:
 		m.cancelled = true
 		return m, tea.Quit
 	}

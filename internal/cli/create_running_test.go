@@ -11,11 +11,10 @@ import (
 )
 
 type createRunningTestProvider struct {
-	id  sandbox.ID
 	url string
 }
 
-func (p *createRunningTestProvider) Name() string { return "sprites" }
+func (p *createRunningTestProvider) Name() string { return spritesProviderName }
 
 func (p *createRunningTestProvider) Configure(string) error { return nil }
 
@@ -66,7 +65,7 @@ func TestCreateRunningOpensBrowserURL(t *testing.T) {
 	out := new(bytes.Buffer)
 	cmd.SetOut(out)
 	cmd.SetErr(new(bytes.Buffer))
-	cmd.SetArgs([]string{"--provider", "sprites", "create", "demo", "--running"})
+	cmd.SetArgs([]string{"--provider", spritesProviderName, "create", fixtureDemo, "--running"})
 	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
@@ -94,7 +93,7 @@ func TestCreateWithoutRunningDoesNotOpenBrowser(t *testing.T) {
 	cmd := NewRootCmd(reg)
 	cmd.SetOut(new(bytes.Buffer))
 	cmd.SetErr(new(bytes.Buffer))
-	cmd.SetArgs([]string{"--provider", "sprites", "create", "demo"})
+	cmd.SetArgs([]string{"--provider", spritesProviderName, "create", fixtureDemo})
 	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {

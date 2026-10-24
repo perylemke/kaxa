@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -14,8 +15,8 @@ func TestListInteractiveDetailViewShowsFields(t *testing.T) {
 	m := listInteractiveModel{
 		mode: listModeDetail,
 		detail: sandbox.Detail{
-			ID:           "demo",
-			Status:       "warm",
+			ID:           fixtureDemo,
+			Status:       fixtureWarm,
 			SpriteUUID:   "uuid-1",
 			Organization: "acme",
 			URL:          "https://demo.sprites.dev",
@@ -27,8 +28,8 @@ func TestListInteractiveDetailViewShowsFields(t *testing.T) {
 	}
 	view := stripANSI(m.View())
 	for _, want := range []string{
-		"demo",
-		"warm",
+		fixtureDemo,
+		fixtureWarm,
 		"sprite-uuid-1",
 		"acme",
 		"https://demo.sprites.dev",
@@ -45,8 +46,8 @@ func TestListInteractiveDetailViewShowsFields(t *testing.T) {
 func TestListInteractiveListViewShowsHelp(t *testing.T) {
 	t.Parallel()
 
-	m := newListInteractiveModel(nil, nil, []sandbox.Info{
-		{ID: "a", Status: "warm", Provider: "sprites"},
+	m := newListInteractiveModel(context.TODO(), nil, []sandbox.Info{
+		{ID: "a", Status: fixtureWarm, Provider: spritesProviderName},
 	})
 	m.mode = listModeTable
 	view := stripANSI(m.View())

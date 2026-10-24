@@ -2,6 +2,7 @@ package sprites
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -26,7 +27,7 @@ type realSDKClient struct {
 	baseURL string
 }
 
-func newSDKClient(token string, baseURL string, opts ...spritesdk.Option) *realSDKClient {
+func newSDKClient(token, baseURL string, opts ...spritesdk.Option) *realSDKClient {
 	if baseURL == "" {
 		baseURL = defaultAPIBase
 	}
@@ -62,7 +63,7 @@ func (r *realSDKClient) RestartSprite(ctx context.Context, name string) error {
 
 func (r *realSDKClient) Run(ctx context.Context, name string, argv []string, stdout, stderr io.Writer) error {
 	if len(argv) == 0 {
-		return fmt.Errorf("sprites run: empty command")
+		return errors.New("sprites run: empty command")
 	}
 	cmd := r.c.Sprite(name).CommandContext(ctx, argv[0], argv[1:]...)
 	cmd.Stdout = stdout

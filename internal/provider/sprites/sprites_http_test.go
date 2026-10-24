@@ -2,8 +2,6 @@ package sprites_test
 
 import (
 	"context"
-	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -15,83 +13,6 @@ import (
 	"github.com/perylemke/sbox/internal/provider/sprites"
 	"github.com/perylemke/sbox/internal/sandbox"
 )
-
-func lifecycleTestHandler(page, createdGets *int) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
-		}
-		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/v1/sprites":
-			handleLifecycleCreate(w, r)
-		case r.Method == http.MethodGet && r.URL.Path == "/v1/sprites/"+lifecycleSpriteName:
-			handleLifecycleGetCreated(w, createdGets)
-		case r.Method == http.MethodGet && r.URL.Path == "/v1/sprites":
-			writeListPage(w, page)
-		case r.Method == http.MethodDelete && r.URL.Path == "/v1/sprites/alpha":
-			w.WriteHeader(http.StatusNoContent)
-		default:
-			http.NotFound(w, r)
-		}
-	}
-}
-
-func handleLifecycleCreate(w http.ResponseWriter, r *http.Request) {
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, "bad body", http.StatusBadRequest)
-		return
-	}
-	var req struct {
-		Name   string   `json:"name"`
-		Labels []string `json:"labels"`
-	}
-	if err := json.Unmarshal(body, &req); err != nil {
-		http.Error(w, "bad json", http.StatusBadRequest)
-		return
-	}
-	if req.Name != lifecycleSpriteName || len(req.Labels) != 1 || req.Labels[0] != lifecycleSboxLabel {
-		http.Error(w, "unexpected create payload", http.StatusBadRequest)
-		return
-	}
-	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(map[string]string{spriteJSONFieldName: lifecycleSpriteName})
-}
-
-func handleLifecycleGetCreated(w http.ResponseWriter, createdGets *int) {
-	*createdGets++
-	status := spriteStatusCold
-	if *createdGets >= 2 {
-		status = spriteStatusWarm
-	}
-	_ = json.NewEncoder(w).Encode(map[string]any{
-		spriteJSONFieldName: lifecycleSpriteName,
-		"status":            status,
-		"organization":      "org",
-		"id":                "99",
-	})
-}
-
-func writeListPage(w http.ResponseWriter, page *int) {
-	*page++
-	if *page == 1 {
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			spritesName: []map[string]any{
-				{spriteJSONFieldName: "alpha", "status": spriteStatusCold, "organization": "org", "id": "1", "labels": []string{"team=a"}},
-			},
-			"has_more":                true,
-			"next_continuation_token": "next",
-		})
-		return
-	}
-	_ = json.NewEncoder(w).Encode(map[string]any{
-		spritesName: []map[string]string{
-			{spriteJSONFieldName: "beta", "status": spriteStatusWarm, "organization": "org", "id": "2"},
-		},
-		"has_more": false,
-	})
-}
 
 func assertLifecycleList(t *testing.T, list []sandbox.Info) {
 	t.Helper()
@@ -109,18 +30,52 @@ func assertLifecycleList(t *testing.T, list []sandbox.Info) {
 	}
 }
 
+type lifecycleProbe struct {
+	client        *fakeSDKClient
+	createdName   string
+	createdLabels []string
+	getCalls      int
+	destroyed     string
+}
+
+func newLifecycleProbe(t *testing.T, token string) *lifecycleProbe {
+	t.Helper()
+	probe := &lifecycleProbe{}
+	probe.client = &fakeSDKClient{
+		create: func(_ context.Context, name string, labels []string) (*spritesdk.Sprite, error) {
+			if name != lifecycleSpriteName || len(labels) != 1 || labels[0] != lifecycleSboxLabel {
+				t.Fatalf("create name=%q labels=%v", name, labels)
+			}
+			probe.createdName = name
+			probe.createdLabels = append([]string(nil), labels...)
+			return spritesdk.New(token).Sprite(lifecycleSpriteName), nil
+		},
+		get: func(_ context.Context, _ string) (*spritesdk.Sprite, error) {
+			probe.getCalls++
+			status := spriteStatusCold
+			if probe.getCalls >= 2 {
+				status = spriteStatusWarm
+			}
+			return &spritesdk.Sprite{Status: status}, nil
+		},
+		list: func(_ context.Context, _ string) ([]sprites.SpriteListEntry, error) {
+			return []sprites.SpriteListEntry{
+				{Name: "alpha", Status: spriteStatusCold, Labels: []string{"team=a"}},
+				{Name: "beta", Status: spriteStatusWarm},
+			}, nil
+		},
+		destroy: func(_ context.Context, name string) error {
+			probe.destroyed = name
+			return nil
+		},
+	}
+	return probe
+}
+
 func TestHTTPLifecycle(t *testing.T) {
 	const token = "httptest-token-value" // #nosec G101 -- test fixture
-	page := 0
-	createdGets := 0
-
-	srv := httptest.NewServer(lifecycleTestHandler(&page, &createdGets))
-	t.Cleanup(srv.Close)
-
-	p := sprites.New()
-	if err := p.ConfigureWithOptions(token, srv.URL, spritesdk.WithDisableControl()); err != nil {
-		t.Fatalf("configure: %v", err)
-	}
+	probe := newLifecycleProbe(t, token)
+	p := sprites.NewWithClient(probe.client, token)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -132,8 +87,11 @@ func TestHTTPLifecycle(t *testing.T) {
 	if id != lifecycleSpriteName {
 		t.Fatalf("id = %q", id)
 	}
-	if createdGets < 2 {
-		t.Fatalf("createdGets = %d, want at least 2 warm polls", createdGets)
+	if probe.createdName != lifecycleSpriteName || len(probe.createdLabels) != 1 || probe.createdLabels[0] != lifecycleSboxLabel {
+		t.Fatalf("create payload name=%q labels=%v", probe.createdName, probe.createdLabels)
+	}
+	if probe.getCalls < 2 {
+		t.Fatalf("getCalls = %d, want at least 2 warm polls", probe.getCalls)
 	}
 
 	list, err := p.List(ctx)
@@ -144,6 +102,9 @@ func TestHTTPLifecycle(t *testing.T) {
 
 	if err := p.Destroy(ctx, "alpha"); err != nil {
 		t.Fatalf("destroy: %v", err)
+	}
+	if probe.destroyed != "alpha" {
+		t.Fatalf("destroyed = %q", probe.destroyed)
 	}
 }
 

@@ -52,7 +52,7 @@ func (m destroyCheckModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cancelled = true
 		}
 		return m, tea.Quit
-	case "q", "esc", "ctrl+c":
+	case "q", "esc", keyInterrupt:
 		m.cancelled = true
 		return m, tea.Quit
 	}

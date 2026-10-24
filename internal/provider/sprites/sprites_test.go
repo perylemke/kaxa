@@ -93,7 +93,7 @@ func TestMissingToken(t *testing.T) {
 		t.Fatalf("Configure empty: %v", err)
 	}
 
-	_, err := p.Create(ctx, sandbox.Spec{Name: "demo"})
+	_, err := p.Create(ctx, sandbox.Spec{Name: spriteName})
 	if !errors.Is(err, sprites.ErrMissingToken) {
 		t.Fatalf("Create: %v", err)
 	}
@@ -169,10 +169,15 @@ func TestCreateRunningRegistersHoldAndHTTPService(t *testing.T) {
 		},
 	}
 	p := sprites.NewWithClient(client, "token")
-	_, err := p.Create(context.Background(), sandbox.Spec{Name: "demo", Running: true})
+	_, err := p.Create(context.Background(), sandbox.Spec{Name: spriteName, Running: true})
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
+	assertRunningCalls(t, runCalls)
+}
+
+func assertRunningCalls(t *testing.T, runCalls [][]string) {
+	t.Helper()
 	if len(runCalls) == 0 || !reflect.DeepEqual(runCalls[0], sprites.RunningHoldArgv) {
 		t.Fatalf("first run = %v", runCalls)
 	}
@@ -216,7 +221,7 @@ func TestCreateRunningRejectsBadWebtmuxChecksum(t *testing.T) {
 		},
 	}
 	p := sprites.NewWithClient(client, "token")
-	_, err := p.Create(context.Background(), sandbox.Spec{Name: "demo", Running: true})
+	_, err := p.Create(context.Background(), sandbox.Spec{Name: spriteName, Running: true})
 	if err == nil || !strings.Contains(err.Error(), "checksum") {
 		t.Fatalf("err = %v", err)
 	}
@@ -239,7 +244,7 @@ func TestCreateWithoutRunningSkipsHold(t *testing.T) {
 		},
 	}
 	p := sprites.NewWithClient(client, "token")
-	if _, err := p.Create(context.Background(), sandbox.Spec{Name: "demo"}); err != nil {
+	if _, err := p.Create(context.Background(), sandbox.Spec{Name: spriteName}); err != nil {
 		t.Fatalf("create: %v", err)
 	}
 	if runCalls != 0 {

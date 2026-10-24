@@ -177,7 +177,7 @@ func NewWithClient(client sdkClient, token string) *Provider {
 }
 
 // ConfigureWithOptions sets token and SDK options (tests against httptest).
-func (p *Provider) ConfigureWithOptions(token string, apiBase string, opts ...spritesdk.Option) error {
+func (p *Provider) ConfigureWithOptions(token, apiBase string, opts ...spritesdk.Option) error {
 	if token == "" {
 		return missingTokenErr()
 	}
