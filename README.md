@@ -1,5 +1,7 @@
 # sbx
 
+[![CI](https://github.com/perylemke/sbx/actions/workflows/ci.yml/badge.svg)](https://github.com/perylemke/sbx/actions/workflows/ci.yml)
+
 Unified CLI for sandbox providers. **sbx** aggregates isolated execution environments behind one command-line interface, starting with [Fly.io Sprites](https://docs.fly.io/sprites) and [Modal Sandboxes](https://modal.com/docs/guide/sdk-javascript-go).
 
 This repository is early-stage: the root command loads configuration and registers providers; sandbox lifecycle commands are not implemented yet.
