@@ -7,7 +7,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/perylemke/sbx/internal/sandbox"
+	"github.com/perylemke/sbox/internal/sandbox"
 )
 
 // Registry maps provider names to implementations.

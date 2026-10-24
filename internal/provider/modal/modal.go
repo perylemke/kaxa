@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/perylemke/sbx/internal/sandbox"
+	"github.com/perylemke/sbox/internal/sandbox"
 )
 
 // Provider implements sandbox.Provider for Modal sandboxes.
@@ -32,7 +32,7 @@ func (p *Provider) List(_ context.Context) ([]sandbox.Info, error) {
 }
 
 // Exec is not implemented yet.
-func (p *Provider) Exec(_ context.Context, _ sandbox.ID, _ []string) error {
+func (p *Provider) Exec(_ context.Context, _ sandbox.ID, _ sandbox.ExecOptions) error {
 	return fmt.Errorf("%w: modal exec", sandbox.ErrNotImplemented)
 }
 

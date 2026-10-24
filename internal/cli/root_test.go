@@ -5,10 +5,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/perylemke/sbx/internal/cli"
-	"github.com/perylemke/sbx/internal/provider/modal"
-	"github.com/perylemke/sbx/internal/provider/sprites"
-	"github.com/perylemke/sbx/internal/registry"
+	"github.com/perylemke/sbox/internal/cli"
+	"github.com/perylemke/sbox/internal/provider/modal"
+	"github.com/perylemke/sbox/internal/provider/sprites"
+	"github.com/perylemke/sbox/internal/registry"
 )
 
 func testRegistry(t *testing.T) *registry.Registry {
@@ -41,6 +41,11 @@ func TestRootHelp(t *testing.T) {
 	if !strings.Contains(help, "sprites") || !strings.Contains(help, "modal") {
 		t.Fatalf("help should list providers: %s", help)
 	}
+	for _, sub := range []string{"create", "list", "exec", "destroy"} {
+		if !strings.Contains(help, sub) {
+			t.Fatalf("help should list %q subcommand: %s", sub, help)
+		}
+	}
 }
 
 func TestVersionCommand(t *testing.T) {
@@ -56,7 +61,7 @@ func TestVersionCommand(t *testing.T) {
 		t.Fatalf("execute: %v", err)
 	}
 	got := out.String()
-	if !strings.Contains(got, "sbx dev") {
+	if !strings.Contains(got, "sbox dev") {
 		t.Fatalf("version output = %q", got)
 	}
 	if !strings.Contains(got, "on ") {
@@ -69,7 +74,7 @@ func TestVersionSkipsConfigValidation(t *testing.T) {
 	cmd := cli.NewRootCmd(reg)
 	cmd.SetOut(new(bytes.Buffer))
 	cmd.SetErr(new(bytes.Buffer))
-	cmd.SetArgs([]string{"--provider", "nope", "version"})
+	cmd.SetArgs([]string{testProviderFlag, "nope", "version"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("version should not validate provider: %v", err)
@@ -83,7 +88,7 @@ func TestRootUnknownProvider(t *testing.T) {
 	cmd := cli.NewRootCmd(reg)
 	cmd.SetOut(new(bytes.Buffer))
 	cmd.SetErr(new(bytes.Buffer))
-	cmd.SetArgs([]string{"--provider", "nope"})
+	cmd.SetArgs([]string{testProviderFlag, "nope"})
 
 	if err := cmd.Execute(); err == nil {
 		t.Fatal("expected error for unknown provider")
@@ -97,7 +102,7 @@ func TestRootKnownProvider(t *testing.T) {
 	cmd := cli.NewRootCmd(reg)
 	cmd.SetOut(new(bytes.Buffer))
 	cmd.SetErr(new(bytes.Buffer))
-	cmd.SetArgs([]string{"--provider", "sprites", "--help"})
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, "--help"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)

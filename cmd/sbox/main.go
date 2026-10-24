@@ -1,14 +1,14 @@
-// Package main is the sbx CLI entrypoint.
+// Package main is the sbox CLI entrypoint.
 package main
 
 import (
 	"fmt"
 	"os"
 
-	"github.com/perylemke/sbx/internal/cli"
-	"github.com/perylemke/sbx/internal/provider/modal"
-	"github.com/perylemke/sbx/internal/provider/sprites"
-	"github.com/perylemke/sbx/internal/registry"
+	"github.com/perylemke/sbox/internal/cli"
+	"github.com/perylemke/sbox/internal/provider/modal"
+	"github.com/perylemke/sbox/internal/provider/sprites"
+	"github.com/perylemke/sbox/internal/registry"
 )
 
 func main() {

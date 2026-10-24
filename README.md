@@ -1,10 +1,10 @@
-# sbx
+# sbox
 
-[![CI](https://github.com/perylemke/sbx/actions/workflows/ci.yml/badge.svg)](https://github.com/perylemke/sbx/actions/workflows/ci.yml)
+[![CI](https://github.com/perylemke/sbox/actions/workflows/ci.yml/badge.svg)](https://github.com/perylemke/sbox/actions/workflows/ci.yml)
 
-Unified CLI for sandbox providers. **sbx** aggregates isolated execution environments behind one command-line interface, starting with [Fly.io Sprites](https://docs.fly.io/sprites) and [Modal Sandboxes](https://modal.com/docs/guide/sdk-javascript-go).
+Unified CLI for sandbox providers. **sbox** aggregates isolated execution environments behind one command-line interface, starting with [Fly.io Sprites](https://docs.fly.io/sprites) and [Modal Sandboxes](https://modal.com/docs/guide/sdk-javascript-go).
 
-This repository is early-stage: the root command loads configuration and registers providers; sandbox lifecycle commands are not implemented yet.
+Sprites lifecycle commands (`create`, `list`, `exec`, `destroy`) are implemented when using `--provider sprites`. Modal remains a stub.
 
 ## Requirements
 
@@ -14,7 +14,7 @@ This repository is early-stage: the root command loads configuration and registe
 ## Install (from source)
 
 ```bash
-go install ./cmd/sbx
+go install ./cmd/sbox
 ```
 
 ## Configuration
@@ -22,7 +22,7 @@ go install ./cmd/sbx
 Configuration is loaded from environment variables. CLI flags override environment when set (highest priority first):
 
 1. CLI flags (`--provider`)
-2. Environment variables with prefix `SBX_`
+2. Environment variables with prefix `SBOX_`
 
 Never commit real tokens.
 
@@ -30,18 +30,28 @@ Never commit real tokens.
 
 | Variable | Description |
 | --- | --- |
-| `SBX_DEFAULT_PROVIDER` | Default provider (`sprites` or `modal`) |
-| `SBX_SPRITES_TOKEN` | Sprites API token |
-| `SBX_MODAL_TOKEN_ID` | Modal token ID |
-| `SBX_MODAL_TOKEN_SECRET` | Modal token secret |
+| `SBOX_DEFAULT_PROVIDER` | Default provider (`sprites` or `modal`) |
+| `SBOX_SPRITES_TOKEN` | Sprites API token |
+| `SBOX_MODAL_TOKEN_ID` | Modal token ID |
+| `SBOX_MODAL_TOKEN_SECRET` | Modal token secret |
 
 ## Usage
 
 ```bash
-sbx --help
-sbx version
-sbx --provider sprites --help
+sbox --help
+sbox version
+
+export SBOX_DEFAULT_PROVIDER=sprites
+export SBOX_SPRITES_TOKEN=...   # never commit real tokens
+
+sbox create my-sprite
+sbox list
+sbox exec my-sprite              # interactive bash (requires a terminal)
+sbox exec my-sprite -- ls -la    # run a command; remote exit code is propagated
+sbox destroy my-sprite
 ```
+
+You can pass `--provider sprites` instead of `SBOX_DEFAULT_PROVIDER`.
 
 ## Development
 
@@ -49,7 +59,7 @@ Run `make help` for all targets. Quick local build:
 
 ```bash
 make build
-./bin/sbx --help
+./bin/sbox --help
 ```
 
 ```bash

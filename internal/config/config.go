@@ -1,4 +1,4 @@
-// Package config loads sbx settings from environment variables and CLI flags.
+// Package config loads sbox settings from environment variables and CLI flags.
 package config
 
 import (
@@ -6,14 +6,14 @@ import (
 	"os"
 	"strings"
 
-	"github.com/perylemke/sbx/internal/registry"
+	"github.com/perylemke/sbox/internal/registry"
 )
 
 const (
-	envDefaultProvider  = "SBX_DEFAULT_PROVIDER"
-	envSpritesToken     = "SBX_SPRITES_TOKEN"      // #nosec G101 -- env var name, not a credential value
-	envModalTokenID     = "SBX_MODAL_TOKEN_ID"     // #nosec G101 -- env var name, not a credential value
-	envModalTokenSecret = "SBX_MODAL_TOKEN_SECRET" // #nosec G101 -- env var name, not a credential value
+	envDefaultProvider  = "SBOX_DEFAULT_PROVIDER"
+	envSpritesToken     = "SBOX_SPRITES_TOKEN"      // #nosec G101 -- env var name, not a credential value
+	envModalTokenID     = "SBOX_MODAL_TOKEN_ID"     // #nosec G101 -- env var name, not a credential value
+	envModalTokenSecret = "SBOX_MODAL_TOKEN_SECRET" // #nosec G101 -- env var name, not a credential value
 )
 
 // Config holds resolved CLI settings (secrets are never logged via String).

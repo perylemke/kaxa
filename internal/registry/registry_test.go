@@ -3,9 +3,9 @@ package registry_test
 import (
 	"testing"
 
-	"github.com/perylemke/sbx/internal/provider/modal"
-	"github.com/perylemke/sbx/internal/provider/sprites"
-	"github.com/perylemke/sbx/internal/registry"
+	"github.com/perylemke/sbox/internal/provider/modal"
+	"github.com/perylemke/sbox/internal/provider/sprites"
+	"github.com/perylemke/sbox/internal/registry"
 )
 
 func TestRegisterGetNames(t *testing.T) {
