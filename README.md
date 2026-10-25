@@ -69,7 +69,7 @@ sbox rm my-sprite                # alias of destroy
 
 You can pass `--provider sprites` instead of `SBOX_DEFAULT_PROVIDER`.
 
-`create` labels the sandbox `sbox`. `--running` registers a one-hour hold, serves a browser tmux session on the sprite URL, and opens that URL. In a terminal, `list` highlights a row: Enter shows sprite details, `r` restarts, `u` upgrades, `d` destroys, and `q` quits. With no sandboxes, `list` prints `no sandboxes created` and exits. `restart` and `upgrade` without a name open the same kind of picker; `destroy` without a name asks you to choose. Each of those actions confirms before it runs.
+`create` labels the sandbox `sbox`. `--running` registers a one-hour hold, serves a browser tmux session on the sprite URL, and opens that URL. In a terminal, `list` highlights a row: Enter shows sprite details, `r` restarts, `u` upgrades, `d` destroys, and `q` quits. With no sandboxes, `list` prints `no sandboxes created` and exits. `restart` and `upgrade` without a name open the same kind of picker; `destroy` without a name opens a form where you can select one or more sandboxes (when stdin is not a terminal, enter numbers to toggle and `0` to confirm). Named sandboxes and `destroy --all` still ask for `[y/N]` before they run.
 
 ## Development
 

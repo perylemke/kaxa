@@ -96,19 +96,8 @@ func destroyTargets(ctx context.Context, p sandbox.Provider, destroyAll bool, ar
 		}
 		return ids, false, nil
 	}
-	if inputIsTTY(in) {
-		ids, err := runDestroyCheckboxes(infos)
-		return ids, true, err
-	}
-	id, err := chooseDestroyTarget(in, errOut, infos)
-	if err != nil {
-		return nil, false, err
-	}
-	return []sandbox.ID{id}, false, nil
-}
-
-func chooseDestroyTarget(in io.Reader, out io.Writer, infos []sandbox.Info) (sandbox.ID, error) {
-	return chooseSandbox(in, out, "Destroy which sandbox? ", infos)
+	ids, err := collectDestroyForm(in, errOut, infos)
+	return ids, true, err
 }
 
 func chooseSandbox(in io.Reader, out io.Writer, prompt string, infos []sandbox.Info) (sandbox.ID, error) {

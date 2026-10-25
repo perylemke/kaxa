@@ -403,7 +403,7 @@ func TestDestroyChooseFromList(t *testing.T) {
 	errOut := new(bytes.Buffer)
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
-	cmd.SetIn(strings.NewReader("2\ny\n"))
+	cmd.SetIn(strings.NewReader("2\n0\n"))
 	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdDestroy})
 	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
 
