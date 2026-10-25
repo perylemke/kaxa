@@ -1,6 +1,8 @@
 # sbox
 
 [![CI](https://github.com/perylemke/sbox/actions/workflows/ci.yml/badge.svg)](https://github.com/perylemke/sbox/actions/workflows/ci.yml)
+[![Lint](https://github.com/perylemke/sbox/actions/workflows/lint.yml/badge.svg)](https://github.com/perylemke/sbox/actions/workflows/lint.yml)
+[![Sec](https://github.com/perylemke/sbox/actions/workflows/sec.yml/badge.svg)](https://github.com/perylemke/sbox/actions/workflows/sec.yml)
 
 Unified CLI for sandbox providers. **sbox** aggregates isolated execution environments behind one command-line interface, starting with [Fly.io Sprites](https://docs.fly.io/sprites) and [Modal Sandboxes](https://modal.com/docs/guide/sdk-javascript-go).
 
