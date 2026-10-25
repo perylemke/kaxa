@@ -20,7 +20,7 @@ type fakeSDKClient struct {
 	list    func(ctx context.Context, prefix string) ([]sprites.SpriteListEntry, error)
 	upgrade func(ctx context.Context, name string) error
 	restart func(ctx context.Context, name string) error
-	run     func(ctx context.Context, name string, argv []string, stdout, stderr io.Writer) error
+	run     func(ctx context.Context, name string, argv []string, stdin io.Reader, stdout, stderr io.Writer) error
 	destroy func(ctx context.Context, name string) error
 	sprite  func(name string) *spritesdk.Sprite
 }
@@ -60,9 +60,13 @@ func (f *fakeSDKClient) RestartSprite(ctx context.Context, name string) error {
 	return nil
 }
 
-func (f *fakeSDKClient) Run(ctx context.Context, name string, argv []string, stdout, stderr io.Writer) error {
+func (f *fakeSDKClient) Run(ctx context.Context, name string, argv []string, stdin io.Reader, stdout, stderr io.Writer) error {
+	return f.RunIn(ctx, name, "", nil, argv, stdin, stdout, stderr)
+}
+
+func (f *fakeSDKClient) RunIn(ctx context.Context, name, _ string, _, argv []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	if f.run != nil {
-		return f.run(ctx, name, argv, stdout, stderr)
+		return f.run(ctx, name, argv, stdin, stdout, stderr)
 	}
 	return nil
 }
@@ -157,7 +161,7 @@ func TestCreateRunningRegistersHoldAndHTTPService(t *testing.T) {
 		create: func(_ context.Context, _ string, _ []string) (*spritesdk.Sprite, error) {
 			return &spritesdk.Sprite{}, nil
 		},
-		run: func(_ context.Context, _ string, argv []string, stdout, _ io.Writer) error {
+		run: func(_ context.Context, _ string, argv []string, _ io.Reader, stdout, _ io.Writer) error {
 			runCalls = append(runCalls, append([]string(nil), argv...))
 			switch argv[0] {
 			case "uname":
@@ -207,7 +211,7 @@ func TestCreateRunningRejectsBadWebtmuxChecksum(t *testing.T) {
 		create: func(_ context.Context, _ string, _ []string) (*spritesdk.Sprite, error) {
 			return &spritesdk.Sprite{}, nil
 		},
-		run: func(_ context.Context, _ string, argv []string, stdout, _ io.Writer) error {
+		run: func(_ context.Context, _ string, argv []string, _ io.Reader, stdout, _ io.Writer) error {
 			if reflect.DeepEqual(argv, sprites.RunningHTTPServiceArgv) {
 				startedService = true
 			}
@@ -238,7 +242,7 @@ func TestCreateWithoutRunningSkipsHold(t *testing.T) {
 		create: func(_ context.Context, _ string, _ []string) (*spritesdk.Sprite, error) {
 			return &spritesdk.Sprite{}, nil
 		},
-		run: func(context.Context, string, []string, io.Writer, io.Writer) error {
+		run: func(context.Context, string, []string, io.Reader, io.Writer, io.Writer) error {
 			runCalls++
 			return nil
 		},

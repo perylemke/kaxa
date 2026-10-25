@@ -61,7 +61,7 @@ func (p *Provider) Create(ctx context.Context, spec sandbox.Spec) (sandbox.ID, e
 		return "", err
 	}
 	if spec.Running {
-		if err := configureRunning(ctx, c, name, token); err != nil {
+		if err := configureRunning(ctx, c, name, token, spec.ExposeAPI); err != nil {
 			return "", redactErr(err, token)
 		}
 	}
@@ -108,21 +108,15 @@ func (p *Provider) Exec(ctx context.Context, id sandbox.ID, opts sandbox.ExecOpt
 	if err != nil {
 		return err
 	}
-
-	sprite := c.Sprite(string(id))
-	cmd := sprite.CommandContext(ctx, opts.Command[0], opts.Command[1:]...)
-	if opts.TTY {
-		cmd.SetTTY(true)
-		if opts.Size.Rows > 0 && opts.Size.Cols > 0 {
-			if err := cmd.SetTTYSize(opts.Size.Rows, opts.Size.Cols); err != nil {
-				return redactErr(err, token)
-			}
-		}
+	sp, err := c.GetSprite(ctx, string(id))
+	if err != nil {
+		return redactErr(err, token)
 	}
-	cmd.Stdin = opts.Stdin
-	cmd.Stdout = opts.Stdout
-	cmd.Stderr = opts.Stderr
 
+	cmd, err := prepareExecCmd(ctx, c.Sprite(string(id)), opts, spriteLabels(sp))
+	if err != nil {
+		return redactErr(err, token)
+	}
 	if opts.TTY && opts.Resize != nil {
 		go p.watchResize(ctx, cmd, opts.Resize)
 	}
@@ -146,6 +140,23 @@ func (p *Provider) Destroy(ctx context.Context, id sandbox.ID) error {
 		return redactErr(err, token)
 	}
 	return nil
+}
+
+func prepareExecCmd(ctx context.Context, sprite *spritesdk.Sprite, opts sandbox.ExecOptions, labels []string) (*spritesdk.Cmd, error) {
+	cmd := sprite.CommandContext(ctx, opts.Command[0], opts.Command[1:]...)
+	cmd.Dir = workspaceExecDir(labels)
+	if opts.TTY {
+		cmd.SetTTY(true)
+		if opts.Size.Rows > 0 && opts.Size.Cols > 0 {
+			if err := cmd.SetTTYSize(opts.Size.Rows, opts.Size.Cols); err != nil {
+				return nil, err
+			}
+		}
+	}
+	cmd.Stdin = opts.Stdin
+	cmd.Stdout = opts.Stdout
+	cmd.Stderr = opts.Stderr
+	return cmd, nil
 }
 
 func (p *Provider) clientAndToken() (sdkClient, string, error) {

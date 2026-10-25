@@ -16,6 +16,7 @@ import (
 const (
 	testProviderFlag = "--provider"
 	testSpritesName  = "sprites"
+	testRunningFlag  = "--running"
 )
 
 type fakeProvider struct {
@@ -132,7 +133,7 @@ func TestCreateInteractiveForm(t *testing.T) {
 	errOut := new(bytes.Buffer)
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
-	cmd.SetIn(strings.NewReader("demo\n1\ny\n"))
+	cmd.SetIn(strings.NewReader(strings.Join([]string{"demo", "1", "y", "n", "n", "n", ""}, "\n")))
 	cmd.SetArgs([]string{testCmdCreate})
 	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
 
@@ -162,7 +163,7 @@ func TestCreateRunningSetsSpec(t *testing.T) {
 	out := new(bytes.Buffer)
 	cmd.SetOut(out)
 	cmd.SetErr(new(bytes.Buffer))
-	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdCreate, testBoxName, "--running"})
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdCreate, testBoxName, testRunningFlag})
 	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
@@ -646,7 +647,10 @@ func TestSandboxSubcommandHelp(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
-	if !strings.Contains(out.String(), "create") {
-		t.Fatalf("help = %q", out.String())
+	help := out.String()
+	for _, want := range []string{"--api", "--api-cmd", "--api-port", "--public", "0.0.0.0", "--sync", "--dir", "--running", "HTTP API", "30s"} {
+		if !strings.Contains(help, want) {
+			t.Fatalf("help missing %q: %s", want, help)
+		}
 	}
 }

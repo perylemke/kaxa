@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 )
 
@@ -16,11 +17,13 @@ const (
 	webtmuxDir         = "/home/sprite/.local/bin"
 	webtmuxBin         = webtmuxDir + "/webtmux"
 	webtmuxArchive     = "/tmp/sbox-webtmux.tar.gz"
+	spriteEnvCmd       = "sprite-env"
+	servicesCmd        = "services"
 )
 
 // RunningHoldArgv is the remote command used to register a 1-hour task hold.
 var RunningHoldArgv = []string{
-	"sprite-env", "curl", "-fsS",
+	spriteEnvCmd, "curl", "-fsS",
 	"-X", "POST",
 	"-H", "Content-Type: application/json",
 	"-d", runningTaskPayload,
@@ -29,10 +32,18 @@ var RunningHoldArgv = []string{
 
 // RunningHTTPServiceArgv starts webtmux on port 8080 attached to a tmux session named main.
 var RunningHTTPServiceArgv = []string{
-	"sprite-env", "services", "create", "webtmux",
+	spriteEnvCmd, servicesCmd, "create", "webtmux",
 	"--cmd", webtmuxBin,
 	"--args", "-w,--no-auth,tmux,new-session,-A,-s,main",
 	"--http-port", "8080",
+	"--no-stream",
+}
+
+// RunningWebtmuxArgv starts webtmux without taking the sandbox URL.
+var RunningWebtmuxArgv = []string{
+	spriteEnvCmd, servicesCmd, "create", "webtmux",
+	"--cmd", webtmuxBin,
+	"--args", "-w,--no-auth,tmux,new-session,-A,-s,main",
 	"--no-stream",
 }
 
@@ -50,7 +61,7 @@ var webtmuxAssets = map[string]webtmuxAsset{
 		name:   "webtmux-linux-arm64",
 		sha256: "b041b1dfb67027cbb17a93febd7389a277d5a7635b8a3539bace707bb34848d2",
 	},
-	"arm64": {
+	archARM64: {
 		name:   "webtmux-linux-arm64",
 		sha256: "b041b1dfb67027cbb17a93febd7389a277d5a7635b8a3539bace707bb34848d2",
 	},
@@ -63,11 +74,15 @@ func registerRunningHold(ctx context.Context, c sdkClient, name, token string) e
 	return nil
 }
 
-func registerRunningHTTPService(ctx context.Context, c sdkClient, name, token string) error {
+func registerRunningHTTPService(ctx context.Context, c sdkClient, name, token string, apiOwnsURL bool) error {
 	if err := installWebtmux(ctx, c, name, token); err != nil {
 		return err
 	}
-	if _, err := runRemote(ctx, c, name, token, RunningHTTPServiceArgv); err != nil {
+	argv := RunningHTTPServiceArgv
+	if apiOwnsURL {
+		argv = RunningWebtmuxArgv
+	}
+	if _, err := runRemote(ctx, c, name, token, argv); err != nil {
 		return fmt.Errorf("start tmux terminal: %w", err)
 	}
 	return nil
@@ -83,7 +98,7 @@ func installWebtmux(ctx context.Context, c sdkClient, name, token string) error 
 		return fmt.Errorf("detect sprite arch: unsupported %q", strings.TrimSpace(archOut))
 	}
 
-	if _, err := runRemote(ctx, c, name, token, []string{"mkdir", "-p", webtmuxDir}); err != nil {
+	if _, err := runRemote(ctx, c, name, token, []string{argvMkdir, "-p", webtmuxDir}); err != nil {
 		return fmt.Errorf("install webtmux: %w", err)
 	}
 	url := fmt.Sprintf("https://raw.githubusercontent.com/superfly/webtmux-sprites-demo/%s/builds/dist/%s.tar.gz", webtmuxCommit, asset.name)
@@ -99,7 +114,7 @@ func installWebtmux(ctx context.Context, c sdkClient, name, token string) error 
 		_ = removeWebtmuxArchive(ctx, c, name, token)
 		return errors.New("checksum webtmux: archive hash does not match")
 	}
-	if _, err := runRemote(ctx, c, name, token, []string{"tar", "-xzf", webtmuxArchive, "-C", "/tmp"}); err != nil {
+	if _, err := runRemote(ctx, c, name, token, []string{argvTar, tarGzip, webtmuxArchive, "-C", "/tmp"}); err != nil {
 		_ = removeWebtmuxArchive(ctx, c, name, token)
 		return fmt.Errorf("extract webtmux: %w", err)
 	}
@@ -117,23 +132,32 @@ func removeWebtmuxArchive(ctx context.Context, c sdkClient, name, token string) 
 	return err
 }
 
-func configureRunning(ctx context.Context, c sdkClient, name, token string) error {
+func configureRunning(ctx context.Context, c sdkClient, name, token string, apiOwnsURL bool) error {
 	if err := registerRunningHold(ctx, c, name, token); err != nil {
 		return err
 	}
-	return registerRunningHTTPService(ctx, c, name, token)
+	return registerRunningHTTPService(ctx, c, name, token, apiOwnsURL)
 }
 
 func runRemote(ctx context.Context, c sdkClient, name, token string, argv []string) (string, error) {
+	return runRemoteIn(ctx, c, name, token, "", nil, argv, nil)
+}
+
+func runRemoteStdin(ctx context.Context, c sdkClient, name, token string, argv []string, stdin io.Reader) (string, error) {
+	return runRemoteIn(ctx, c, name, token, "", nil, argv, stdin)
+}
+
+func runRemoteIn(ctx context.Context, c sdkClient, name, token, dir string, env, argv []string, stdin io.Reader) (string, error) {
 	var stdout, stderr bytes.Buffer
-	if err := c.Run(ctx, name, argv, &stdout, &stderr); err != nil {
-		msg := mapExecErr(err, token).Error()
-		if detail := strings.TrimSpace(stderr.String()); detail != "" {
-			return "", fmt.Errorf("%s: %s", msg, detail)
-		}
-		return "", fmt.Errorf("%s", msg)
+	err := c.RunIn(ctx, name, dir, env, argv, stdin, &stdout, &stderr)
+	if err == nil {
+		return stdout.String(), nil
 	}
-	return stdout.String(), nil
+	msg := mapExecErr(err, token).Error()
+	if detail := strings.TrimSpace(stderr.String()); detail != "" {
+		return "", fmt.Errorf("%s: %s", msg, detail)
+	}
+	return "", fmt.Errorf("%s", msg)
 }
 
 func checksumMatches(output, want string) bool {

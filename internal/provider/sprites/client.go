@@ -15,7 +15,8 @@ type sdkClient interface {
 	ListEntries(ctx context.Context, prefix string) ([]SpriteListEntry, error)
 	UpgradeSprite(ctx context.Context, name string) error
 	RestartSprite(ctx context.Context, name string) error
-	Run(ctx context.Context, name string, argv []string, stdout, stderr io.Writer) error
+	Run(ctx context.Context, name string, argv []string, stdin io.Reader, stdout, stderr io.Writer) error
+	RunIn(ctx context.Context, name, dir string, env, argv []string, stdin io.Reader, stdout, stderr io.Writer) error
 	DestroySprite(ctx context.Context, name string) error
 	Sprite(name string) *spritesdk.Sprite
 	Close() error
@@ -61,11 +62,22 @@ func (r *realSDKClient) RestartSprite(ctx context.Context, name string) error {
 	return postSpriteAction(ctx, r.baseURL, r.token, fmt.Sprintf("/v1/sprites/%s/restart", name))
 }
 
-func (r *realSDKClient) Run(ctx context.Context, name string, argv []string, stdout, stderr io.Writer) error {
+func (r *realSDKClient) Run(ctx context.Context, name string, argv []string, stdin io.Reader, stdout, stderr io.Writer) error {
+	return r.RunIn(ctx, name, "", nil, argv, stdin, stdout, stderr)
+}
+
+func (r *realSDKClient) RunIn(ctx context.Context, name, dir string, env, argv []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	if len(argv) == 0 {
 		return errors.New("sprites run: empty command")
 	}
 	cmd := r.c.Sprite(name).CommandContext(ctx, argv[0], argv[1:]...)
+	if dir != "" {
+		cmd.Dir = dir
+	}
+	if len(env) > 0 {
+		cmd.Env = env
+	}
+	cmd.Stdin = stdin
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 	return cmd.Run()

@@ -42,7 +42,11 @@ func (s *warmStubClient) UpgradeSprite(context.Context, string) error { return n
 
 func (s *warmStubClient) RestartSprite(context.Context, string) error { return nil }
 
-func (s *warmStubClient) Run(context.Context, string, []string, io.Writer, io.Writer) error {
+func (s *warmStubClient) Run(context.Context, string, []string, io.Reader, io.Writer, io.Writer) error {
+	return nil
+}
+
+func (s *warmStubClient) RunIn(context.Context, string, string, []string, []string, io.Reader, io.Writer, io.Writer) error {
 	return nil
 }
 
