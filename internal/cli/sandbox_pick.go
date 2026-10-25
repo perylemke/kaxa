@@ -134,7 +134,7 @@ func (m sandboxPickModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.cursor < len(m.infos)-1 {
 			m.cursor++
 		}
-	case "enter":
+	case keyEnter:
 		if len(m.infos) == 0 {
 			m.cancelled = true
 			return m, tea.Quit

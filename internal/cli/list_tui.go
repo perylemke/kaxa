@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/sbox/internal/usererr"
 )
 
 type listPostAction int
@@ -21,11 +23,13 @@ const (
 	listPostRestart
 	listPostUpgrade
 	listPostDestroy
+	listPostURLAuth
 )
 
 type listTUIResult struct {
 	postAction listPostAction
 	id         sandbox.ID
+	auth       string
 }
 
 const (
@@ -34,7 +38,10 @@ const (
 	listModeDetail
 )
 
-const keyInterrupt = "ctrl+c"
+const (
+	keyInterrupt = "ctrl+c"
+	keyEnter     = "enter"
+)
 
 type listInteractiveModel struct {
 	inspect    func(sandbox.ID) tea.Cmd
@@ -45,6 +52,7 @@ type listInteractiveModel struct {
 	detailErr  error
 	postAction listPostAction
 	postID     sandbox.ID
+	auth       string
 }
 
 type detailLoadedMsg struct {
@@ -112,7 +120,7 @@ func (m listInteractiveModel) updateKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m listInteractiveModel) updateTableKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "enter":
+	case keyEnter:
 		if len(m.infos) == 0 {
 			return m, nil
 		}
@@ -152,9 +160,24 @@ func (m listInteractiveModel) updateDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cm
 		m.postAction = listPostDestroy
 		m.postID = id
 		return m, tea.Quit
+	case keyEnter:
+		if id == "" || m.detailErr != nil {
+			return m, nil
+		}
+		m.postAction = listPostURLAuth
+		m.postID = id
+		m.auth = selectedURLAuth(m.detail.Auth)
+		return m, tea.Quit
 	default:
 		return m, nil
 	}
+}
+
+func selectedURLAuth(displayed string) string {
+	if strings.HasPrefix(displayed, sandbox.URLAuthPublic) {
+		return sandbox.URLAuthPublic
+	}
+	return sandbox.URLAuthSprite
 }
 
 func (m listInteractiveModel) detailID() sandbox.ID {
@@ -215,7 +238,7 @@ func (m listInteractiveModel) detailView() string {
 	if len(d.Labels) > 0 {
 		fmt.Fprintf(&b, "Labels        %s\n", joinListLabels(d.Labels))
 	}
-	b.WriteString("\nr restart • u upgrade • d destroy • esc back • q quit\n")
+	b.WriteString("\nenter auth • r restart • u upgrade • d destroy • esc back • q quit\n")
 	return b.String()
 }
 
@@ -236,7 +259,7 @@ func runListInteractive(ctx context.Context, p sandbox.Provider, infos []sandbox
 	if !ok {
 		return listTUIResult{}, errors.New("list interactive failed")
 	}
-	return listTUIResult{postAction: model.postAction, id: model.postID}, nil
+	return listTUIResult{postAction: model.postAction, id: model.postID, auth: model.auth}, nil
 }
 
 func handleListPostAction(cmd *cobra.Command, p sandbox.Provider, res listTUIResult) error {
@@ -276,7 +299,51 @@ func handleListPostAction(cmd *cobra.Command, p sandbox.Provider, res listTUIRes
 			destroySuccessMessage([]sandbox.ID{res.id}),
 			func(ctx context.Context) error { return p.Destroy(ctx, res.id) },
 		)
+	case listPostURLAuth:
+		return runListURLAuth(ctx, in, errOut, out, p, res)
 	default:
 		return nil
 	}
+}
+
+func runListURLAuth(ctx context.Context, in io.Reader, errOut, out io.Writer, p sandbox.Provider, res listTUIResult) error {
+	setter, ok := p.(sandbox.PublicURL)
+	if !ok {
+		return usererr.New(
+			"url auth is only supported for the sprites provider",
+			"pass --provider sprites",
+		)
+	}
+	reader := in
+	if !inputIsTTY(in) {
+		reader = newOneLineReader(in)
+	}
+	auth, err := collectURLAuth(reader, errOut, res.auth)
+	if errors.Is(err, errURLAuthCancelled) {
+		_, err = fmt.Fprintln(out, "cancelled")
+		return err
+	}
+	if err != nil {
+		return err
+	}
+	confirmed, err := confirmAction(reader, errOut, fmt.Sprintf("Set sandbox %s URL auth to %s?", res.id, auth))
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		_, err = fmt.Fprintln(out, "cancelled")
+		return err
+	}
+	err = runTaskWithSpinner(ctx, errOut, "setting url auth…", func(ctx context.Context) error {
+		return setter.SetURLAuth(ctx, res.id, auth)
+	})
+	if err != nil {
+		return err
+	}
+	detail, err := p.Inspect(ctx, res.id)
+	if err != nil {
+		return err
+	}
+	msg := fmt.Sprintf("sandbox %s URL auth is %s\n%s", res.id, auth, detail.URL)
+	return WriteSuccess(out, "url", msg)
 }
