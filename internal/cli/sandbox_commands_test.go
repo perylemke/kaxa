@@ -345,6 +345,63 @@ func TestDestroyCommands(t *testing.T) {
 	}
 }
 
+func TestDestroyForceSkipsConfirm(t *testing.T) {
+	for _, flag := range []string{"--force", "-f"} {
+		t.Run(flag, func(t *testing.T) {
+			fp := &fakeProvider{name: testSpritesName}
+			reg := spritesRegistry(t, fp)
+			cmd := cli.NewRootCmd(reg)
+			out := new(bytes.Buffer)
+			errOut := new(bytes.Buffer)
+			cmd.SetOut(out)
+			cmd.SetErr(errOut)
+			cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdDestroy, flag, testBoxName})
+			t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+
+			if err := cmd.Execute(); err != nil {
+				t.Fatalf("execute: %v", err)
+			}
+			if fp.destroyed != testBoxName {
+				t.Fatalf("destroyed = %q", fp.destroyed)
+			}
+			if strings.Contains(errOut.String(), "[y/N]") {
+				t.Fatalf("prompt = %q", errOut.String())
+			}
+			if !strings.Contains(out.String(), "sandbox "+testBoxName+" was destroyed") {
+				t.Fatalf("output = %q", out.String())
+			}
+		})
+	}
+}
+
+func TestDestroyAllForce(t *testing.T) {
+	fp := &fakeProvider{
+		name: testSpritesName,
+		list: []sandbox.Info{{ID: "a"}, {ID: "b"}},
+	}
+	reg := spritesRegistry(t, fp)
+	cmd := cli.NewRootCmd(reg)
+	out := new(bytes.Buffer)
+	errOut := new(bytes.Buffer)
+	cmd.SetOut(out)
+	cmd.SetErr(errOut)
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdDestroy, "-f", "--all"})
+	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if len(fp.destroyedIDs) != 2 || fp.destroyedIDs[0] != "a" || fp.destroyedIDs[1] != "b" {
+		t.Fatalf("destroyed = %v", fp.destroyedIDs)
+	}
+	if strings.Contains(errOut.String(), "[y/N]") {
+		t.Fatalf("prompt = %q", errOut.String())
+	}
+	if !strings.Contains(out.String(), "2 sandboxes were destroyed") {
+		t.Fatalf("output = %q", out.String())
+	}
+}
+
 func TestDestroyNoSkipsProvider(t *testing.T) {
 	fp := &fakeProvider{name: testSpritesName}
 	reg := spritesRegistry(t, fp)

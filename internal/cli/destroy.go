@@ -19,6 +19,7 @@ var errDestroyCancelled = errors.New("destroy cancelled")
 
 func newDestroyCmd(reg *registry.Registry) *cobra.Command {
 	var destroyAll bool
+	var force bool
 
 	cmd := &cobra.Command{
 		Use:     "destroy [name]",
@@ -49,7 +50,7 @@ func newDestroyCmd(reg *registry.Registry) *cobra.Command {
 				return err
 			}
 
-			if !picked {
+			if !picked && !force {
 				ok, err := confirmAction(cmd.InOrStdin(), cmd.ErrOrStderr(), destroyPrompt(destroyAll, ids))
 				if err != nil {
 					return err
@@ -75,6 +76,7 @@ func newDestroyCmd(reg *registry.Registry) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&destroyAll, "all", false, "destroy every sandbox")
+	cmd.Flags().BoolVarP(&force, "force", "f", false, "destroy without confirmation")
 	return cmd
 }
 
