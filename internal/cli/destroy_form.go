@@ -19,7 +19,7 @@ func newDestroyForm(infos []sandbox.Info, selected *[]sandbox.ID) *huh.Form {
 
 	// huh sizes an unset multi-select from the option list, then subtracts the
 	// title. That leaves the option viewport at height 0, so the list is blank.
-	return huh.NewForm(
+	return newThemedForm(
 		huh.NewGroup(
 			huh.NewMultiSelect[sandbox.ID]().
 				Title("Sandboxes").

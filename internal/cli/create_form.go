@@ -104,10 +104,10 @@ func collectCreateForm(in io.Reader, out io.Writer, providers []string, defaultP
 func runCreateForm(out io.Writer, in io.Reader, accessible bool, main, detail *huh.Group, result *createFormResult) error {
 	var form *huh.Form
 	if accessible {
-		form = huh.NewForm(main).WithAccessible(true).WithInput(in).WithOutput(out)
+		form = newThemedForm(main).WithAccessible(true).WithInput(in).WithOutput(out)
 	} else {
 		detail = detail.WithHideFunc(func() bool { return !result.API })
-		form = huh.NewForm(main, detail)
+		form = newThemedForm(main, detail)
 	}
 	if err := form.Run(); err != nil {
 		return formRunErr(err)
@@ -115,7 +115,7 @@ func runCreateForm(out io.Writer, in io.Reader, accessible bool, main, detail *h
 	if !accessible || !result.API {
 		return nil
 	}
-	next := huh.NewForm(detail).WithAccessible(true).WithInput(in).WithOutput(out)
+	next := newThemedForm(detail).WithAccessible(true).WithInput(in).WithOutput(out)
 	if err := next.Run(); err != nil {
 		return formRunErr(err)
 	}
