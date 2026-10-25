@@ -1,0 +1,16 @@
+# sbox upgrade
+
+Upgrade a sandbox.
+
+```bash
+sbox upgrade [name]
+```
+
+With a name, upgrade asks `[y/N]` and then upgrades that sandbox. Answering no prints `upgrade cancelled` and does not call the provider.
+
+Without a name, upgrade opens a picker. Choose a number or a name from the list, confirm `[y/N]`, and the sandbox upgrades. `q` cancels the picker.
+
+```bash
+sbox upgrade my-sprite
+sbox upgrade
+```
