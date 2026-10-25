@@ -69,6 +69,7 @@ Configure Sprites or Modal credentials via SBOX_* environment variables (see REA
 	root.AddCommand(newDestroyCmd(reg))
 	root.AddCommand(newRestartCmd(reg))
 	root.AddCommand(newUpgradeCmd(reg))
+	root.AddCommand(newURLCmd(reg))
 
 	return root
 }
