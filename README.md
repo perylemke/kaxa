@@ -77,11 +77,43 @@ sbox rm my-sprite                # alias of destroy
 
 You can pass `--provider sprites` instead of `SBOX_DEFAULT_PROVIDER`.
 
-`create` labels the sandbox `sbox`. `--running` registers a one-hour hold, serves a browser tmux session on the sprite URL, and opens that URL. `--sync` copies the current Git repository, including `.git` and excluding ignored files, into `/home/sprite/workspace/<repo>` on a Sprites sandbox. `--dir` selects another repository; without it, sync uses the directory where sbox is running. A subdirectory still copies the whole Git repository. If that copy fails, the sandbox is deleted. The repository root selects Go, Rust, Python, and Node; missing tools are installed in the sandbox and then the project dependencies, and a failure deletes the sandbox. `--api` then publishes one HTTP service on the Sprites URL: `--api-cmd` is comma-separated argv, as in `.venv/bin/uvicorn,app.main:app,--host,0.0.0.0,--port,8000`, and the process must listen on `0.0.0.0` and on `--api-port` (8000 by default). With `--sync`, `--api` requires an HTTP API in the repository; a CLI project is rejected and the sandbox is not created. Create waits until the service is running; if it fails or does not become running within 30s, the sandbox is deleted. `--public` makes that URL reachable without a Sprites account during create. `sbox url <name> public` and `sbox url <name> sprite` change that access later, and only the sprites provider accepts the command. With `--running` and `--api` together, tmux still starts and the URL forwards to the API; if publishing the service fails, the sandbox is deleted. `exec` and `console` on a sandbox created with `--sync` start in `/home/sprite/workspace`. In a terminal, `list` highlights a row: Enter shows sprite details, Enter again opens the URL auth form, `r` restarts, `u` upgrades, `d` destroys, and `q` quits. With no sandboxes, `list` prints `no sandboxes created` and exits. `restart` and `upgrade` without a name open the same kind of picker; `destroy` without a name opens a form where you can select one or more sandboxes (when stdin is not a terminal, enter numbers to toggle and `0` to confirm). Named sandboxes and `destroy --all` still ask for `[y/N]` before they run, unless `--force` or `-f` is set.
+### create
+
+`create` labels the sandbox `sbox`.
+
+- `--running` keeps the sandbox up for one hour, serves tmux on its URL, and opens that URL.
+- `--sync` copies the Git repository, including `.git` and excluding ignored files, into `/home/sprite/workspace/<repo>`. `--dir` selects another repository. A subdirectory still copies the whole repository. The root selects Go, Rust, Python, and Node; missing tools are installed, then project dependencies. A failed copy or install deletes the sandbox.
+- `--api` publishes one HTTP service on the Sprites URL. `--api-cmd` is comma-separated argv, and the process must listen on `0.0.0.0` and on `--api-port` (8000 by default). With `--sync`, the repository must be an HTTP API; a CLI project is rejected before create. Create waits until the service is running, for up to 30 seconds, and deletes the sandbox if it does not. With `--running`, port `8080` stays with tmux and the URL forwards to the API.
+- `--public` makes that URL reachable without a Sprites account. A failed auth change leaves the sandbox in place. Change it later with `sbox url <name> public` or `sbox url <name> sprite`. Only the sprites provider accepts `url`.
+
+### exec and console
+
+On a sandbox created with `--sync`, `exec` and `console` start in `/home/sprite/workspace`.
+
+### list
+
+With no sandboxes, `list` prints `no sandboxes created` and exits. In a terminal, highlight a row and press Enter for details. From the detail view, Enter opens the URL auth form, `r` restarts, `u` upgrades, `d` destroys, and `q` quits.
+
+### restart, upgrade, and destroy
+
+`restart` and `upgrade` without a name open a picker. `destroy` without a name opens a form where you can select one or more sandboxes. When stdin is not a terminal, enter numbers to toggle and `0` to confirm. Named sandboxes and `destroy --all` still ask for `[y/N]`, unless `--force` or `-f` is set.
 
 ## Documentation
 
-Command manuals and Sprites account setup are in [docs/README.md](docs/README.md). Create a token with [docs/sprites-account.md](docs/sprites-account.md).
+| Manual | What it covers |
+| --- | --- |
+| [Sprites account](docs/sprites-account.md) | Account and API token |
+| [version](docs/version.md) | `sbox version` |
+| [create](docs/create.md) | `sbox create` (`new`) |
+| [list](docs/list.md) | `sbox list` (`ls`) |
+| [exec](docs/exec.md) | `sbox exec` |
+| [console](docs/console.md) | `sbox console` (`ssh`) |
+| [restart](docs/restart.md) | `sbox restart` |
+| [upgrade](docs/upgrade.md) | `sbox upgrade` |
+| [url](docs/url.md) | `sbox url` |
+| [destroy](docs/destroy.md) | `sbox destroy` (`rm`) |
+
+The same index, plus configuration, is in [docs/README.md](docs/README.md).
 
 ## Development
 
