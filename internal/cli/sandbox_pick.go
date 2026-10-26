@@ -37,7 +37,7 @@ func newSandboxActionCmd(
 	return &cobra.Command{
 		Use:   spec.verb + " [name]",
 		Short: spec.title + " a sandbox",
-		Args:  cobra.MaximumNArgs(1),
+		Args:  atMostOneName(spec.verb),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			p, err := providerFromCmd(cmd, reg)
 			if err != nil {

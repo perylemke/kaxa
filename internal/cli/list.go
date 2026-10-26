@@ -13,7 +13,7 @@ func newListCmd(reg *registry.Registry) *cobra.Command {
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List sandboxes",
-		Args:    cobra.NoArgs,
+		Args:    noArgs("list"),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			p, err := providerFromCmd(cmd, reg)
 			if err != nil {

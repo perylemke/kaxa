@@ -20,7 +20,7 @@ func TestURLSetsSpritesAuth(t *testing.T) {
 	cmd := newCreateCmd(t, fp)
 	out := new(bytes.Buffer)
 	cmd.SetOut(out)
-	cmd.SetArgs([]string{testProviderFlag, testSpritesName, "url", testBoxName, sandbox.URLAuthSprite})
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdURL, testBoxName, sandbox.URLAuthSprite})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
@@ -37,7 +37,7 @@ func TestURLSetsSpritesAuth(t *testing.T) {
 func TestURLRejectsProviderWithoutAuth(t *testing.T) {
 	fp := &fakeProvider{name: testSpritesName}
 	cmd := newCreateCmd(t, fp)
-	cmd.SetArgs([]string{testProviderFlag, testSpritesName, "url", testBoxName, sandbox.URLAuthPublic})
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdURL, testBoxName, sandbox.URLAuthPublic})
 
 	err := cmd.Execute()
 	if err == nil || !strings.Contains(err.Error(), "only supported") {
@@ -48,7 +48,7 @@ func TestURLRejectsProviderWithoutAuth(t *testing.T) {
 func TestURLRejectsUnknownAuth(t *testing.T) {
 	fp := &urlProvider{fakeProvider: &fakeProvider{name: testSpritesName}}
 	cmd := newCreateCmd(t, fp)
-	cmd.SetArgs([]string{testProviderFlag, testSpritesName, "url", testBoxName, "open"})
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdURL, testBoxName, "open"})
 
 	err := cmd.Execute()
 	if err == nil || !strings.Contains(err.Error(), "invalid url auth") {

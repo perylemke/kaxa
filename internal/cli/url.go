@@ -19,10 +19,24 @@ func newURLCmd(reg *registry.Registry) *cobra.Command {
 public lets anyone with the address open the URL. sprite requires a Sprites account. This command is only supported for the sprites provider.`,
 		Example: `  sbox url my-sprite public
   sbox url my-sprite sprite`,
-		Args: cobra.ExactArgs(2),
+		Args: requireURLArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runURL(cmd, reg, args[0], args[1])
 		},
+	}
+}
+
+func requireURLArgs(_ *cobra.Command, args []string) error {
+	const hint = "sbox url <name> public|sprite"
+	switch len(args) {
+	case 2:
+		return nil
+	case 0:
+		return usererr.New("url requires a sandbox name and an auth mode", hint)
+	case 1:
+		return usererr.New("url requires an auth mode", hint)
+	default:
+		return usererr.New("url accepts a sandbox name and an auth mode", hint)
 	}
 }
 

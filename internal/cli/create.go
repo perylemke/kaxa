@@ -44,7 +44,7 @@ Without a name, the form asks for the same choices. When API is yes, it asks for
 		Example: `  sbox create --sync my-sprite
   sbox create --sync --dir ~/projects/api-python my-sprite
   sbox create --sync --api --public --api-cmd .venv/bin/uvicorn,app.main:app,--host,0.0.0.0,--port,8000 my-sprite`,
-		Args: cobra.MaximumNArgs(1),
+		Args: atMostOneName("create"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runCreate(cmd, reg, args, createFlags{
 				Running: keepRunning,

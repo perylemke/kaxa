@@ -25,11 +25,8 @@ func newDestroyCmd(reg *registry.Registry) *cobra.Command {
 		Use:     "destroy [name]",
 		Aliases: []string{"rm"},
 		Short:   "Destroy a sandbox",
-		Args: func(cmd *cobra.Command, args []string) error {
-			if destroyAll {
-				return cobra.NoArgs(cmd, args)
-			}
-			return cobra.MaximumNArgs(1)(cmd, args)
+		Args: func(_ *cobra.Command, args []string) error {
+			return destroyArgError(destroyAll, args)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			p, err := providerFromCmd(cmd, reg)
@@ -78,6 +75,19 @@ func newDestroyCmd(reg *registry.Registry) *cobra.Command {
 	cmd.Flags().BoolVar(&destroyAll, "all", false, "destroy every sandbox")
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "destroy without confirmation")
 	return cmd
+}
+
+func destroyArgError(destroyAll bool, args []string) error {
+	if destroyAll {
+		if len(args) == 0 {
+			return nil
+		}
+		return usererr.New(
+			"destroy --all does not take a sandbox name",
+			"sbox destroy --all",
+		)
+	}
+	return rejectExtraName("destroy", args)
 }
 
 func destroyTargets(ctx context.Context, p sandbox.Provider, destroyAll bool, args []string, in io.Reader, errOut io.Writer) ([]sandbox.ID, bool, error) {
