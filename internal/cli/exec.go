@@ -1,13 +1,11 @@
 package cli
 
 import (
-	"context"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 
 	"github.com/perylemke/sbox/internal/registry"
 	"github.com/perylemke/sbox/internal/sandbox"
@@ -16,85 +14,36 @@ import (
 
 func newExecCmd(reg *registry.Registry) *cobra.Command {
 	return &cobra.Command{
-		Use:   "exec <name> [command...]",
-		Short: "Run a command or interactive shell in a sandbox",
-		Long:  "With no command, opens an interactive bash shell (requires a terminal).",
-		Args:  cobra.MinimumNArgs(1),
+		Use:   "exec <name> <command> [args...]",
+		Short: "Run a command in a sandbox",
+		Long:  "Runs the command you pass. The remote exit code is the sbox exit code. For an interactive shell, use sbox console.",
+		Args:  requireExecCommand,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			name := args[0]
-			interactive := len(args) == 1
-			command := args[1:]
-			if interactive {
-				command = []string{"bash"}
-			}
-
 			opts := sandbox.ExecOptions{
-				Command: command,
+				Command: args[1:],
 				Stdin:   os.Stdin,
 				Stdout:  cmd.OutOrStdout(),
 				Stderr:  cmd.ErrOrStderr(),
-				TTY:     interactive,
 			}
 
-			ctx := cmd.Context()
-			if interactive {
-				var cleanup func()
-				var err error
-				ctx, cleanup, err = wrapInteractive(ctx, &opts)
-				if err != nil {
-					return err
-				}
-				defer cleanup()
-			} else {
-				var stop func()
-				ctx, stop = signal.NotifyContext(ctx, syscall.SIGTERM)
-				defer stop()
-			}
+			ctx, stop := signal.NotifyContext(cmd.Context(), syscall.SIGTERM)
+			defer stop()
 
 			p, err := providerFromCmd(cmd, reg)
 			if err != nil {
 				return err
 			}
-			return p.Exec(ctx, sandbox.ID(name), opts)
+			return p.Exec(ctx, sandbox.ID(args[0]), opts)
 		},
 	}
 }
 
-func wrapInteractive(ctx context.Context, opts *sandbox.ExecOptions) (context.Context, func(), error) {
-	if !term.IsTerminal(int(os.Stdin.Fd())) {
-		return ctx, func() {}, usererr.New(
-			"interactive shell requires a terminal",
-			"pass a command, or run sbox exec from a terminal",
+func requireExecCommand(_ *cobra.Command, args []string) error {
+	if len(args) < 2 {
+		return usererr.New(
+			"exec requires a command",
+			"use sbox console for an interactive shell",
 		)
 	}
-
-	fd := int(os.Stdin.Fd())
-	oldState, err := term.MakeRaw(fd)
-	if err != nil {
-		return ctx, func() {}, err
-	}
-
-	cleanup := func() {
-		_ = term.Restore(fd, oldState)
-	}
-
-	w, h, err := term.GetSize(fd)
-	if err != nil {
-		cleanup()
-		return ctx, func() {}, err
-	}
-	opts.Size = sandbox.TermSize{Rows: termRows(h), Cols: termCols(w)}
-
-	resizeCh := make(chan sandbox.TermSize, 1)
-	opts.Resize = resizeCh
-	startWinchWatcher(ctx, fd, resizeCh)
-
-	ctx, stop := signal.NotifyContext(ctx, syscall.SIGTERM)
-	prevCleanup := cleanup
-	cleanup = func() {
-		stop()
-		prevCleanup()
-	}
-
-	return ctx, cleanup, nil
+	return nil
 }

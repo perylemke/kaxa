@@ -11,6 +11,7 @@ import (
 	"github.com/perylemke/sbox/internal/provider/sprites"
 	"github.com/perylemke/sbox/internal/registry"
 	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/sbox/internal/usererr"
 )
 
 const (
@@ -297,13 +298,72 @@ func TestListEmptyPrintsMessage(t *testing.T) {
 	}
 }
 
+func runSpritesCmd(t *testing.T, args ...string) (*fakeProvider, error) {
+	t.Helper()
+	fp := &fakeProvider{name: testSpritesName}
+	cmd := cli.NewRootCmd(spritesRegistry(t, fp))
+	cmd.SetOut(new(bytes.Buffer))
+	cmd.SetErr(new(bytes.Buffer))
+	cmd.SetArgs(append([]string{testProviderFlag, testSpritesName}, args...))
+	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+	return fp, cmd.Execute()
+}
+
+func TestExecRequiresCommand(t *testing.T) {
+	fp, err := runSpritesCmd(t, testCmdExec, testArgBox)
+	if err == nil || !strings.Contains(err.Error(), "exec requires a command") {
+		t.Fatalf("err = %v", err)
+	}
+	if len(fp.lastExec.Command) != 0 {
+		t.Fatalf("exec called: %v", fp.lastExec.Command)
+	}
+}
+
+func TestConsoleRequiresName(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "missing", args: []string{testCmdConsole}, want: "console requires a sandbox name"},
+		{name: "ssh missing", args: []string{"ssh"}, want: "console requires a sandbox name"},
+		{name: "extra", args: []string{testCmdConsole, testArgBox, "extra"}, want: "console accepts one sandbox name"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fp, err := runSpritesCmd(t, tt.args...)
+			ue, ok := usererr.As(err)
+			if !ok || ue.Message != tt.want || ue.Hint != "sbox console <name>" {
+				t.Fatalf("err = %#v", err)
+			}
+			if len(fp.lastExec.Command) != 0 {
+				t.Fatalf("exec called: %v", fp.lastExec.Command)
+			}
+		})
+	}
+}
+
+func TestConsoleRequiresTerminal(t *testing.T) {
+	for _, sub := range []string{testCmdConsole, "ssh"} {
+		t.Run(sub, func(t *testing.T) {
+			fp, err := runSpritesCmd(t, sub, testArgBox)
+			if err == nil || !strings.Contains(err.Error(), "interactive shell requires a terminal") {
+				t.Fatalf("err = %v", err)
+			}
+			if len(fp.lastExec.Command) != 0 {
+				t.Fatalf("exec called: %v", fp.lastExec.Command)
+			}
+		})
+	}
+}
+
 func TestExecWithArgsNoTTY(t *testing.T) {
 	fp := &fakeProvider{name: testSpritesName}
 	reg := spritesRegistry(t, fp)
 	cmd := cli.NewRootCmd(reg)
 	cmd.SetOut(new(bytes.Buffer))
 	cmd.SetErr(new(bytes.Buffer))
-	cmd.SetArgs([]string{testProviderFlag, testSpritesName, "exec", "box", "--", "ls", "-la"})
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdExec, testArgBox, "--", "ls", "-la"})
 	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
@@ -385,7 +445,7 @@ func TestDestroyAllForce(t *testing.T) {
 	errOut := new(bytes.Buffer)
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
-	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdDestroy, "-f", "--all"})
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdDestroy, "-f", testFlagAll})
 	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
@@ -435,7 +495,7 @@ func TestDestroyAll(t *testing.T) {
 	cmd.SetOut(out)
 	cmd.SetErr(new(bytes.Buffer))
 	cmd.SetIn(strings.NewReader("yes\n"))
-	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdDestroy, "--all"})
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdDestroy, testFlagAll})
 	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
@@ -486,7 +546,7 @@ func TestDestroyAllEmpty(t *testing.T) {
 	out := new(bytes.Buffer)
 	cmd.SetOut(out)
 	cmd.SetErr(new(bytes.Buffer))
-	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdDestroy, "--all"})
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdDestroy, testFlagAll})
 	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
@@ -677,7 +737,7 @@ func TestExecReturnsExitError(t *testing.T) {
 	cmd := cli.NewRootCmd(reg)
 	cmd.SetOut(new(bytes.Buffer))
 	cmd.SetErr(new(bytes.Buffer))
-	cmd.SetArgs([]string{testProviderFlag, testSpritesName, "exec", "box", "false"})
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdExec, testArgBox, "false"})
 	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
 
 	err := cmd.Execute()

@@ -36,7 +36,7 @@ sbox create --sync my-sprite
 sbox create --sync --dir ~/projects/api-python my-sprite
 ```
 
-`exec` on a sandbox created with `--sync` starts in `/home/sprite/workspace`.
+`exec` and `console` on a sandbox created with `--sync` start in `/home/sprite/workspace`.
 
 ## API
 

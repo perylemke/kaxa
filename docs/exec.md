@@ -1,16 +1,14 @@
 # sbox exec
 
-Run a shell or a command in a sandbox.
+Run a command in a sandbox.
 
 ```bash
-sbox exec <name>
-sbox exec <name> [command...]
+sbox exec <name> <command> [args...]
 ```
 
-With only the name, exec opens an interactive `bash`. That requires a terminal. Without a terminal, pass a command.
+`exec` always runs the command you pass. For an interactive shell, use [sbox console](console.md).
 
 ```bash
-sbox exec my-sprite
 sbox exec my-sprite -- ls -la
 ```
 

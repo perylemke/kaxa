@@ -24,6 +24,7 @@ Every command except `version` and `--help` loads configuration before it runs.
 | `sbox create` (`new`) | [create](create.md) |
 | `sbox list` (`ls`) | [list](list.md) |
 | `sbox exec` | [exec](exec.md) |
+| `sbox console` (`ssh`) | [console](console.md) |
 | `sbox destroy` (`rm`) | [destroy](destroy.md) |
 | `sbox restart` | [restart](restart.md) |
 | `sbox upgrade` | [upgrade](upgrade.md) |
