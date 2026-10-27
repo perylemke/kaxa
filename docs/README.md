@@ -27,6 +27,7 @@ Every command except `version` and `--help` loads configuration before it runs.
 | `kaxa list` (`ls`) | [list](list.md) |
 | `kaxa exec` | [exec](exec.md) |
 | `kaxa console` (`ssh`) | [console](console.md) |
+| `kaxa sync` | [sync](sync.md) |
 | `kaxa destroy` (`rm`) | [destroy](destroy.md) |
 | `kaxa restart` | [restart](restart.md) |
 | `kaxa upgrade` | [upgrade](upgrade.md) |

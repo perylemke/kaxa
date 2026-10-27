@@ -62,6 +62,9 @@ kaxa exec my-sprite -- ls -la    # run a command; remote exit code is propagated
 kaxa console my-sprite           # interactive bash (requires a terminal)
 kaxa ssh my-sprite               # alias of console
 
+kaxa sync my-sprite              # copy this git repository into a sandbox created with --sync
+kaxa sync --dir ~/projects/api-python my-sprite
+
 kaxa restart                     # pick a sandbox when no name is given
 kaxa restart my-sprite
 kaxa upgrade my-sprite
@@ -93,6 +96,10 @@ You can pass `--provider sprites` instead of `KAXA_DEFAULT_PROVIDER`.
 
 On a sandbox created with `--sync`, `exec` and `console` start in `/home/sprite/workspace` (Sprites) or run as `modal` in `/home/modal/workspace` (Modal).
 
+### sync
+
+`sync` adds another Git repository to a sandbox created with `--sync`, then installs its dependencies like `create --sync`. A sandbox created without `--sync` is rejected, and so is a repository that is already in the sandbox; `sync` never replaces a directory. A failed copy or install keeps the sandbox. See [sync](docs/sync.md).
+
 ### list
 
 With no sandboxes, `list` prints `no sandboxes created` and exits. In a terminal, highlight a row and press Enter for details. From the detail view, Enter opens the URL auth form, `r` restarts, `u` upgrades, `d` destroys, and `q` quits.
@@ -117,6 +124,7 @@ Point `command` at the installed binary. `go install` puts it on `$(go env GOPAT
 | [list](docs/list.md) | `kaxa list` (`ls`) |
 | [exec](docs/exec.md) | `kaxa exec` |
 | [console](docs/console.md) | `kaxa console` (`ssh`) |
+| [sync](docs/sync.md) | `kaxa sync` |
 | [restart](docs/restart.md) | `kaxa restart` |
 | [upgrade](docs/upgrade.md) | `kaxa upgrade` |
 | [url](docs/url.md) | `kaxa url` |

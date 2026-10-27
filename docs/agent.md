@@ -177,7 +177,7 @@ On a sandbox created with `sync`, the command starts in the provider workspace d
 ## Limits
 
 - Edits made with the agent's local file tools are not in the sandbox. Edits made in the sandbox are not copied back. Move code with `git` inside `exec`, or run `sync` again by creating a new sandbox. There is no pull tool yet.
-- `sync` copies the Git repository only at create time.
+- `sync` copies the Git repository only at create time. The MCP server has no tool to add another repository later. The CLI can: run `kaxa sync <name>` yourself; see [sync](sync.md).
 - `sync` copies only a repository that contains the server working directory or sits below it. This keeps a prompt from sending an unrelated repository to a remote provider. Start `kaxa mcp` from the project, or pass a `dir` inside it. A symlink that leaves the working directory is rejected.
 - Checkpoints, network policy and connectors are not exposed. Use the provider's own tools for them.
 - Only Sprites is implemented. `destroy` is permanent, and its tool is marked destructive so a client can ask first.
