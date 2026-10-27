@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/perylemke/kaxa/internal/lifecycle"
@@ -22,6 +23,7 @@ type createFlags struct {
 	API     bool
 	APICmd  string
 	APIPort int
+	APIEnv  []string
 	Public  bool
 }
 
@@ -33,6 +35,9 @@ func applyAPIFlags(req *createRequest, flags createFlags, portSet bool) error {
 		if portSet {
 			return usererr.New("--api-port requires --api", "pass --api to publish the service")
 		}
+		if len(flags.APIEnv) > 0 {
+			return usererr.New("--api-env requires --api", "pass --api to publish the service")
+		}
 		req.Public = flags.Public
 		return nil
 	}
@@ -43,9 +48,14 @@ func applyAPIFlags(req *createRequest, flags createFlags, portSet bool) error {
 	if err := lifecycle.ValidateAPI(flags.Running, flags.APIPort, argv); err != nil {
 		return err
 	}
+	env, err := lifecycle.ResolveAPIEnv(flags.APIEnv, os.LookupEnv)
+	if err != nil {
+		return err
+	}
 	req.API = true
 	req.APIPort = flags.APIPort
 	req.APICmd = argv
+	req.APIEnv = env
 	req.Public = flags.Public
 	return nil
 }

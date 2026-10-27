@@ -22,12 +22,13 @@ const (
 )
 
 var (
-	apiReadyTimeout  = 30 * time.Second
+	apiReadyTimeout  = 90 * time.Second
 	apiReadyInterval = time.Second
 )
 
 // PublishAPI starts an HTTP service and routes the sprite URL to port.
-func (p *Provider) PublishAPI(ctx context.Context, id sandbox.ID, workDir string, port int, argv []string) error {
+// env adds KEY=VALUE variables after the tool environment.
+func (p *Provider) PublishAPI(ctx context.Context, id sandbox.ID, workDir string, port int, argv, env []string) error {
 	if err := validateName(string(id)); err != nil {
 		return err
 	}
@@ -40,11 +41,14 @@ func (p *Provider) PublishAPI(ctx context.Context, id sandbox.ID, workDir string
 	if err := validateAPIArgv(argv); err != nil {
 		return err
 	}
+	if err := validateAPIEnv(env); err != nil {
+		return err
+	}
 	c, token, err := p.clientAndToken()
 	if err != nil {
 		return err
 	}
-	if _, err := runRemote(ctx, c, string(id), token, apiServiceArgv(workDir, port, argv)); err != nil {
+	if _, err := runRemote(ctx, c, string(id), token, apiServiceArgv(workDir, port, argv, env)); err != nil {
 		return fmt.Errorf("start api service: %w", err)
 	}
 	return waitAPIReady(ctx, c, string(id), token)
@@ -81,7 +85,7 @@ func (p *Provider) SetURLAuth(ctx context.Context, id sandbox.ID, auth string) e
 	return nil
 }
 
-func apiServiceArgv(workDir string, port int, argv []string) []string {
+func apiServiceArgv(workDir string, port int, argv, env []string) []string {
 	cmd := []string{spriteEnvCmd, servicesCmd, "create", apiServiceName, "--cmd", argv[0]}
 	if len(argv) > 1 {
 		cmd = append(cmd, "--args", strings.Join(argv[1:], ","))
@@ -89,7 +93,7 @@ func apiServiceArgv(workDir string, port int, argv []string) []string {
 	return append(cmd,
 		"--dir", workDir,
 		"--http-port", strconv.Itoa(port),
-		"--env", strings.Join(toolEnv(), ","),
+		"--env", strings.Join(append(toolEnv(), env...), ","),
 		"--no-stream",
 	)
 }
@@ -180,6 +184,18 @@ func validateAPIArgv(argv []string) error {
 	for _, arg := range argv {
 		if arg == "" || strings.Contains(arg, ",") {
 			return usererr.New("api command has an empty argument", "separate argv with commas and omit empty items")
+		}
+	}
+	return nil
+}
+
+// validateAPIEnv is a last check before variables are joined with commas.
+// The error names no value, which can be a secret.
+func validateAPIEnv(env []string) error {
+	for _, entry := range env {
+		key, _, ok := strings.Cut(entry, "=")
+		if !ok || !sandbox.ValidEnvKey(key) || strings.ContainsAny(entry, ",\n\r\x00") {
+			return usererr.New("invalid api env entry", "use KEY=VALUE without commas or line breaks")
 		}
 	}
 	return nil

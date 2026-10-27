@@ -88,8 +88,26 @@ type ProjectSetup interface {
 }
 
 // APIPublisher starts an HTTP service and routes the sandbox URL to it.
+// env holds extra KEY=VALUE variables for the service process.
 type APIPublisher interface {
-	PublishAPI(ctx context.Context, id ID, workDir string, port int, argv []string) error
+	PublishAPI(ctx context.Context, id ID, workDir string, port int, argv, env []string) error
+}
+
+// ValidEnvKey reports whether key is a portable environment variable name:
+// ASCII letters, digits, and underscores, not starting with a digit.
+func ValidEnvKey(key string) bool {
+	if key == "" {
+		return false
+	}
+	for i := range len(key) {
+		c := key[i]
+		letter := (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_'
+		digit := c >= '0' && c <= '9'
+		if !letter && (i == 0 || !digit) {
+			return false
+		}
+	}
+	return true
 }
 
 // URLAuthPublic is a Sprites URL that anyone with the address can open.

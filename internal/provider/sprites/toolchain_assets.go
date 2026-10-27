@@ -16,6 +16,10 @@ const (
 	nodeVersion   = "v24.22.1"
 	uvVersion     = "0.13.5"
 	rustupVersion = "1.29.2"
+	rubyVersion   = "3.4.12"
+	jdkTag        = "jdk-21.0.9%2B10"
+	jdkFileTag    = "21.0.9_10"
+	clojureTools  = "1.12.6.1673"
 
 	goAMD64SHA   = "65efbc80fdc1fa2cd2631cad5b481777a68e8725f34e89f50fc6ac714e379b40"
 	goARM64SHA   = "a06e99309dbcbdca1a8ccd2282c3ee146e55930886e26b4f1193269587165f49"
@@ -25,6 +29,12 @@ const (
 	uvARM64SHA   = "4bb69cf95ed13f23713bb7bc09f241896ea0c75b7c557e615a20604b82f9c403"
 	rustAMD64SHA = "5be191e8c70a5007074254cb74d78dbfdd25cd5a61c27de7b8e5410122ec24f4"
 	rustARM64SHA = "a9c168dbea81a84671c6b7a5c1795cb0eb699020110d107ddfca427bd797e697"
+
+	rubyAMD64SHA = "12bbaa27dd857892daa21d5c57e1a48908c37b03540388474cf96974d03770d1"
+	rubyARM64SHA = "c098862e9416148e0d5c8851ce222323ef93c23d6176e12ab5c0effc06268f49"
+	jdkAMD64SHA  = "810d3773df7e0d6c4394e4e244b264c8b30e0b05a0acf542d065fd78a6b65c2f"
+	jdkARM64SHA  = "edf0da4debe7cf475dbe320d174d6eed81479eb363f41e38a2efb740428c603a"
+	clojureSHA   = "fe9194858e75d5af13c2e2aff92d710674d5bc5105f2b42f90a7d94d82ec023c"
 )
 
 type spriteArch struct {
@@ -98,5 +108,41 @@ func rustupAsset(arch spriteArch) toolAsset {
 		url:     "https://static.rust-lang.org/rustup/archive/" + rustupVersion + "/" + arch.triple + "/rustup-init",
 		sha256:  sha,
 		archive: "/tmp/kaxa-rustup-init",
+	}
+}
+
+// rubyAsset is a relocatable build (--enable-load-relative) from jdx/ruby.
+func rubyAsset(arch spriteArch) toolAsset {
+	platform, sha := "arm64_linux", rubyARM64SHA
+	if arch.goArch == archAMD64 {
+		platform, sha = "x86_64_linux", rubyAMD64SHA
+	}
+	name := fmt.Sprintf("ruby-%s.%s.tar.gz", rubyVersion, platform)
+	return toolAsset{
+		url:     "https://github.com/jdx/ruby/releases/download/" + rubyVersion + "/" + name,
+		sha256:  sha,
+		archive: "/tmp/kaxa-ruby.tar.gz",
+	}
+}
+
+func jdkAsset(arch spriteArch) toolAsset {
+	cpu, sha := "aarch64", jdkARM64SHA
+	if arch.goArch == archAMD64 {
+		cpu, sha = "x64", jdkAMD64SHA
+	}
+	name := fmt.Sprintf("OpenJDK21U-jdk_%s_linux_hotspot_%s.tar.gz", cpu, jdkFileTag)
+	return toolAsset{
+		url:     "https://github.com/adoptium/temurin21-binaries/releases/download/" + jdkTag + "/" + name,
+		sha256:  sha,
+		archive: "/tmp/kaxa-jdk.tar.gz",
+	}
+}
+
+// clojureAsset is architecture independent: scripts and jars only.
+func clojureAsset() toolAsset {
+	return toolAsset{
+		url:     "https://github.com/clojure/brew-install/releases/download/" + clojureTools + "/clojure-tools-" + clojureTools + ".tar.gz",
+		sha256:  clojureSHA,
+		archive: "/tmp/kaxa-clojure.tar.gz",
 	}
 }

@@ -28,6 +28,7 @@ type recorder struct {
 	published bool
 	workDir   string
 	port      int
+	env       []string
 	publicSet bool
 	steps     []string
 }
@@ -80,10 +81,11 @@ func (f *fullProvider) SetupProjects(context.Context, sandbox.ID, string, []proj
 	return f.setupErr
 }
 
-func (f *fullProvider) PublishAPI(_ context.Context, _ sandbox.ID, workDir string, port int, _ []string) error {
+func (f *fullProvider) PublishAPI(_ context.Context, _ sandbox.ID, workDir string, port int, _, env []string) error {
 	f.rec.published = true
 	f.rec.workDir = workDir
 	f.rec.port = port
+	f.rec.env = append([]string(nil), env...)
 	f.rec.steps = append(f.rec.steps, "publish")
 	return f.publishErr
 }
@@ -338,7 +340,7 @@ func TestCheckRequiresLayoutForAPI(t *testing.T) {
 
 type apiOnlyProvider struct{ basicProvider }
 
-func (apiOnlyProvider) PublishAPI(context.Context, sandbox.ID, string, int, []string) error {
+func (apiOnlyProvider) PublishAPI(context.Context, sandbox.ID, string, int, []string, []string) error {
 	return nil
 }
 
@@ -418,5 +420,82 @@ func TestValidateAPI(t *testing.T) {
 				t.Fatalf("err = %v, want %q", err, tt.want)
 			}
 		})
+	}
+}
+
+const (
+	modeProd   = "MODE=prod"
+	commaValue = "a,b"
+)
+
+func TestResolveAPIEnv(t *testing.T) {
+	t.Parallel()
+
+	local := map[string]string{
+		"INHERITED":  "from-shell",
+		"WITH_COMMA": commaValue,
+	}
+	lookup := func(key string) (string, bool) {
+		v, ok := local[key]
+		return v, ok
+	}
+	tests := []struct {
+		name    string
+		entries []string
+		want    []string
+		errHas  string
+	}{
+		{name: "none"},
+		{name: "literal", entries: []string{modeProd}, want: []string{modeProd}},
+		{name: "empty value", entries: []string{"EMPTY="}, want: []string{"EMPTY="}},
+		{name: "value keeps equals", entries: []string{"Q=a=b"}, want: []string{"Q=a=b"}},
+		{name: "inherited", entries: []string{"INHERITED"}, want: []string{"INHERITED=from-shell"}},
+		{name: "unset inherited", entries: []string{"MISSING"}, errHas: "MISSING is not set"},
+		{name: "bad key", entries: []string{"1BAD=x"}, errHas: "invalid api env key"},
+		{name: "key with dash", entries: []string{"A-B=x"}, errHas: "invalid api env key"},
+		{name: "empty key", entries: []string{"=x"}, errHas: "invalid api env key"},
+		{name: "comma literal", entries: []string{"X=a,b"}, errHas: "comma"},
+		{name: "comma inherited", entries: []string{"WITH_COMMA"}, errHas: "comma"},
+		{name: "newline", entries: []string{"X=a\nb"}, errHas: "control character"},
+		{name: "duplicate", entries: []string{"X=1", "X=2"}, errHas: "more than once"},
+		{name: "reserved path", entries: []string{"PATH=/bin"}, errHas: "reserved"},
+		{name: "reserved home", entries: []string{"HOME=/"}, errHas: "reserved"},
+		{name: "kaxa token", entries: []string{"KAXA_SPRITES_TOKEN"}, errHas: "reserved"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := lifecycle.ResolveAPIEnv(tt.entries, lookup)
+			if tt.errHas != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.errHas) {
+					t.Fatalf("err = %v, want %q", err, tt.errHas)
+				}
+				if strings.Contains(err.Error(), commaValue) {
+					t.Fatalf("error leaks a value: %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("err = %v", err)
+			}
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCreatePassesAPIEnvToPublisher(t *testing.T) {
+	t.Parallel()
+
+	p, rec := newFull()
+	_, err := lifecycle.Create(context.Background(), p, lifecycle.Request{
+		Name: boxName, API: true, APIPort: 8000, APICmd: []string{uvicorn}, APIEnv: []string{modeProd},
+	}, nil)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if !slices.Equal(rec.env, []string{modeProd}) {
+		t.Fatalf("env = %v", rec.env)
 	}
 }

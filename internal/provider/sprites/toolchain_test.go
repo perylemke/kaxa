@@ -30,6 +30,155 @@ func TestToolAssetsPinChecksums(t *testing.T) {
 	}
 }
 
+const (
+	toolBundle     = "bundle"
+	toolClojure    = "clojure"
+	tarExtract     = "-xzf"
+	tarStrip       = "--strip-components=1"
+	rubyArchive    = "/tmp/kaxa-ruby.tar.gz"
+	jdkArchive     = "/tmp/kaxa-jdk.tar.gz"
+	clojureArchive = "/tmp/kaxa-clojure.tar.gz"
+)
+
+var (
+	testAMD64 = spriteArch{goArch: archAMD64, node: "x64", triple: "x86_64-unknown-linux-gnu"}
+	testARM64 = spriteArch{goArch: archARM64, node: archARM64, triple: "aarch64-unknown-linux-gnu"}
+)
+
+func TestRubyJDKClojureAssetsPinChecksums(t *testing.T) {
+	t.Parallel()
+
+	if got := rubyAsset(testAMD64); got.sha256 != rubyAMD64SHA || !strings.HasSuffix(got.url, "/3.4.12/ruby-3.4.12.x86_64_linux.tar.gz") {
+		t.Fatalf("ruby amd64 = %#v", got)
+	}
+	if got := rubyAsset(testARM64); got.sha256 != rubyARM64SHA || !strings.HasSuffix(got.url, "/3.4.12/ruby-3.4.12.arm64_linux.tar.gz") {
+		t.Fatalf("ruby arm64 = %#v", got)
+	}
+	if got := jdkAsset(testAMD64); got.sha256 != jdkAMD64SHA || !strings.HasSuffix(got.url, "jdk-21.0.9%2B10/OpenJDK21U-jdk_x64_linux_hotspot_21.0.9_10.tar.gz") {
+		t.Fatalf("jdk amd64 = %#v", got)
+	}
+	if got := jdkAsset(testARM64); got.sha256 != jdkARM64SHA || !strings.Contains(got.url, "jdk_aarch64_linux_hotspot") {
+		t.Fatalf("jdk arm64 = %#v", got)
+	}
+	if got := clojureAsset(); got.sha256 != clojureSHA || !strings.HasSuffix(got.url, "/1.12.6.1673/clojure-tools-1.12.6.1673.tar.gz") {
+		t.Fatalf("clojure = %#v", got)
+	}
+}
+
+func TestSetupProjectsInstallsMissingRuby(t *testing.T) {
+	t.Parallel()
+
+	client := &setupStub{
+		missing: map[string]bool{toolBundle: true},
+		sums:    map[string]string{rubyArchive: rubyAMD64SHA},
+	}
+	p := NewWithClient(client, "token")
+	err := p.SetupProjects(context.Background(), "box", "api", []project.Step{{
+		Kind:     project.KindRuby,
+		Commands: [][]string{{toolBundle, "install", "--frozen"}},
+	}})
+	if err != nil {
+		t.Fatalf("SetupProjects: %v", err)
+	}
+	mustSee(t, client.calls, "curl", "-fsSL", "-o", rubyArchive, rubyAsset(testAMD64).url)
+	mustSee(t, client.calls, "tar", tarExtract, rubyArchive, "-C", rubyPrefix, tarStrip)
+	for _, tool := range []string{"ruby", "gem", toolBundle} {
+		mustSee(t, client.calls, "ln", "-sfn", rubyPrefix+"/bin/"+tool, localBin+"/"+tool)
+	}
+	install := lastCallWith(client.calls, 3, 1, "install")
+	if install.argv[0] != bundleBin || install.argv[2] != "--frozen" || install.dir != workspaceDir+"/api" || len(install.env) == 0 {
+		t.Fatalf("install = %#v", install)
+	}
+}
+
+func TestSetupProjectsInstallsMissingClojureAndJDK(t *testing.T) {
+	t.Parallel()
+
+	client := &setupStub{
+		missing: map[string]bool{toolClojure: true, "java": true},
+		sums:    map[string]string{jdkArchive: jdkAMD64SHA, clojureArchive: clojureSHA},
+	}
+	p := NewWithClient(client, "token")
+	err := p.SetupProjects(context.Background(), "box", "api", []project.Step{{
+		Kind:     project.KindClojure,
+		Commands: [][]string{{toolClojure, "-P"}},
+	}})
+	if err != nil {
+		t.Fatalf("SetupProjects: %v", err)
+	}
+	mustSee(t, client.calls, "tar", tarExtract, jdkArchive, "-C", jdkPrefix, tarStrip)
+	mustSee(t, client.calls, "ln", "-sfn", jdkPrefix+"/bin/java", javaBin)
+	mustSee(t, client.calls, "tar", tarExtract, clojureArchive, "-C", clojurePrefix, tarStrip)
+	for _, jar := range []string{"clojure-tools-1.12.6.1673.jar", "exec.jar"} {
+		mustSee(t, client.calls, "mv", clojurePrefix+"/"+jar, clojurePrefix+"/libexec/"+jar)
+	}
+	mustSee(t, client.calls, "sed", "-i", "s|^install_dir=PREFIX$|install_dir="+clojurePrefix+"|", clojurePrefix+"/clojure")
+	mustSee(t, client.calls, "ln", "-sfn", clojurePrefix+"/clojure", clojureBin)
+	prep := lastCallWith(client.calls, 2, 1, "-P")
+	if prep.argv[0] != clojureBin || prep.dir != workspaceDir+"/api" || len(prep.env) == 0 {
+		t.Fatalf("prep = %#v", prep)
+	}
+}
+
+func TestSetupProjectsClojureKeepsExistingJava(t *testing.T) {
+	t.Parallel()
+
+	client := &setupStub{
+		missing: map[string]bool{toolClojure: true},
+		sums:    map[string]string{clojureArchive: clojureSHA},
+	}
+	p := NewWithClient(client, "token")
+	err := p.SetupProjects(context.Background(), "box", "api", []project.Step{{
+		Kind:     project.KindClojure,
+		Commands: [][]string{{toolClojure, "-P"}},
+	}})
+	if err != nil {
+		t.Fatalf("SetupProjects: %v", err)
+	}
+	if sawArgv(client.calls, []string{"tar", tarExtract, jdkArchive, "-C", jdkPrefix, tarStrip}) {
+		t.Fatalf("installed a JDK although java exists: %#v", argvOf(client.calls))
+	}
+}
+
+func TestSetupProjectsRejectsBadRubyChecksum(t *testing.T) {
+	t.Parallel()
+
+	client := &setupStub{
+		missing: map[string]bool{toolBundle: true},
+		sums:    map[string]string{rubyArchive: strings.Repeat("0", 64)},
+	}
+	p := NewWithClient(client, "token")
+	err := p.SetupProjects(context.Background(), "box", "api", []project.Step{{
+		Kind:     project.KindRuby,
+		Commands: [][]string{{toolBundle, "install"}},
+	}})
+	if err == nil || !strings.Contains(err.Error(), "checksum") {
+		t.Fatalf("err = %v", err)
+	}
+	if sawCommand(client.calls, "tar") {
+		t.Fatal("extracted an archive with a bad checksum")
+	}
+}
+
+// mustSee fails unless a remote call ran exactly argv.
+func mustSee(t *testing.T, calls []remoteCall, argv ...string) {
+	t.Helper()
+	if !sawArgv(calls, argv) {
+		t.Fatalf("missing call %v in %#v", argv, argvOf(calls))
+	}
+}
+
+// lastCallWith returns the last call with n args whose argv[idx] equals want.
+func lastCallWith(calls []remoteCall, n, idx int, want string) remoteCall {
+	var found remoteCall
+	for _, call := range calls {
+		if len(call.argv) == n && call.argv[idx] == want {
+			found = call
+		}
+	}
+	return found
+}
+
 func TestSetupProjectsInstallsMissingGo(t *testing.T) {
 	t.Parallel()
 
@@ -126,6 +275,7 @@ type setupStub struct {
 	calls   []remoteCall
 	missing map[string]bool
 	badSum  bool
+	sums    map[string]string
 }
 
 func (s *setupStub) CreateSprite(context.Context, string, []string) (*spritesdk.Sprite, error) {
@@ -166,6 +316,9 @@ func (s *setupStub) RunIn(_ context.Context, _, dir string, env, argv []string, 
 		_, _ = io.WriteString(stdout, "x86_64\n")
 	case argv[0] == "sha256sum":
 		sum := goAMD64SHA
+		if pinned, ok := s.sums[argv[len(argv)-1]]; ok {
+			sum = pinned
+		}
 		if s.badSum {
 			sum = "0000000000000000000000000000000000000000000000000000000000000000"
 		}

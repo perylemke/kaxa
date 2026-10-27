@@ -154,6 +154,7 @@ A request that needs a missing capability fails before anything is created, with
 | `api` | Publish one HTTP service. Requires `api_cmd` |
 | `api_cmd` | Argv of the service as a list. The first item is the binary |
 | `api_port` | Port the service listens on. Default `8000`. `8080` is reserved with `running` |
+| `api_env` | Service environment as a list. Each item is `KEY=VALUE`, or `KEY` to copy the value from the server environment. No commas in values. `HOME`, `USER`, `PATH`, and `KAXA_` names are reserved. Requires `api` |
 | `public` | Make the URL reachable without a provider account |
 
 The result has `id`, `provider`, `work_dir`, `url` and `auth`. `work_dir` is where the repository lives inside the sandbox and is set only with `sync`. Use it instead of assuming a path.

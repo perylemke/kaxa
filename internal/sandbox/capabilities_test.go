@@ -36,7 +36,7 @@ func (fullProvider) SetupProjects(context.Context, sandbox.ID, string, []project
 	return nil
 }
 
-func (fullProvider) PublishAPI(context.Context, sandbox.ID, string, int, []string) error {
+func (fullProvider) PublishAPI(context.Context, sandbox.ID, string, int, []string, []string) error {
 	return nil
 }
 func (fullProvider) SetURLAuth(context.Context, sandbox.ID, string) error { return nil }

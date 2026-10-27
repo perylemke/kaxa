@@ -765,7 +765,7 @@ func TestSandboxSubcommandHelp(t *testing.T) {
 		t.Fatalf("execute: %v", err)
 	}
 	help := out.String()
-	for _, want := range []string{"--api", "--api-cmd", "--api-port", "--public", "0.0.0.0", "--sync", "--dir", "--running", "HTTP API", "30s"} {
+	for _, want := range []string{"--api", "--api-cmd", "--api-port", "--public", "0.0.0.0", "--sync", "--dir", "--running", "HTTP API", "90s", "--api-env"} {
 		if !strings.Contains(help, want) {
 			t.Fatalf("help missing %q: %s", want, help)
 		}

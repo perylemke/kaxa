@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"slices"
 	"strings"
 	"testing"
 
@@ -16,6 +17,7 @@ import (
 const (
 	testAPIFlag    = "--api"
 	testAPICmdFlag = "--api-cmd"
+	testAPIEnvFlag = "--api-env"
 	testUvicorn    = "uvicorn"
 )
 
@@ -39,6 +41,21 @@ func TestCreateAPIFlagValidation(t *testing.T) {
 			name: "port without api",
 			args: []string{"--api-port", "9000"},
 			want: "--api-port requires --api",
+		},
+		{
+			name: "env without api",
+			args: []string{testAPIEnvFlag, "MODE=prod"},
+			want: "--api-env requires --api",
+		},
+		{
+			name: "reserved env",
+			args: []string{testAPIFlag, testAPICmdFlag, testUvicorn, testAPIEnvFlag, "KAXA_SPRITES_TOKEN"},
+			want: "reserved",
+		},
+		{
+			name: "unset inherited env",
+			args: []string{testAPIFlag, testAPICmdFlag, testUvicorn, testAPIEnvFlag, "SAMPLE_TEST_UNSET_VAR_X"},
+			want: "SAMPLE_TEST_UNSET_VAR_X is not set",
 		},
 		{
 			name: "empty argument",
@@ -123,6 +140,27 @@ func TestCreateAPIPublishesService(t *testing.T) {
 	got := out.String()
 	if !strings.Contains(got, spriteURL) || !strings.Contains(got, "port 8000") || !strings.Contains(got, "Sprites account") {
 		t.Fatalf("output = %q", got)
+	}
+}
+
+func TestCreateAPIPassesEnv(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://db:5432/app")
+	fp := &publishingProvider{
+		fakeProvider: &fakeProvider{name: testSpritesName, createID: testBoxName},
+	}
+	cmd := newCreateCmd(t, fp)
+	cmd.SetArgs([]string{
+		testProviderFlag, testSpritesName, testCmdCreate, testBoxName,
+		testAPIFlag, testAPICmdFlag, testUvicorn,
+		testAPIEnvFlag, "DATABASE_URL", testAPIEnvFlag, "MODE=prod",
+	})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	want := []string{"DATABASE_URL=postgres://db:5432/app", "MODE=prod"}
+	if !slices.Equal(fp.env, want) {
+		t.Fatalf("env = %#v", fp.env)
 	}
 }
 
@@ -216,6 +254,7 @@ type publishingProvider struct {
 	workDir    string
 	port       int
 	argv       []string
+	env        []string
 }
 
 func (p *publishingProvider) SyncWorkspace(_ context.Context, _ sandbox.ID, archive io.Reader) error {
@@ -236,7 +275,8 @@ func (p *publishingProvider) SetupProjects(context.Context, sandbox.ID, string, 
 	return nil
 }
 
-func (p *publishingProvider) PublishAPI(_ context.Context, _ sandbox.ID, workDir string, port int, argv []string) error {
+func (p *publishingProvider) PublishAPI(_ context.Context, _ sandbox.ID, workDir string, port int, argv, env []string) error {
+	p.env = append([]string(nil), env...)
 	p.published = true
 	p.workDir = workDir
 	p.port = port
