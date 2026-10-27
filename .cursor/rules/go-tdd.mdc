@@ -1,5 +1,5 @@
 ---
-description: TDD and test layout for Go code in sbx
+description: TDD and test layout for Go code in sbox
 globs: "**/*.go"
 alwaysApply: false
 ---

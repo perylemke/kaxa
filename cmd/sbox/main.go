@@ -1,14 +1,14 @@
-// Package main is the sbx CLI entrypoint.
+// Package main is the sbox CLI entrypoint.
 package main
 
 import (
 	"fmt"
 	"os"
 
-	"github.com/perylemke/sbx/internal/cli"
-	"github.com/perylemke/sbx/internal/provider/modal"
-	"github.com/perylemke/sbx/internal/provider/sprites"
-	"github.com/perylemke/sbx/internal/registry"
+	"github.com/perylemke/sbox/internal/cli"
+	"github.com/perylemke/sbox/internal/provider/modal"
+	"github.com/perylemke/sbox/internal/provider/sprites"
+	"github.com/perylemke/sbox/internal/registry"
 )
 
 func main() {
@@ -21,7 +21,7 @@ func main() {
 		{"modal", func() error { return reg.Register(modal.New()) }},
 	} {
 		if err := p.reg(); err != nil {
-			fmt.Fprintf(os.Stderr, "register %s: %v\n", p.name, err)
+			_ = cli.WriteError(os.Stderr, fmt.Errorf("register %s: %w", p.name, err))
 			os.Exit(1)
 		}
 	}

@@ -5,9 +5,17 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/perylemke/sbx/internal/provider/modal"
-	"github.com/perylemke/sbx/internal/sandbox"
+	"github.com/perylemke/sbox/internal/provider/modal"
+	"github.com/perylemke/sbox/internal/sandbox"
 )
+
+func TestStubIsNotAvailable(t *testing.T) {
+	t.Parallel()
+
+	if sandbox.IsAvailable(modal.New()) {
+		t.Fatal("modal stub should not be available")
+	}
+}
 
 func TestStubMethodsNotImplemented(t *testing.T) {
 	t.Parallel()
@@ -36,7 +44,7 @@ func TestStubMethodsNotImplemented(t *testing.T) {
 		{
 			name: "exec",
 			run: func() error {
-				return p.Exec(ctx, "id", []string{"echo"})
+				return p.Exec(ctx, "id", sandbox.ExecOptions{Command: []string{"echo"}})
 			},
 		},
 		{

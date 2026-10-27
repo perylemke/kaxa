@@ -1,5 +1,5 @@
 ---
-description: Security practices for sbx CLI
+description: Security practices for sbox CLI
 globs: "**/*.go"
 alwaysApply: false
 ---

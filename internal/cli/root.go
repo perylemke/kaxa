@@ -1,50 +1,58 @@
-// Package cli builds the sbx command tree.
+// Package cli builds the sbox command tree.
 package cli
 
 import (
-	"fmt"
+	"errors"
 	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
 
-	"github.com/perylemke/sbx/internal/config"
-	"github.com/perylemke/sbx/internal/registry"
+	"github.com/perylemke/sbox/internal/config"
+	"github.com/perylemke/sbox/internal/registry"
+	"github.com/perylemke/sbox/internal/sandbox"
 )
 
 // Execute runs the root command and returns an exit code.
 func Execute(reg *registry.Registry) int {
 	cmd := NewRootCmd(reg)
 	if err := cmd.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		if exitErr, ok := errors.AsType[*sandbox.ExitError](err); ok {
+			return remoteExitCode(exitErr.Code)
+		}
+		_ = WriteError(os.Stderr, err)
 		return 1
 	}
 	return 0
 }
 
-// NewRootCmd builds the sbx CLI root command.
+// NewRootCmd builds the sbox CLI root command.
 func NewRootCmd(reg *registry.Registry) *cobra.Command {
 	var provider string
 
 	root := &cobra.Command{
-		Use:   "sbx",
+		Use:   "sbox",
 		Short: "Unified CLI for sandbox providers",
 		Long: strings.TrimSpace(`
-sbx aggregates sandbox providers behind one CLI.
+sbox aggregates sandbox providers behind one CLI.
 
 Supported providers: ` + strings.Join(reg.Names(), ", ") + `.
 
-Configure Sprites or Modal credentials via SBX_* environment variables (see README).`),
+Configure Sprites or Modal credentials via SBOX_* environment variables (see README).`),
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
-			if cmd.Name() == "help" || cmd.Name() == "completion" || cmd.Name() == "version" {
+			if skipConfigLoad(cmd) {
 				return nil
 			}
-			_, err := config.Load(config.LoadOptions{
+			cfg, err := config.Load(config.LoadOptions{
 				Provider: provider,
 			}, reg)
-			return err
+			if err != nil {
+				return err
+			}
+			cmd.SetContext(withConfig(cmd.Context(), cfg))
+			return nil
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return cmd.Help()
@@ -52,8 +60,25 @@ Configure Sprites or Modal credentials via SBX_* environment variables (see READ
 	}
 
 	root.PersistentFlags().StringVar(&provider, "provider", "", "sandbox provider (sprites, modal)")
+	root.SetUsageTemplate(usageTemplate)
 
 	root.AddCommand(newVersionCmd())
+	root.AddCommand(newCreateCmd(reg))
+	root.AddCommand(newListCmd(reg))
+	root.AddCommand(newExecCmd(reg))
+	root.AddCommand(newConsoleCmd(reg))
+	root.AddCommand(newDestroyCmd(reg))
+	root.AddCommand(newRestartCmd(reg))
+	root.AddCommand(newUpgradeCmd(reg))
+	root.AddCommand(newURLCmd(reg))
+	root.AddCommand(newMCPCmd(reg))
 
 	return root
+}
+
+func remoteExitCode(code int) int {
+	if code < 0 || code > 255 {
+		return 1
+	}
+	return code
 }

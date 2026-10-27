@@ -4,10 +4,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/perylemke/sbx/internal/config"
-	"github.com/perylemke/sbx/internal/provider/modal"
-	"github.com/perylemke/sbx/internal/provider/sprites"
-	"github.com/perylemke/sbx/internal/registry"
+	"github.com/perylemke/sbox/internal/config"
+	"github.com/perylemke/sbox/internal/provider/modal"
+	"github.com/perylemke/sbox/internal/provider/sprites"
+	"github.com/perylemke/sbox/internal/registry"
 )
 
 func testRegistry(t *testing.T) *registry.Registry {
@@ -24,7 +24,7 @@ func testRegistry(t *testing.T) *registry.Registry {
 
 func TestLoadFlagOverridesEnv(t *testing.T) {
 	reg := testRegistry(t)
-	t.Setenv("SBX_DEFAULT_PROVIDER", "sprites")
+	t.Setenv("SBOX_DEFAULT_PROVIDER", "sprites")
 
 	cfg, err := config.Load(config.LoadOptions{Provider: "modal"}, reg)
 	if err != nil {
@@ -38,10 +38,10 @@ func TestLoadFlagOverridesEnv(t *testing.T) {
 func TestLoadFromEnv(t *testing.T) {
 	reg := testRegistry(t)
 	const token = "sprites-env-token" // #nosec G101 -- test fixture, not a real credential
-	t.Setenv("SBX_DEFAULT_PROVIDER", "sprites")
-	t.Setenv("SBX_SPRITES_TOKEN", token)
-	t.Setenv("SBX_MODAL_TOKEN_ID", "modal-id")
-	t.Setenv("SBX_MODAL_TOKEN_SECRET", "modal-secret")
+	t.Setenv("SBOX_DEFAULT_PROVIDER", "sprites")
+	t.Setenv("SBOX_SPRITES_TOKEN", token)
+	t.Setenv("SBOX_MODAL_TOKEN_ID", "modal-id")
+	t.Setenv("SBOX_MODAL_TOKEN_SECRET", "modal-secret")
 
 	cfg, err := config.Load(config.LoadOptions{}, reg)
 	if err != nil {
@@ -61,7 +61,7 @@ func TestLoadFromEnv(t *testing.T) {
 func TestValidateUnknownProvider(t *testing.T) {
 	reg := testRegistry(t)
 	const secret = "must-not-leak-token"
-	t.Setenv("SBX_SPRITES_TOKEN", secret)
+	t.Setenv("SBOX_SPRITES_TOKEN", secret)
 
 	_, err := config.Load(config.LoadOptions{Provider: "unknown"}, reg)
 	if err == nil {
