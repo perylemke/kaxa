@@ -8,7 +8,10 @@ import (
 	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
-const testLognameEnv = "LOGNAME=modal"
+const (
+	testLognameEnv = "LOGNAME=modal"
+	testEnvBinary  = "env"
+)
 
 func TestRepoExistsRunsTestDirAsModal(t *testing.T) {
 	t.Parallel()
@@ -34,7 +37,7 @@ func TestRepoExistsRunsTestDirAsModal(t *testing.T) {
 				t.Fatalf("RepoExists = %v, %v, want %v", exists, err, tt.want)
 			}
 			want := []string{
-				testRunuser, "-u", testModalUser, "--", "env", testHomeEnv, testUserEnv, testLognameEnv,
+				testRunuser, "-u", testModalUser, "--", testEnvBinary, testHomeEnv, testUserEnv, testLognameEnv,
 				"test", "-d", testWorkspace + "/api",
 			}
 			if !slices.Equal(f.execArgv, want) {
