@@ -134,7 +134,7 @@ func TestRunListURLAuthRejectsProvider(t *testing.T) {
 		id:   fixtureDemo,
 		auth: sandbox.URLAuthPublic,
 	})
-	if err == nil || !strings.Contains(err.Error(), "only supported") {
+	if err == nil || !strings.Contains(err.Error(), "does not support url auth") {
 		t.Fatalf("err = %v", err)
 	}
 }

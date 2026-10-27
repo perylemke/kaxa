@@ -7,19 +7,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
-
-	"github.com/perylemke/sbox/internal/sandbox"
 )
-
-func runCreateWithSpinner(ctx context.Context, errOut io.Writer, name string, create func(context.Context) (sandbox.ID, error)) (sandbox.ID, error) {
-	var id sandbox.ID
-	err := runTaskWithSpinner(ctx, errOut, "creating "+name+"…", func(ctx context.Context) error {
-		var createErr error
-		id, createErr = create(ctx)
-		return createErr
-	})
-	return id, err
-}
 
 func runTaskWithSpinner(ctx context.Context, errOut io.Writer, label string, task func(context.Context) error) error {
 	if !listOutputIsTTY(errOut) {

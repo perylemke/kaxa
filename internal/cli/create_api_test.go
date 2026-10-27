@@ -48,7 +48,7 @@ func TestCreateAPIFlagValidation(t *testing.T) {
 		{
 			name: "public without support",
 			args: []string{"--public"},
-			want: "only supported",
+			want: "does not support public urls",
 		},
 		{
 			name: "tmux port",
@@ -79,7 +79,7 @@ func TestCreateAPIRejectsProviderWithoutPublish(t *testing.T) {
 	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdCreate, testBoxName, testAPIFlag, testAPICmdFlag, testUvicorn})
 
 	err := cmd.Execute()
-	if err == nil || !strings.Contains(err.Error(), "only supported") {
+	if err == nil || !strings.Contains(err.Error(), "does not support api publish") {
 		t.Fatalf("err = %v", err)
 	}
 	if fp.lastCreate.Name != "" {
@@ -224,6 +224,12 @@ func (p *publishingProvider) SyncWorkspace(_ context.Context, _ sandbox.ID, arch
 	}
 	_, err := io.Copy(io.Discard, io.LimitReader(archive, 8<<20))
 	return err
+}
+
+func (p *publishingProvider) HomeDir() string { return "/home/sprite" }
+
+func (p *publishingProvider) RepoDir(repo string) (string, error) {
+	return "/home/sprite/workspace/" + repo, nil
 }
 
 func (p *publishingProvider) SetupProjects(context.Context, sandbox.ID, string, []project.Step) error {

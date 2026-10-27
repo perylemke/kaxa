@@ -7,19 +7,10 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/perylemke/sbox/internal/lifecycle"
 	"github.com/perylemke/sbox/internal/registry"
 	"github.com/perylemke/sbox/internal/sandbox"
 )
-
-var sboxCreateLabels = []string{"sbox"}
-
-func createLabels(sync bool) []string {
-	labels := append([]string{}, sboxCreateLabels...)
-	if sync {
-		labels = append(labels, sandbox.SyncLabel)
-	}
-	return labels
-}
 
 func newCreateCmd(reg *registry.Registry) *cobra.Command {
 	var keepRunning bool
@@ -77,37 +68,14 @@ func runCreate(cmd *cobra.Command, reg *registry.Registry, args []string, flags 
 	if err != nil {
 		return err
 	}
-	if err := requirePublishers(p, req); err != nil {
-		return err
-	}
-	if err := requireAPIProject(req); err != nil {
-		return err
-	}
-	syncer, err := workspaceSyncer(p, req)
-	if err != nil {
-		return err
-	}
-	id, err := runCreateWithSpinner(cmd.Context(), cmd.ErrOrStderr(), req.Name, func(ctx context.Context) (sandbox.ID, error) {
-		return p.Create(ctx, sandbox.Spec{
-			Name:      req.Name,
-			Labels:    createLabels(req.Sync),
-			Running:   req.Running,
-			ExposeAPI: req.API,
-		})
+	errOut := cmd.ErrOrStderr()
+	res, err := lifecycle.Create(cmd.Context(), p, req, func(ctx context.Context, label string, task func(context.Context) error) error {
+		return runTaskWithSpinner(ctx, errOut, label, task)
 	})
 	if err != nil {
 		return err
 	}
-	if err := syncIfRequested(cmd.Context(), cmd.ErrOrStderr(), p, syncer, id, req); err != nil {
-		return err
-	}
-	if err := publishAPIIfRequested(cmd.Context(), cmd.ErrOrStderr(), p, id, req); err != nil {
-		return err
-	}
-	if err := publishURLIfRequested(cmd.Context(), p, id, req); err != nil {
-		return err
-	}
-	return writeCreated(cmd, p, id, req)
+	return writeCreated(cmd, p, res.ID, req)
 }
 
 func cancelledOrErr(cmd *cobra.Command, err error) error {

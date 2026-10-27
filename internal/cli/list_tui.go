@@ -12,8 +12,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 
+	"github.com/perylemke/sbox/internal/lifecycle"
 	"github.com/perylemke/sbox/internal/sandbox"
-	"github.com/perylemke/sbox/internal/usererr"
 )
 
 type listPostAction int
@@ -309,10 +309,7 @@ func handleListPostAction(cmd *cobra.Command, p sandbox.Provider, res listTUIRes
 func runListURLAuth(ctx context.Context, in io.Reader, errOut, out io.Writer, p sandbox.Provider, res listTUIResult) error {
 	setter, ok := p.(sandbox.PublicURL)
 	if !ok {
-		return usererr.New(
-			"url auth is only supported for the sprites provider",
-			"pass --provider sprites",
-		)
+		return lifecycle.Unsupported(p, "url auth")
 	}
 	reader := in
 	if !inputIsTTY(in) {

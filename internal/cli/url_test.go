@@ -40,7 +40,7 @@ func TestURLRejectsProviderWithoutAuth(t *testing.T) {
 	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdURL, testBoxName, sandbox.URLAuthPublic})
 
 	err := cmd.Execute()
-	if err == nil || !strings.Contains(err.Error(), "only supported") {
+	if err == nil || !strings.Contains(err.Error(), "does not support url auth") {
 		t.Fatalf("err = %v", err)
 	}
 }
