@@ -9,6 +9,14 @@ import (
 	"github.com/perylemke/sbox/internal/sandbox"
 )
 
+func TestStubIsNotAvailable(t *testing.T) {
+	t.Parallel()
+
+	if sandbox.IsAvailable(modal.New()) {
+		t.Fatal("modal stub should not be available")
+	}
+}
+
 func TestStubMethodsNotImplemented(t *testing.T) {
 	t.Parallel()
 

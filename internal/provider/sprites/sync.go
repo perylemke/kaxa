@@ -14,6 +14,24 @@ import (
 
 const workspaceDir = "/home/sprite/workspace"
 
+// HomeDir is the default working directory of a sprite.
+func (p *Provider) HomeDir() string {
+	return spriteHome
+}
+
+// RepoDir is where SyncWorkspace places the repository named repo.
+func (p *Provider) RepoDir(repo string) (string, error) {
+	if err := validateRepoDir(repo); err != nil {
+		return "", err
+	}
+	return workspaceDir + "/" + repo, nil
+}
+
+// Available reports that Sprites can create sandboxes.
+func (p *Provider) Available() bool {
+	return true
+}
+
 func workspaceExecDir(labels []string) string {
 	if slices.Contains(labels, sandbox.SyncLabel) {
 		return workspaceDir

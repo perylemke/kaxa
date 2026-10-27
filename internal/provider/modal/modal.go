@@ -20,6 +20,11 @@ func (p *Provider) Name() string {
 	return "modal"
 }
 
+// Available reports false: the Modal provider is a stub and cannot serve requests.
+func (p *Provider) Available() bool {
+	return false
+}
+
 // Create is not implemented yet.
 func (p *Provider) Create(_ context.Context, _ sandbox.Spec) (sandbox.ID, error) {
 	return "", errNotImplemented("create")
