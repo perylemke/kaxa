@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/perylemke/sbox/internal/project"
+	"github.com/perylemke/kaxa/internal/project"
 )
 
 type apiCase struct {

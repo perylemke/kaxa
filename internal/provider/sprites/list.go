@@ -5,7 +5,7 @@ import (
 
 	spritesdk "github.com/superfly/sprites-go"
 
-	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
 // SpriteListEntry is one sandbox row from paginated ListSprites.

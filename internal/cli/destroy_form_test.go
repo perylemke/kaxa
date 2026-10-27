@@ -8,7 +8,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
 func TestDestroyFormViewListsSandboxes(t *testing.T) {

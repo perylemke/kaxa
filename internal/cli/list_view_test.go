@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
 func TestListModelViewShowsColumnsAndRow(t *testing.T) {

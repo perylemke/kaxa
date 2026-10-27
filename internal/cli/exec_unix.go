@@ -10,7 +10,7 @@ import (
 
 	"golang.org/x/term"
 
-	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
 func startWinchWatcher(ctx context.Context, fd int, resize chan<- sandbox.TermSize) {

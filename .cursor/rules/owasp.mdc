@@ -1,11 +1,11 @@
 ---
-description: OWASP Top 10:2025 secure coding guidance for sbox
+description: OWASP Top 10:2025 secure coding guidance for kaxa
 alwaysApply: true
 ---
 
 # OWASP Top 10:2025
 
-Apply these defenses when designing or changing sbox (CLI, config, providers, file/exec paths).
+Apply these defenses when designing or changing kaxa (CLI, config, providers, file/exec paths).
 
 - **A01 Broken Access Control** — Enforce authorization where the operation runs; reject path traversal in file paths; do not fetch URLs the user did not intend (SSRF).
 - **A02 Security Misconfiguration** — Secure defaults; no `tls.Config{InsecureSkipVerify: true}` without documented exception.
@@ -18,4 +18,4 @@ Apply these defenses when designing or changing sbox (CLI, config, providers, fi
 - **A09 Security Logging and Alerting Failures** — Log security-relevant failures without tokens, secret query strings, or auth headers.
 - **A10 Mishandling of Exceptional Conditions** — Check errors and fail closed (crypto, I/O, auth); do not ignore errors that leave the system in an unsafe state.
 
-For verified false positives, suppress gosec with rule ID and justification: `//gosec:disable Gxxx -- reason`. See also `go-security.mdc` for sbox-specific token and exec rules.
+For verified false positives, suppress gosec with rule ID and justification: `//gosec:disable Gxxx -- reason`. See also `go-security.mdc` for kaxa-specific token and exec rules.

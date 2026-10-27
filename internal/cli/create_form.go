@@ -9,7 +9,7 @@ import (
 
 	"charm.land/huh/v2"
 
-	"github.com/perylemke/sbox/internal/usererr"
+	"github.com/perylemke/kaxa/internal/usererr"
 )
 
 var errCreateCancelled = errors.New("create cancelled")
@@ -27,7 +27,7 @@ type createFormResult struct {
 
 func collectCreateForm(in io.Reader, out io.Writer, providers []string, defaultProvider string, flags createFlags) (createFormResult, error) {
 	if len(providers) == 0 {
-		return createFormResult{}, usererr.New("no sandbox providers registered", "check sbox installation")
+		return createFormResult{}, usererr.New("no sandbox providers registered", "check kaxa installation")
 	}
 
 	var result createFormResult

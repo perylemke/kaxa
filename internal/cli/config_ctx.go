@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/perylemke/sbox/internal/config"
+	"github.com/perylemke/kaxa/internal/config"
 )
 
 type configKey struct{}

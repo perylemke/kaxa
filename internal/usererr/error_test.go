@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/perylemke/sbox/internal/usererr"
+	"github.com/perylemke/kaxa/internal/usererr"
 )
 
 func TestWrapUnwrap(t *testing.T) {

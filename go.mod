@@ -1,4 +1,4 @@
-module github.com/perylemke/sbox
+module github.com/perylemke/kaxa
 
 go 1.27
 

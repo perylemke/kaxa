@@ -4,14 +4,14 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/perylemke/sbox/internal/usererr"
+	"github.com/perylemke/kaxa/internal/usererr"
 )
 
 // ErrMissingToken indicates Sprites credentials were not configured.
 var ErrMissingToken = errors.New("sprites: missing API token")
 
 func missingTokenErr() error {
-	return usererr.Wrap(ErrMissingToken, "missing Sprites API token", "set SBOX_SPRITES_TOKEN")
+	return usererr.Wrap(ErrMissingToken, "missing Sprites API token", "set KAXA_SPRITES_TOKEN")
 }
 
 func redactErr(err error, token string) error {

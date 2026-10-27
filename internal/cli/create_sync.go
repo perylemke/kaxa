@@ -1,8 +1,8 @@
 package cli
 
 import (
-	"github.com/perylemke/sbox/internal/lifecycle"
-	"github.com/perylemke/sbox/internal/usererr"
+	"github.com/perylemke/kaxa/internal/lifecycle"
+	"github.com/perylemke/kaxa/internal/usererr"
 )
 
 type createRequest = lifecycle.Request

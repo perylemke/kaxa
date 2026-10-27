@@ -1,4 +1,4 @@
-// Package cli builds the sbox command tree.
+// Package cli builds the kaxa command tree.
 package cli
 
 import (
@@ -8,9 +8,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/perylemke/sbox/internal/config"
-	"github.com/perylemke/sbox/internal/registry"
-	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/config"
+	"github.com/perylemke/kaxa/internal/registry"
+	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
 // Execute runs the root command and returns an exit code.
@@ -26,19 +26,19 @@ func Execute(reg *registry.Registry) int {
 	return 0
 }
 
-// NewRootCmd builds the sbox CLI root command.
+// NewRootCmd builds the kaxa CLI root command.
 func NewRootCmd(reg *registry.Registry) *cobra.Command {
 	var provider string
 
 	root := &cobra.Command{
-		Use:   "sbox",
+		Use:   "kaxa",
 		Short: "Unified CLI for sandbox providers",
 		Long: strings.TrimSpace(`
-sbox aggregates sandbox providers behind one CLI.
+kaxa aggregates sandbox providers behind one CLI.
 
 Supported providers: ` + strings.Join(reg.Names(), ", ") + `.
 
-Configure Sprites or Modal credentials via SBOX_* environment variables (see README).`),
+Configure Sprites or Modal credentials via KAXA_* environment variables (see README).`),
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {

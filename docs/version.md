@@ -1,9 +1,9 @@
-# sbox version
+# kaxa version
 
-Print the sbox version. This command does not load provider configuration and does not need a token.
+Print the kaxa version. This command does not load provider configuration and does not need a token.
 
 ```bash
-sbox version
+kaxa version
 ```
 
-`sbox version` takes no arguments.
+`kaxa version` takes no arguments.

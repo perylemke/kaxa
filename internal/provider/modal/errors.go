@@ -3,8 +3,8 @@ package modal
 import (
 	"fmt"
 
-	"github.com/perylemke/sbox/internal/sandbox"
-	"github.com/perylemke/sbox/internal/usererr"
+	"github.com/perylemke/kaxa/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/usererr"
 )
 
 const notAvailableHint = "this provider is not available yet"

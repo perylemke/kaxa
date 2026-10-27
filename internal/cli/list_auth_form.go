@@ -6,7 +6,7 @@ import (
 
 	"charm.land/huh/v2"
 
-	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
 var errURLAuthCancelled = errors.New("url auth cancelled")

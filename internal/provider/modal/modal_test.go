@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/perylemke/sbox/internal/provider/modal"
-	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/provider/modal"
+	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
 func TestStubIsNotAvailable(t *testing.T) {

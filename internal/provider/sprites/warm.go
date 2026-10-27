@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/perylemke/sbox/internal/usererr"
+	"github.com/perylemke/kaxa/internal/usererr"
 )
 
 const (
@@ -38,7 +38,7 @@ func waitForWarm(ctx context.Context, c sdkClient, name, token string) error {
 		case <-waitCtx.Done():
 			if errors.Is(waitCtx.Err(), context.DeadlineExceeded) {
 				msg := fmt.Sprintf("sandbox %q was created but is still %q", name, sp.Status)
-				return usererr.Wrap(ErrWarmTimeout, msg, "check sbox list, or destroy it and create again")
+				return usererr.Wrap(ErrWarmTimeout, msg, "check kaxa list, or destroy it and create again")
 			}
 			return waitCtx.Err()
 		case <-ticker.C:

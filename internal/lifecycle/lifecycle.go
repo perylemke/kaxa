@@ -11,15 +11,15 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/perylemke/sbox/internal/project"
-	"github.com/perylemke/sbox/internal/reposync"
-	"github.com/perylemke/sbox/internal/sandbox"
-	"github.com/perylemke/sbox/internal/usererr"
+	"github.com/perylemke/kaxa/internal/project"
+	"github.com/perylemke/kaxa/internal/reposync"
+	"github.com/perylemke/kaxa/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/usererr"
 )
 
 const (
 	destroyTimeout = 15 * time.Second
-	sboxLabel      = "sbox"
+	kaxaLabel      = "kaxa"
 )
 
 // Request describes one sandbox to create.
@@ -38,7 +38,7 @@ type Request struct {
 
 // Labels returns the provider labels for the sandbox.
 func (r Request) Labels() []string {
-	labels := []string{sboxLabel}
+	labels := []string{kaxaLabel}
 	if r.Sync {
 		labels = append(labels, sandbox.SyncLabel)
 	}

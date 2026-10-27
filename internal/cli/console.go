@@ -9,9 +9,9 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"github.com/perylemke/sbox/internal/registry"
-	"github.com/perylemke/sbox/internal/sandbox"
-	"github.com/perylemke/sbox/internal/usererr"
+	"github.com/perylemke/kaxa/internal/registry"
+	"github.com/perylemke/kaxa/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/usererr"
 )
 
 func newConsoleCmd(reg *registry.Registry) *cobra.Command {
@@ -52,12 +52,12 @@ func requireConsoleName(_ *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		return usererr.New(
 			"console requires a sandbox name",
-			"sbox console <name>",
+			"kaxa console <name>",
 		)
 	}
 	return usererr.New(
 		"console accepts one sandbox name",
-		"sbox console <name>",
+		"kaxa console <name>",
 	)
 }
 
@@ -65,7 +65,7 @@ func wrapInteractive(ctx context.Context, opts *sandbox.ExecOptions) (context.Co
 	if !term.IsTerminal(int(os.Stdin.Fd())) {
 		return ctx, func() {}, usererr.New(
 			"interactive shell requires a terminal",
-			"run sbox console from a terminal",
+			"run kaxa console from a terminal",
 		)
 	}
 

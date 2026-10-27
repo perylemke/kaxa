@@ -22,7 +22,7 @@ func String() string {
 
 // Write prints version information in a Terraform-like format to w.
 func Write(w io.Writer) error {
-	if _, err := fmt.Fprintf(w, "sbox %s\n", label()); err != nil {
+	if _, err := fmt.Fprintf(w, "kaxa %s\n", label()); err != nil {
 		return err
 	}
 	_, err := fmt.Fprintf(w, "on %s_%s\n", runtime.GOOS, runtime.GOARCH)

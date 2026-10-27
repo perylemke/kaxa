@@ -1,10 +1,10 @@
-# sbox destroy
+# kaxa destroy
 
 Destroy one or more sandboxes. `rm` is an alias. Destroying a sprite deletes its persisted state.
 
 ```bash
-sbox destroy [name]
-sbox rm [name]
+kaxa destroy [name]
+kaxa rm [name]
 ```
 
 ## Flags
@@ -25,9 +25,9 @@ With no name and without `--all`, a form lets you select one or more sandboxes. 
 The `d` key in [list](list.md) still asks. It does not read `--force`.
 
 ```bash
-sbox destroy my-sprite
-sbox destroy --force my-sprite
-sbox destroy -f --all
+kaxa destroy my-sprite
+kaxa destroy --force my-sprite
+kaxa destroy -f --all
 ```
 
 Empty `--all` prints `no sandboxes to destroy`.

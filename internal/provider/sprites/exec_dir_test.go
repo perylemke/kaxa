@@ -6,13 +6,13 @@ import (
 
 	spritesdk "github.com/superfly/sprites-go"
 
-	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
 func TestPrepareExecCmdStartsInWorkspace(t *testing.T) {
 	t.Parallel()
 
-	cmd := execCmd(t, []string{"sbox", sandbox.SyncLabel})
+	cmd := execCmd(t, []string{"kaxa", sandbox.SyncLabel})
 	if cmd.Dir != workspaceDir {
 		t.Fatalf("dir = %q", cmd.Dir)
 	}
@@ -21,7 +21,7 @@ func TestPrepareExecCmdStartsInWorkspace(t *testing.T) {
 func TestPrepareExecCmdKeepsDefaultDir(t *testing.T) {
 	t.Parallel()
 
-	cmd := execCmd(t, []string{"sbox"})
+	cmd := execCmd(t, []string{"kaxa"})
 	if cmd.Dir != "" {
 		t.Fatalf("dir = %q", cmd.Dir)
 	}

@@ -11,12 +11,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/perylemke/sbox/internal/sandbox"
-	"github.com/perylemke/sbox/internal/usererr"
+	"github.com/perylemke/kaxa/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/usererr"
 )
 
 const (
-	apiServiceName   = "sbox-api"
+	apiServiceName   = "kaxa-api"
 	apiStatusRunning = "running"
 	apiStatusFailed  = "failed"
 )

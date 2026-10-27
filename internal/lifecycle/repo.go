@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/perylemke/sbox/internal/reposync"
-	"github.com/perylemke/sbox/internal/usererr"
+	"github.com/perylemke/kaxa/internal/reposync"
+	"github.com/perylemke/kaxa/internal/usererr"
 )
 
 // ResolveRepo finds the Git repository to copy. It returns the repository
@@ -66,7 +66,7 @@ func syncRepoError(err error, dir string) error {
 				"pass a directory inside a git repository",
 			)
 		}
-		return usererr.Wrap(err, "current directory is not inside a git repository", "run sbox create --sync from a git repository")
+		return usererr.Wrap(err, "current directory is not inside a git repository", "run kaxa create --sync from a git repository")
 	case errors.Is(err, reposync.ErrGitDirFile):
 		return usererr.Wrap(err, ".git is not a directory", "sync does not follow linked worktrees")
 	case errors.Is(err, reposync.ErrInvalidName):

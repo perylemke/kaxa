@@ -10,7 +10,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
 func TestListInteractiveDetailViewShowsFields(t *testing.T) {
@@ -25,7 +25,7 @@ func TestListInteractiveDetailViewShowsFields(t *testing.T) {
 			Organization: "acme",
 			URL:          "https://demo.sprites.dev",
 			Auth:         "sprite · admins",
-			Labels:       []string{"sbox", "team=a"},
+			Labels:       []string{"kaxa", "team=a"},
 			CreatedAt:    time.Now().Add(-2 * time.Hour),
 			UpdatedAt:    time.Now().Add(-5 * time.Minute),
 		},
@@ -38,7 +38,7 @@ func TestListInteractiveDetailViewShowsFields(t *testing.T) {
 		"acme",
 		"https://demo.sprites.dev",
 		"sprite · admins",
-		"sbox,team=a",
+		"kaxa,team=a",
 		"r restart",
 		"enter auth",
 	} {

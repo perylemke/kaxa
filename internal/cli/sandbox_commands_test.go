@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/perylemke/sbox/internal/cli"
-	"github.com/perylemke/sbox/internal/provider/sprites"
-	"github.com/perylemke/sbox/internal/registry"
-	"github.com/perylemke/sbox/internal/sandbox"
-	"github.com/perylemke/sbox/internal/usererr"
+	"github.com/perylemke/kaxa/internal/cli"
+	"github.com/perylemke/kaxa/internal/provider/sprites"
+	"github.com/perylemke/kaxa/internal/registry"
+	"github.com/perylemke/kaxa/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/usererr"
 )
 
 const (
@@ -109,7 +109,7 @@ func TestCreatePrintsName(t *testing.T) {
 	cmd.SetOut(out)
 	cmd.SetErr(new(bytes.Buffer))
 	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdCreate, testBoxName})
-	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
@@ -121,7 +121,7 @@ func TestCreatePrintsName(t *testing.T) {
 	if fp.configureToken != "tok" {
 		t.Fatalf("token = %q", fp.configureToken)
 	}
-	if fp.lastCreate.Labels == nil || fp.lastCreate.Labels[0] != "sbox" {
+	if fp.lastCreate.Labels == nil || fp.lastCreate.Labels[0] != "kaxa" {
 		t.Fatalf("create labels = %v", fp.lastCreate.Labels)
 	}
 }
@@ -136,7 +136,7 @@ func TestCreateInteractiveForm(t *testing.T) {
 	cmd.SetErr(errOut)
 	cmd.SetIn(strings.NewReader(strings.Join([]string{"demo", "1", "y", "n", "n", "n", ""}, "\n")))
 	cmd.SetArgs([]string{testCmdCreate})
-	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
@@ -165,7 +165,7 @@ func TestCreateRunningSetsSpec(t *testing.T) {
 	cmd.SetOut(out)
 	cmd.SetErr(new(bytes.Buffer))
 	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdCreate, testBoxName, testRunningFlag})
-	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
@@ -187,7 +187,7 @@ func TestCreateWithoutRunningFlag(t *testing.T) {
 	cmd.SetOut(out)
 	cmd.SetErr(new(bytes.Buffer))
 	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdCreate, testBoxName})
-	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
@@ -208,7 +208,7 @@ func TestCreateAliasNew(t *testing.T) {
 	cmd.SetOut(out)
 	cmd.SetErr(new(bytes.Buffer))
 	cmd.SetArgs([]string{testProviderFlag, testSpritesName, "new", testBoxName})
-	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
@@ -226,7 +226,7 @@ func TestListAliasLs(t *testing.T) {
 	cmd.SetOut(out)
 	cmd.SetErr(new(bytes.Buffer))
 	cmd.SetArgs([]string{testProviderFlag, testSpritesName, "ls"})
-	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
@@ -245,7 +245,7 @@ func TestCreateNoSpinnerOnNonTTYStderr(t *testing.T) {
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
 	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdCreate, testBoxName})
-	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
@@ -269,7 +269,7 @@ func TestListFormatsOutput(t *testing.T) {
 	cmd.SetOut(out)
 	cmd.SetErr(new(bytes.Buffer))
 	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdList})
-	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
@@ -288,7 +288,7 @@ func TestListEmptyPrintsMessage(t *testing.T) {
 	cmd.SetOut(out)
 	cmd.SetErr(new(bytes.Buffer))
 	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdList})
-	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
@@ -305,7 +305,7 @@ func runSpritesCmd(t *testing.T, args ...string) (*fakeProvider, error) {
 	cmd.SetOut(new(bytes.Buffer))
 	cmd.SetErr(new(bytes.Buffer))
 	cmd.SetArgs(append([]string{testProviderFlag, testSpritesName}, args...))
-	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 	return fp, cmd.Execute()
 }
 
@@ -333,7 +333,7 @@ func TestConsoleRequiresName(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			fp, err := runSpritesCmd(t, tt.args...)
 			ue, ok := usererr.As(err)
-			if !ok || ue.Message != tt.want || ue.Hint != "sbox console <name>" {
+			if !ok || ue.Message != tt.want || ue.Hint != "kaxa console <name>" {
 				t.Fatalf("err = %#v", err)
 			}
 			if len(fp.lastExec.Command) != 0 {
@@ -364,7 +364,7 @@ func TestExecWithArgsNoTTY(t *testing.T) {
 	cmd.SetOut(new(bytes.Buffer))
 	cmd.SetErr(new(bytes.Buffer))
 	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdExec, testArgBox, "--", "ls", "-la"})
-	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
@@ -390,7 +390,7 @@ func TestDestroyCommands(t *testing.T) {
 			cmd.SetErr(new(bytes.Buffer))
 			cmd.SetIn(strings.NewReader("y\n"))
 			cmd.SetArgs([]string{testProviderFlag, testSpritesName, sub, sandboxName})
-			t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+			t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 
 			if err := cmd.Execute(); err != nil {
 				t.Fatalf("execute: %v", err)
@@ -416,7 +416,7 @@ func TestDestroyForceSkipsConfirm(t *testing.T) {
 			cmd.SetOut(out)
 			cmd.SetErr(errOut)
 			cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdDestroy, flag, testBoxName})
-			t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+			t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 
 			if err := cmd.Execute(); err != nil {
 				t.Fatalf("execute: %v", err)
@@ -446,7 +446,7 @@ func TestDestroyAllForce(t *testing.T) {
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
 	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdDestroy, "-f", testFlagAll})
-	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
@@ -471,7 +471,7 @@ func TestDestroyNoSkipsProvider(t *testing.T) {
 	cmd.SetErr(new(bytes.Buffer))
 	cmd.SetIn(strings.NewReader("n\n"))
 	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdDestroy, "gone"})
-	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
@@ -496,7 +496,7 @@ func TestDestroyAll(t *testing.T) {
 	cmd.SetErr(new(bytes.Buffer))
 	cmd.SetIn(strings.NewReader("yes\n"))
 	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdDestroy, testFlagAll})
-	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
@@ -523,7 +523,7 @@ func TestDestroyChooseFromList(t *testing.T) {
 	cmd.SetErr(errOut)
 	cmd.SetIn(strings.NewReader("2\n0\n"))
 	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdDestroy})
-	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
@@ -547,7 +547,7 @@ func TestDestroyAllEmpty(t *testing.T) {
 	cmd.SetOut(out)
 	cmd.SetErr(new(bytes.Buffer))
 	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdDestroy, testFlagAll})
-	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
@@ -569,7 +569,7 @@ func TestRestartCancelledWithoutConfirm(t *testing.T) {
 	cmd.SetErr(new(bytes.Buffer))
 	cmd.SetIn(strings.NewReader("n\n"))
 	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdRestart, testBoxName})
-	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
@@ -609,7 +609,7 @@ func TestUpgradeCancelledWithoutConfirm(t *testing.T) {
 	cmd.SetErr(new(bytes.Buffer))
 	cmd.SetIn(strings.NewReader("n\n"))
 	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdUpgrade, testBoxName})
-	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
@@ -647,7 +647,7 @@ func testNamedActionConfirm(t *testing.T, subcmd, needle string, acted func(*fak
 	cmd.SetErr(new(bytes.Buffer))
 	cmd.SetIn(strings.NewReader("y\n"))
 	cmd.SetArgs([]string{testProviderFlag, testSpritesName, subcmd, testBoxName})
-	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
@@ -674,7 +674,7 @@ func testActionFromList(t *testing.T, subcmd, prompt, success string, acted func
 	cmd.SetErr(errOut)
 	cmd.SetIn(strings.NewReader("2\ny\n"))
 	cmd.SetArgs([]string{testProviderFlag, testSpritesName, subcmd})
-	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
@@ -699,7 +699,7 @@ func testActionWhenEmpty(t *testing.T, subcmd, emptyMsg string, acted func(*fake
 	cmd.SetOut(out)
 	cmd.SetErr(new(bytes.Buffer))
 	cmd.SetArgs([]string{testProviderFlag, testSpritesName, subcmd})
-	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
@@ -720,7 +720,7 @@ func TestDestroyReturnsProviderError(t *testing.T) {
 	cmd.SetErr(new(bytes.Buffer))
 	cmd.SetIn(strings.NewReader("y\n"))
 	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdDestroy, "gone"})
-	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 
 	err := cmd.Execute()
 	if err == nil || !strings.Contains(err.Error(), "delete failed") {
@@ -738,7 +738,7 @@ func TestExecReturnsExitError(t *testing.T) {
 	cmd.SetOut(new(bytes.Buffer))
 	cmd.SetErr(new(bytes.Buffer))
 	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdExec, testArgBox, "false"})
-	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 
 	err := cmd.Execute()
 	var exitErr *sandbox.ExitError

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/perylemke/sbox/internal/cli"
+	"github.com/perylemke/kaxa/internal/cli"
 )
 
 func TestUnknownProviderErrorRendersStyledBlock(t *testing.T) {

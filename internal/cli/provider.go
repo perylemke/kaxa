@@ -3,10 +3,10 @@ package cli
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/perylemke/sbox/internal/config"
-	"github.com/perylemke/sbox/internal/lifecycle"
-	"github.com/perylemke/sbox/internal/registry"
-	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/config"
+	"github.com/perylemke/kaxa/internal/lifecycle"
+	"github.com/perylemke/kaxa/internal/registry"
+	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
 const spritesProviderName = "sprites"

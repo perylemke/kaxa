@@ -14,15 +14,15 @@ func TestBinaryHelpAndVersion(t *testing.T) {
 	bin := buildBinary(t)
 
 	help := run(t, bin, "--help")
-	if !strings.Contains(help.stdout, "sbox") {
-		t.Fatalf("help missing sbox: %q", help.stdout)
+	if !strings.Contains(help.stdout, "kaxa") {
+		t.Fatalf("help missing kaxa: %q", help.stdout)
 	}
 
 	version := run(t, bin, "version")
 	if version.exitCode != 0 {
 		t.Fatalf("version exit = %d", version.exitCode)
 	}
-	if !strings.Contains(version.stdout, "sbox ") {
+	if !strings.Contains(version.stdout, "kaxa ") {
 		t.Fatalf("unexpected version: %q", version.stdout)
 	}
 	if !strings.Contains(version.stdout, "on ") {
@@ -33,8 +33,8 @@ func TestBinaryHelpAndVersion(t *testing.T) {
 func buildBinary(t *testing.T) string {
 	t.Helper()
 	root := repoRoot(t)
-	out := filepath.Join(t.TempDir(), "sbox")
-	cmd := exec.Command("go", "build", "-o", out, "./cmd/sbox")
+	out := filepath.Join(t.TempDir(), "kaxa")
+	cmd := exec.Command("go", "build", "-o", out, "./cmd/kaxa")
 	cmd.Dir = root
 	cmd.Env = append(os.Environ(),
 		"CGO_ENABLED=0",

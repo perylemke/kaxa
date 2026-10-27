@@ -12,8 +12,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 
-	"github.com/perylemke/sbox/internal/lifecycle"
-	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/lifecycle"
+	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
 type listPostAction int

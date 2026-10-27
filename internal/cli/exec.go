@@ -7,16 +7,16 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/perylemke/sbox/internal/registry"
-	"github.com/perylemke/sbox/internal/sandbox"
-	"github.com/perylemke/sbox/internal/usererr"
+	"github.com/perylemke/kaxa/internal/registry"
+	"github.com/perylemke/kaxa/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/usererr"
 )
 
 func newExecCmd(reg *registry.Registry) *cobra.Command {
 	return &cobra.Command{
 		Use:   "exec <name> <command> [args...]",
 		Short: "Run a command in a sandbox",
-		Long:  "Runs the command you pass. The remote exit code is the sbox exit code. For an interactive shell, use sbox console.",
+		Long:  "Runs the command you pass. The remote exit code is the kaxa exit code. For an interactive shell, use kaxa console.",
 		Args:  requireExecCommand,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts := sandbox.ExecOptions{
@@ -42,7 +42,7 @@ func requireExecCommand(_ *cobra.Command, args []string) error {
 	if len(args) < 2 {
 		return usererr.New(
 			"exec requires a command",
-			"use sbox console for an interactive shell",
+			"use kaxa console for an interactive shell",
 		)
 	}
 	return nil

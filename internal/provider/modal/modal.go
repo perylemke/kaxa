@@ -4,7 +4,7 @@ package modal
 import (
 	"context"
 
-	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
 // Provider implements sandbox.Provider for Modal sandboxes.

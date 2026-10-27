@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/perylemke/sbox/internal/lifecycle"
-	"github.com/perylemke/sbox/internal/project"
-	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/lifecycle"
+	"github.com/perylemke/kaxa/internal/project"
+	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
 const (
@@ -146,7 +146,7 @@ func TestCreateLabelsAndOrder(t *testing.T) {
 	if !slices.Equal(rec.steps, want) {
 		t.Fatalf("steps = %v, want %v", rec.steps, want)
 	}
-	if !slices.Contains(rec.created.Labels, sandbox.SyncLabel) || !slices.Contains(rec.created.Labels, "sbox") {
+	if !slices.Contains(rec.created.Labels, sandbox.SyncLabel) || !slices.Contains(rec.created.Labels, "kaxa") {
 		t.Fatalf("labels = %v", rec.created.Labels)
 	}
 	if res.ID != boxName || res.WorkDir != "/home/box/ws/"+name {

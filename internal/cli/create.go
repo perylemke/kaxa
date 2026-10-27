@@ -7,9 +7,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/perylemke/sbox/internal/lifecycle"
-	"github.com/perylemke/sbox/internal/registry"
-	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/lifecycle"
+	"github.com/perylemke/kaxa/internal/registry"
+	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
 func newCreateCmd(reg *registry.Registry) *cobra.Command {
@@ -32,9 +32,9 @@ func newCreateCmd(reg *registry.Registry) *cobra.Command {
 --api publishes one HTTP service on that URL after the copy. It requires --api-cmd and works only with Sprites. With --sync, the repository must be an HTTP API; a CLI project is rejected before the sandbox is created. The process must listen on 0.0.0.0 and on --api-port (8000 unless you change it). Together with --running, port 8080 stays with tmux and the URL forwards to the API. A failed publish deletes the sandbox. Create waits until the service is running. If it fails or does not become running within 30s, the sandbox is deleted.
 --public makes the Sprites URL reachable without an account. A failed auth change leaves the sandbox in place.
 Without a name, the form asks for the same choices. When API is yes, it asks for the command and the port.`,
-		Example: `  sbox create --sync my-sprite
-  sbox create --sync --dir ~/projects/api-python my-sprite
-  sbox create --sync --api --public --api-cmd .venv/bin/uvicorn,app.main:app,--host,0.0.0.0,--port,8000 my-sprite`,
+		Example: `  kaxa create --sync my-sprite
+  kaxa create --sync --dir ~/projects/api-python my-sprite
+  kaxa create --sync --api --public --api-cmd .venv/bin/uvicorn,app.main:app,--host,0.0.0.0,--port,8000 my-sprite`,
 		Args: atMostOneName("create"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runCreate(cmd, reg, args, createFlags{

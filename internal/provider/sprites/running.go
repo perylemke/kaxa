@@ -12,11 +12,11 @@ import (
 )
 
 const (
-	runningTaskPayload = `{"name":"sbox","expire":"1h"}`
+	runningTaskPayload = `{"name":"kaxa","expire":"1h"}`
 	webtmuxCommit      = "0612eeb71406c83603044fcb8e351a12e864afd5"
 	webtmuxDir         = "/home/sprite/.local/bin"
 	webtmuxBin         = webtmuxDir + "/webtmux"
-	webtmuxArchive     = "/tmp/sbox-webtmux.tar.gz"
+	webtmuxArchive     = "/tmp/kaxa-webtmux.tar.gz"
 	spriteEnvCmd       = "sprite-env"
 	servicesCmd        = "services"
 )

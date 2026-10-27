@@ -25,8 +25,8 @@ func TestMCPServerSpeaksOnlyProtocolOnStdout(t *testing.T) {
 
 	cmd := exec.Command(bin, "mcp")
 	cmd.Env = append(os.Environ(),
-		"SBOX_DEFAULT_PROVIDER=sprites",
-		"SBOX_SPRITES_TOKEN=e2e-not-a-real-token",
+		"KAXA_DEFAULT_PROVIDER=sprites",
+		"KAXA_SPRITES_TOKEN=e2e-not-a-real-token",
 	)
 	var stderr strings.Builder
 	cmd.Stderr = &stderr

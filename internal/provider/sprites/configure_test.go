@@ -3,7 +3,7 @@ package sprites_test
 import (
 	"testing"
 
-	"github.com/perylemke/sbox/internal/provider/sprites"
+	"github.com/perylemke/kaxa/internal/provider/sprites"
 )
 
 type closeCountingClient struct {

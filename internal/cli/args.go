@@ -3,7 +3,7 @@ package cli
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/perylemke/sbox/internal/usererr"
+	"github.com/perylemke/kaxa/internal/usererr"
 )
 
 func atMostOneName(command string) cobra.PositionalArgs {
@@ -18,7 +18,7 @@ func rejectExtraName(command string, args []string) error {
 	}
 	return usererr.New(
 		command+" accepts one sandbox name",
-		"sbox "+command+" [name]",
+		"kaxa "+command+" [name]",
 	)
 }
 
@@ -29,7 +29,7 @@ func noArgs(command string) cobra.PositionalArgs {
 		}
 		return usererr.New(
 			command+" does not take arguments",
-			"sbox "+command,
+			"kaxa "+command,
 		)
 	}
 }
