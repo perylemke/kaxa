@@ -26,14 +26,6 @@ func missingCredentialsErr() error {
 	)
 }
 
-func errNotImplemented(op string) error {
-	return usererr.Wrap(
-		sandbox.ErrNotImplemented,
-		fmt.Sprintf("modal %s is not implemented yet", op),
-		"use another provider for now",
-	)
-}
-
 // userErr turns client errors into user-facing errors and keeps credentials
 // out of any message.
 func userErr(err error, name string, secrets ...string) error {

@@ -3,6 +3,7 @@ package modal
 import (
 	"context"
 	"errors"
+	"io"
 	"slices"
 	"sort"
 	"time"
@@ -28,11 +29,32 @@ type Record struct {
 	ExitCode *int
 }
 
+// ExecParams are the options of one command run in a sandbox.
+type ExecParams struct {
+	// PTY gives the command a terminal. Modal then merges stderr into stdout.
+	PTY bool
+	// Workdir is an absolute directory to start in. Empty means the image default.
+	Workdir string
+}
+
+// Process is a command running inside a sandbox.
+type Process interface {
+	Stdin() io.WriteCloser
+	Stdout() io.Reader
+	Stderr() io.Reader
+	// Wait blocks until the command exits and returns its exit code.
+	Wait(ctx context.Context) (int, error)
+	// Close releases the handle on the sandbox. The command is not stopped.
+	Close()
+}
+
 type sdkClient interface {
 	Create(ctx context.Context, name string, labels []string) (Record, error)
 	List(ctx context.Context) ([]Record, error)
 	Get(ctx context.Context, name string) (Record, error)
 	Terminate(ctx context.Context, name string) error
+	// Exec starts argv in the named sandbox.
+	Exec(ctx context.Context, name string, argv []string, params ExecParams) (Process, error)
 	Close()
 }
 
@@ -115,6 +137,33 @@ func (r *realSDKClient) Terminate(ctx context.Context, name string) error {
 	// Wait so the sandbox is finished, not still stopping, when Destroy returns.
 	_, err = sb.Terminate(ctx, &sdk.SandboxTerminateParams{Wait: true})
 	return err
+}
+
+func (r *realSDKClient) Exec(ctx context.Context, name string, argv []string, params ExecParams) (Process, error) {
+	sb, err := r.c.Sandboxes.FromName(ctx, appName, name, nil)
+	if err != nil {
+		return nil, notFound(err)
+	}
+	cp, err := sb.Exec(ctx, argv, &sdk.SandboxExecParams{PTY: params.PTY, Workdir: params.Workdir})
+	if err != nil {
+		_ = sb.Detach()
+		return nil, err
+	}
+	return &sdkProcess{sb: sb, cp: cp}, nil
+}
+
+type sdkProcess struct {
+	sb *sdk.Sandbox
+	cp *sdk.ContainerProcess
+}
+
+func (p *sdkProcess) Stdin() io.WriteCloser { return p.cp.Stdin }
+func (p *sdkProcess) Stdout() io.Reader     { return p.cp.Stdout }
+func (p *sdkProcess) Stderr() io.Reader     { return p.cp.Stderr }
+func (p *sdkProcess) Close()                { _ = p.sb.Detach() }
+
+func (p *sdkProcess) Wait(ctx context.Context) (int, error) {
+	return p.cp.Wait(ctx, nil)
 }
 
 // recordOf reads tags and status, then detaches the handle.

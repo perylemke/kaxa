@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -60,6 +61,38 @@ func TestRealModalCRUD(t *testing.T) {
 	}
 	if detail.ID != sid || detail.Status != "running" || len(detail.Labels) != 2 {
 		t.Fatalf("detail = %+v", detail)
+	}
+
+	var stdout, stderr strings.Builder
+	err = p.Exec(ctx, sid, sandbox.ExecOptions{
+		Command: []string{"sh", "-c", "echo hi; echo oops >&2"},
+		Stdout:  &stdout,
+		Stderr:  &stderr,
+	})
+	if err != nil {
+		t.Fatalf("exec: %v", err)
+	}
+	if strings.TrimSpace(stdout.String()) != "hi" || strings.TrimSpace(stderr.String()) != "oops" {
+		t.Fatalf("exec stdout = %q, stderr = %q", stdout.String(), stderr.String())
+	}
+
+	err = p.Exec(ctx, sid, sandbox.ExecOptions{Command: []string{"sh", "-c", "exit 3"}})
+	if exitErr, ok := errors.AsType[*sandbox.ExitError](err); !ok || exitErr.Code != 3 {
+		t.Fatalf("exec exit 3 err = %v, want exit code 3", err)
+	}
+
+	var tty strings.Builder
+	err = p.Exec(ctx, sid, sandbox.ExecOptions{
+		Command: []string{"sh", "-c", "stty size"},
+		Stdout:  &tty,
+		TTY:     true,
+		Size:    sandbox.TermSize{Rows: 30, Cols: 100},
+	})
+	if err != nil {
+		t.Fatalf("exec tty: %v", err)
+	}
+	if !strings.Contains(tty.String(), "30 100") {
+		t.Fatalf("tty size output = %q, want 30 100", tty.String())
 	}
 
 	if err := p.Destroy(ctx, sid); err != nil {

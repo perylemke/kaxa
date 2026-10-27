@@ -27,7 +27,7 @@ func TestNameAndAvailability(t *testing.T) {
 	t.Parallel()
 
 	p := modal.New()
-	if p.Name() != "modal" {
+	if p.Name() != testProviderName {
 		t.Fatalf("name = %q", p.Name())
 	}
 	if !sandbox.IsAvailable(p) {
@@ -93,7 +93,7 @@ func TestCreate(t *testing.T) {
 	fake := newFakeClient()
 	p := newProvider(t, fake)
 
-	id, err := p.Create(context.Background(), sandbox.Spec{Name: testName, Labels: []string{"kaxa", "sync"}})
+	id, err := p.Create(context.Background(), sandbox.Spec{Name: testName, Labels: []string{testKaxa, "sync"}})
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -142,7 +142,7 @@ func TestListSortedWithStatusAndLabels(t *testing.T) {
 
 	code := 0
 	fake := newFakeClient()
-	fake.boxes["b"] = &modal.Record{ID: "sb-b", Name: "b", Labels: []string{"kaxa"}}
+	fake.boxes["b"] = &modal.Record{ID: "sb-b", Name: "b", Labels: []string{testKaxa}}
 	fake.boxes["a"] = &modal.Record{ID: "sb-a", Name: "a", ExitCode: &code}
 
 	infos, err := newProvider(t, fake).List(context.Background())
@@ -155,7 +155,7 @@ func TestListSortedWithStatusAndLabels(t *testing.T) {
 	if infos[0].Status != "exited (0)" || infos[1].Status != "running" {
 		t.Fatalf("statuses = %q, %q", infos[0].Status, infos[1].Status)
 	}
-	if infos[0].Provider != "modal" || len(infos[1].Labels) != 1 {
+	if infos[0].Provider != testProviderName || len(infos[1].Labels) != 1 {
 		t.Fatalf("infos = %+v", infos)
 	}
 }
@@ -173,7 +173,7 @@ func TestInspect(t *testing.T) {
 	t.Parallel()
 
 	fake := newFakeClient()
-	fake.boxes[testName] = &modal.Record{ID: testSandboxID, Name: testName, Labels: []string{"kaxa"}}
+	fake.boxes[testName] = &modal.Record{ID: testSandboxID, Name: testName, Labels: []string{testKaxa}}
 	p := newProvider(t, fake)
 
 	d, err := p.Inspect(context.Background(), testName)
@@ -236,14 +236,5 @@ func TestErrorsRedactCredentials(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), testTokenSecret) || strings.Contains(err.Error(), testTokenID) {
 		t.Fatalf("error leaks credentials: %v", err)
-	}
-}
-
-func TestExecNotImplemented(t *testing.T) {
-	t.Parallel()
-
-	err := modal.New().Exec(context.Background(), testName, sandbox.ExecOptions{Command: []string{"echo"}})
-	if !errors.Is(err, sandbox.ErrNotImplemented) {
-		t.Fatalf("err = %v, want ErrNotImplemented", err)
 	}
 }

@@ -129,11 +129,6 @@ func (p *Provider) Inspect(ctx context.Context, id sandbox.ID) (sandbox.Detail, 
 	}, nil
 }
 
-// Exec is not implemented yet.
-func (p *Provider) Exec(_ context.Context, _ sandbox.ID, _ sandbox.ExecOptions) error {
-	return errNotImplemented("exec")
-}
-
 // Destroy terminates a sandbox.
 func (p *Provider) Destroy(ctx context.Context, id sandbox.ID) error {
 	if err := validateName(string(id)); err != nil {
