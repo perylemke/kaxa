@@ -29,6 +29,7 @@ type fakeProvider struct {
 	published bool
 	pubDir    string
 	pubPort   int
+	pubEnv    []string
 	auth      string
 
 	execFn    func(sandbox.ExecOptions) error
@@ -91,8 +92,9 @@ func (f *fakeProvider) SetupProjects(context.Context, sandbox.ID, string, []proj
 	return nil
 }
 
-func (f *fakeProvider) PublishAPI(_ context.Context, _ sandbox.ID, workDir string, port int, _ []string) error {
+func (f *fakeProvider) PublishAPI(_ context.Context, _ sandbox.ID, workDir string, port int, _, env []string) error {
 	f.published, f.pubDir, f.pubPort = true, workDir, port
+	f.pubEnv = append([]string(nil), env...)
 	return nil
 }
 
@@ -244,6 +246,8 @@ func TestCreateRejectsBeforeCreating(t *testing.T) {
 		{name: "dir without sync", in: createIn{Name: testBox, Dir: "/tmp"}, want: "dir requires sync"},
 		{name: "api_cmd without api", in: createIn{Name: testBox, APICmd: []string{"uvicorn"}}, want: "api_cmd requires api"},
 		{name: "api_port without api", in: createIn{Name: testBox, APIPort: 9000}, want: "api_port requires api"},
+		{name: "api_env without api", in: createIn{Name: testBox, APIEnv: []string{"A=b"}}, want: "api_env requires api"},
+		{name: "api_env reserved", in: createIn{Name: testBox, API: true, APICmd: []string{"x"}, APIEnv: []string{"KAXA_SPRITES_TOKEN"}}, want: "reserved"},
 		{name: "api without command", in: createIn{Name: testBox, API: true}, want: "api command is required"},
 		{name: "tmux port", in: createIn{Name: testBox, API: true, Running: true, APIPort: 8080, APICmd: []string{"x"}}, want: "8080"},
 	}
@@ -572,6 +576,21 @@ func TestPublishAPI(t *testing.T) {
 	wantErr(t, err, "absolute path")
 	_, err = svc.publishAPI(ctx, publishIn{Name: testBox})
 	wantErr(t, err, "api command is required")
+}
+
+func TestPublishAPIPassesEnv(t *testing.T) {
+	t.Parallel()
+
+	fp := &fakeProvider{name: testSprites}
+	svc := newTestService(t, t.TempDir(), testSprites, fp)
+	ctx := context.Background()
+
+	_, err := svc.publishAPI(ctx, publishIn{Name: testBox, APICmd: []string{"x"}, APIEnv: []string{"MODE=prod"}})
+	if err != nil || !slices.Equal(fp.pubEnv, []string{"MODE=prod"}) {
+		t.Fatalf("err=%v env=%v", err, fp.pubEnv)
+	}
+	_, err = svc.publishAPI(ctx, publishIn{Name: testBox, APICmd: []string{"x"}, APIEnv: []string{"PATH=/tmp"}})
+	wantErr(t, err, "reserved")
 }
 
 func TestPublishAPIAndURLAuthNeedCapabilities(t *testing.T) {

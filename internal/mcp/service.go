@@ -172,6 +172,9 @@ func applyAPI(req *lifecycle.Request, in createIn) error {
 		if in.APIPort != 0 {
 			return usererr.New("api_port requires api", "set api to publish the service")
 		}
+		if len(in.APIEnv) > 0 {
+			return usererr.New("api_env requires api", "set api to publish the service")
+		}
 		return nil
 	}
 	port := in.APIPort
@@ -181,7 +184,11 @@ func applyAPI(req *lifecycle.Request, in createIn) error {
 	if err := lifecycle.ValidateAPI(in.Running, port, in.APICmd); err != nil {
 		return err
 	}
-	req.API, req.APIPort, req.APICmd = true, port, in.APICmd
+	env, err := lifecycle.ResolveAPIEnv(in.APIEnv, os.LookupEnv)
+	if err != nil {
+		return err
+	}
+	req.API, req.APIPort, req.APICmd, req.APIEnv = true, port, in.APICmd, env
 	return nil
 }
 
@@ -337,12 +344,16 @@ func (s *service) publishAPI(ctx context.Context, in publishIn) (actionOut, erro
 	if err := lifecycle.ValidateAPI(false, port, in.APICmd); err != nil {
 		return actionOut{}, err
 	}
+	env, err := lifecycle.ResolveAPIEnv(in.APIEnv, os.LookupEnv)
+	if err != nil {
+		return actionOut{}, err
+	}
 	workDir, err := publishDir(p, in.WorkDir)
 	if err != nil {
 		return actionOut{}, err
 	}
 	err = s.progress(ctx, "publishing api…", func(ctx context.Context) error {
-		return publisher.PublishAPI(ctx, id, workDir, port, in.APICmd)
+		return publisher.PublishAPI(ctx, id, workDir, port, in.APICmd, env)
 	})
 	if err != nil {
 		return actionOut{}, err

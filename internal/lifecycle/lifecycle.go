@@ -30,7 +30,9 @@ type Request struct {
 	API     bool
 	APIPort int
 	APICmd  []string
-	Public  bool
+	// APIEnv holds resolved KEY=VALUE entries for the API service. See ResolveAPIEnv.
+	APIEnv []string
+	Public bool
 	// Root and Repo locate the Git repository to copy. Both are set when Sync is true.
 	Root string
 	Repo string
@@ -219,7 +221,7 @@ func publishAPI(ctx context.Context, p sandbox.Provider, id sandbox.ID, req Requ
 		return destroyAfterFailure(ctx, p, id, err, "publish api")
 	}
 	err = run(ctx, "publishing api…", func(ctx context.Context) error {
-		return publisher.PublishAPI(ctx, id, workDir, req.APIPort, req.APICmd)
+		return publisher.PublishAPI(ctx, id, workDir, req.APIPort, req.APICmd, req.APIEnv)
 	})
 	if err != nil {
 		return destroyAfterFailure(ctx, p, id, err, "publish api")

@@ -14,7 +14,7 @@ import (
 func TestPublishAPIFailedStatus(t *testing.T) {
 	p := providerWithAPIStates(t, apiStateJSON(t, apiStatusFailed, "exited with code 1"))
 	start := time.Now()
-	err := p.PublishAPI(context.Background(), "box", spriteHome, 8000, []string{"uvicorn"})
+	err := p.PublishAPI(context.Background(), "box", spriteHome, 8000, []string{"uvicorn"}, nil)
 	if time.Since(start) >= 500*time.Millisecond {
 		t.Fatalf("waited %s", time.Since(start))
 	}
@@ -29,7 +29,7 @@ func TestPublishAPIBecomesRunning(t *testing.T) {
 		apiStateJSON(t, "starting", ""),
 		apiStateJSON(t, apiStatusRunning, ""),
 	)
-	if err := p.PublishAPI(context.Background(), "box", spriteHome, 8000, []string{"uvicorn"}); err != nil {
+	if err := p.PublishAPI(context.Background(), "box", spriteHome, 8000, []string{"uvicorn"}, nil); err != nil {
 		t.Fatalf("PublishAPI: %v", err)
 	}
 }
@@ -37,9 +37,15 @@ func TestPublishAPIBecomesRunning(t *testing.T) {
 func TestPublishAPIReadyTimeout(t *testing.T) {
 	setAPIReadyForTest(t, 40*time.Millisecond, 5*time.Millisecond)
 	p := providerWithAPIStates(t, apiStateJSON(t, "starting", ""))
-	err := p.PublishAPI(context.Background(), "box", spriteHome, 8000, []string{"uvicorn"})
+	err := p.PublishAPI(context.Background(), "box", spriteHome, 8000, []string{"uvicorn"}, nil)
 	if err == nil || !strings.Contains(err.Error(), "did not become running") {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestPublishAPIWaitsAtLeastNinetySeconds(t *testing.T) {
+	if apiReadyTimeout != 90*time.Second {
+		t.Fatalf("apiReadyTimeout = %s", apiReadyTimeout)
 	}
 }
 

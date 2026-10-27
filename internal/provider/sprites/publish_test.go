@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -33,7 +34,7 @@ func TestPublishAPIBuildsServiceCommand(t *testing.T) {
 	p := sprites.NewWithClient(client, "token")
 	err := p.PublishAPI(context.Background(), "box", "/home/sprite/workspace/api-python", 8000, []string{
 		".venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000",
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("PublishAPI: %v", err)
 	}
@@ -52,6 +53,51 @@ func TestPublishAPIBuildsServiceCommand(t *testing.T) {
 	}
 	if got[len(got)-1] != "--no-stream" {
 		t.Fatalf("argv = %#v", got)
+	}
+}
+
+func TestPublishAPIAppendsServiceEnv(t *testing.T) {
+	t.Parallel()
+
+	var got []string
+	client := &fakeSDKClient{
+		run: func(_ context.Context, _ string, argv []string, _ io.Reader, stdout, _ io.Writer) error {
+			if len(argv) >= 3 && argv[2] == "get" {
+				_, _ = io.WriteString(stdout, `{"state":{"status":"running"}}`)
+				return nil
+			}
+			got = append([]string(nil), argv...)
+			return nil
+		},
+	}
+	p := sprites.NewWithClient(client, "token")
+	err := p.PublishAPI(context.Background(), "box", "/home/sprite", 8000, []string{"app"}, []string{
+		"DATABASE_URL=postgres://u:p@db:5432/app", "REDIS_URL=redis://cache:6379/0",
+	})
+	if err != nil {
+		t.Fatalf("PublishAPI: %v", err)
+	}
+	idx := slices.Index(got, "--env")
+	if idx < 0 || idx+1 >= len(got) {
+		t.Fatalf("argv = %#v", got)
+	}
+	env := strings.Split(got[idx+1], ",")
+	if !slices.Contains(env, "USER=sprite") || !slices.Contains(env, "DATABASE_URL=postgres://u:p@db:5432/app") || !slices.Contains(env, "REDIS_URL=redis://cache:6379/0") {
+		t.Fatalf("env = %#v", env)
+	}
+	if slices.Index(env, "DATABASE_URL=postgres://u:p@db:5432/app") < slices.Index(env, "USER=sprite") {
+		t.Fatalf("service env must follow the tool env: %#v", env)
+	}
+}
+
+func TestPublishAPIRejectsBadEnv(t *testing.T) {
+	t.Parallel()
+
+	p := sprites.NewWithClient(&fakeSDKClient{}, "token")
+	for _, env := range [][]string{{"NOEQUALS"}, {"A=b,c"}, {"1X=y"}} {
+		if err := p.PublishAPI(context.Background(), "box", "/home/sprite", 8000, []string{"app"}, env); err == nil {
+			t.Fatalf("env %v accepted", env)
+		}
 	}
 }
 

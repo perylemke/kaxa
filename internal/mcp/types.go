@@ -24,6 +24,7 @@ type createIn struct {
 	API      bool     `json:"api,omitempty" jsonschema:"Publish one HTTP service on the sandbox URL. Requires api_cmd."`
 	APICmd   []string `json:"api_cmd,omitempty" jsonschema:"Argv of the HTTP service. The first item is the binary. The process must listen on 0.0.0.0 and on api_port."`
 	APIPort  int      `json:"api_port,omitempty" jsonschema:"Port the HTTP service listens on. Defaults to 8000. Port 8080 is reserved when running is true."`
+	APIEnv   []string `json:"api_env,omitempty" jsonschema:"Environment of the HTTP service. Each item is KEY=VALUE, or KEY to copy the value from the server environment so secrets stay out of the conversation. Values cannot contain commas. HOME, USER, PATH and KAXA_ names are reserved. Requires api."`
 	Public   bool     `json:"public,omitempty" jsonschema:"Make the sandbox URL reachable without a provider account."`
 }
 
@@ -91,6 +92,7 @@ type publishIn struct {
 	Name     string   `json:"name" jsonschema:"Sandbox name."`
 	APICmd   []string `json:"api_cmd" jsonschema:"Argv of the HTTP service. The first item is the binary. The process must listen on 0.0.0.0 and on api_port."`
 	APIPort  int      `json:"api_port,omitempty" jsonschema:"Port the HTTP service listens on. Defaults to 8000."`
+	APIEnv   []string `json:"api_env,omitempty" jsonschema:"Environment of the HTTP service. Each item is KEY=VALUE, or KEY to copy the value from the server environment so secrets stay out of the conversation. Values cannot contain commas. HOME, USER, PATH and KAXA_ names are reserved."`
 	WorkDir  string   `json:"work_dir,omitempty" jsonschema:"Absolute directory inside the sandbox to run the service from. Defaults to the sandbox home directory."`
 }
 
