@@ -16,6 +16,9 @@ const (
 	detectGoMod        = "go.mod"
 	detectCargoToml    = "Cargo.toml"
 	detectPackageJSON  = "package.json"
+	detectGemfile      = "Gemfile"
+	detectDepsEdn      = "deps.edn"
+	detectGemfileLock  = "Gemfile.lock"
 )
 
 func TestDetectNone(t *testing.T) {
@@ -30,96 +33,131 @@ func TestDetectNone(t *testing.T) {
 	}
 }
 
+var detectCases = []struct {
+	name  string
+	files []string
+	want  []project.Step
+}{
+	{
+		name:  "go",
+		files: []string{detectGoMod},
+		want: []project.Step{{
+			Kind:     project.KindGo,
+			Commands: [][]string{{"go", detectBuild, "./..."}},
+		}},
+	},
+	{
+		name:  "rust locked",
+		files: []string{detectCargoToml, "Cargo.lock"},
+		want: []project.Step{{
+			Kind:     project.KindRust,
+			Commands: [][]string{{"cargo", detectBuild, "--locked"}},
+		}},
+	},
+	{
+		name:  "rust unlocked",
+		files: []string{detectCargoToml},
+		want: []project.Step{{
+			Kind:     project.KindRust,
+			Commands: [][]string{{"cargo", detectBuild}},
+		}},
+	},
+	{
+		name:  "python pyproject",
+		files: []string{"pyproject.toml", detectRequirements},
+		want: []project.Step{{
+			Kind:     project.KindPython,
+			Commands: [][]string{{"uv", "sync"}},
+		}},
+	},
+	{
+		name:  "python uv lock",
+		files: []string{"uv.lock"},
+		want: []project.Step{{
+			Kind:     project.KindPython,
+			Commands: [][]string{{"uv", "sync"}},
+		}},
+	},
+	{
+		name:  "python requirements",
+		files: []string{detectRequirements},
+		want: []project.Step{{
+			Kind: project.KindPython,
+			Commands: [][]string{
+				{"uv", "venv", ".venv"},
+				{"uv", "pip", detectInstall, "--python", ".venv/bin/python", "-r", detectRequirements},
+			},
+		}},
+	},
+	{
+		name:  "node lock",
+		files: []string{detectPackageJSON, "package-lock.json"},
+		want: []project.Step{{
+			Kind:     project.KindNode,
+			Commands: [][]string{{"npm", "ci"}},
+		}},
+	},
+	{
+		name:  "node",
+		files: []string{detectPackageJSON},
+		want: []project.Step{{
+			Kind:     project.KindNode,
+			Commands: [][]string{{"npm", detectInstall}},
+		}},
+	},
+	{
+		name:  "ruby",
+		files: []string{detectGemfile},
+		want: []project.Step{{
+			Kind:     project.KindRuby,
+			Commands: [][]string{{"bundle", detectInstall}},
+		}},
+	},
+	{
+		name:  "ruby lock",
+		files: []string{detectGemfile, detectGemfileLock},
+		want: []project.Step{{
+			Kind:     project.KindRuby,
+			Commands: [][]string{{"bundle", detectInstall, "--frozen"}},
+		}},
+	},
+	{
+		name:  "ruby lock without gemfile",
+		files: []string{detectGemfileLock},
+	},
+	{
+		name:  "clojure",
+		files: []string{detectDepsEdn},
+		want: []project.Step{{
+			Kind:     project.KindClojure,
+			Commands: [][]string{{"clojure", "-P"}},
+		}},
+	},
+	{
+		name:  "leiningen only",
+		files: []string{"project.clj"},
+	},
+	{
+		name:  "all",
+		files: []string{detectPackageJSON, detectRequirements, detectCargoToml, detectGoMod, detectGemfile, detectDepsEdn},
+		want: []project.Step{
+			{Kind: project.KindGo, Commands: [][]string{{"go", detectBuild, "./..."}}},
+			{Kind: project.KindRust, Commands: [][]string{{"cargo", detectBuild}}},
+			{Kind: project.KindPython, Commands: [][]string{
+				{"uv", "venv", ".venv"},
+				{"uv", "pip", detectInstall, "--python", ".venv/bin/python", "-r", detectRequirements},
+			}},
+			{Kind: project.KindNode, Commands: [][]string{{"npm", detectInstall}}},
+			{Kind: project.KindRuby, Commands: [][]string{{"bundle", detectInstall}}},
+			{Kind: project.KindClojure, Commands: [][]string{{"clojure", "-P"}}},
+		},
+	},
+}
+
 func TestDetectOrderAndCommands(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name  string
-		files []string
-		want  []project.Step
-	}{
-		{
-			name:  "go",
-			files: []string{detectGoMod},
-			want: []project.Step{{
-				Kind:     project.KindGo,
-				Commands: [][]string{{"go", detectBuild, "./..."}},
-			}},
-		},
-		{
-			name:  "rust locked",
-			files: []string{detectCargoToml, "Cargo.lock"},
-			want: []project.Step{{
-				Kind:     project.KindRust,
-				Commands: [][]string{{"cargo", detectBuild, "--locked"}},
-			}},
-		},
-		{
-			name:  "rust unlocked",
-			files: []string{detectCargoToml},
-			want: []project.Step{{
-				Kind:     project.KindRust,
-				Commands: [][]string{{"cargo", detectBuild}},
-			}},
-		},
-		{
-			name:  "python pyproject",
-			files: []string{"pyproject.toml", detectRequirements},
-			want: []project.Step{{
-				Kind:     project.KindPython,
-				Commands: [][]string{{"uv", "sync"}},
-			}},
-		},
-		{
-			name:  "python uv lock",
-			files: []string{"uv.lock"},
-			want: []project.Step{{
-				Kind:     project.KindPython,
-				Commands: [][]string{{"uv", "sync"}},
-			}},
-		},
-		{
-			name:  "python requirements",
-			files: []string{detectRequirements},
-			want: []project.Step{{
-				Kind: project.KindPython,
-				Commands: [][]string{
-					{"uv", "venv", ".venv"},
-					{"uv", "pip", detectInstall, "--python", ".venv/bin/python", "-r", detectRequirements},
-				},
-			}},
-		},
-		{
-			name:  "node lock",
-			files: []string{detectPackageJSON, "package-lock.json"},
-			want: []project.Step{{
-				Kind:     project.KindNode,
-				Commands: [][]string{{"npm", "ci"}},
-			}},
-		},
-		{
-			name:  "node",
-			files: []string{detectPackageJSON},
-			want: []project.Step{{
-				Kind:     project.KindNode,
-				Commands: [][]string{{"npm", detectInstall}},
-			}},
-		},
-		{
-			name:  "all",
-			files: []string{detectPackageJSON, detectRequirements, detectCargoToml, detectGoMod},
-			want: []project.Step{
-				{Kind: project.KindGo, Commands: [][]string{{"go", detectBuild, "./..."}}},
-				{Kind: project.KindRust, Commands: [][]string{{"cargo", detectBuild}}},
-				{Kind: project.KindPython, Commands: [][]string{
-					{"uv", "venv", ".venv"},
-					{"uv", "pip", detectInstall, "--python", ".venv/bin/python", "-r", detectRequirements},
-				}},
-				{Kind: project.KindNode, Commands: [][]string{{"npm", detectInstall}}},
-			},
-		},
-	}
-	for _, tt := range tests {
+	for _, tt := range detectCases {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			root := t.TempDir()

@@ -118,6 +118,66 @@ var apiCases = []apiCase{
 		want: true,
 	},
 	{
+		name: "ruby rails gemfile",
+		files: map[string]string{
+			detectGemfile: "source \"https://rubygems.org\"\ngem \"rails\", \"~> 8.0\"\n",
+		},
+		want: true,
+	},
+	{
+		name: "ruby sinatra lock",
+		files: map[string]string{
+			detectGemfileLock: "GEM\n  specs:\n    sinatra (4.1.1)\n",
+		},
+		want: true,
+	},
+	{
+		name: "ruby thor",
+		files: map[string]string{
+			detectGemfile: "source \"https://rubygems.org\"\ngem \"thor\"\n",
+		},
+	},
+	{
+		name: "ruby rails sibling gems",
+		files: map[string]string{
+			detectGemfileLock: "GEM\n  specs:\n    railties (8.0.2)\n    rails-html-sanitizer (1.6.2)\n",
+		},
+	},
+	{
+		name: "clojure ring",
+		files: map[string]string{
+			detectDepsEdn: "{:deps {ring/ring {:mvn/version \"1.14.1\"}}}\n",
+		},
+		want: true,
+	},
+	{
+		name: "clojure ring adapter",
+		files: map[string]string{
+			detectDepsEdn: "{:deps {ring/ring-jetty-adapter {:mvn/version \"1.14.1\"}}}\n",
+		},
+		want: true,
+	},
+	{
+		name: "clojure reitit",
+		files: map[string]string{
+			detectDepsEdn: "{:deps {metosin/reitit {:mvn/version \"0.9.1\"}}}\n",
+		},
+		want: true,
+	},
+	{
+		name: "clojure http-kit",
+		files: map[string]string{
+			detectDepsEdn: "{:deps {http-kit/http-kit {:mvn/version \"2.8.0\"}}}\n",
+		},
+		want: true,
+	},
+	{
+		name: "clojure cli",
+		files: map[string]string{
+			detectDepsEdn: "{:deps {org.clojure/tools.cli {:mvn/version \"1.1.230\"}}}\n",
+		},
+	},
+	{
 		name: "go quoted signal",
 		files: map[string]string{
 			"scan.go": "package scan\nvar signals = []string{\"http.ListenAndServe\", \"http.Server\"}\n",

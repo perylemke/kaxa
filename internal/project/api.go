@@ -45,6 +45,22 @@ var (
 		"poem",
 		"salvo",
 	}
+	rubyAPIModules = []string{
+		"rails",
+		"sinatra",
+		"roda",
+		"hanami",
+	}
+	clojureAPIModules = []string{
+		"ring/ring",
+		"ring/ring-core",
+		"ring/ring-jetty-adapter",
+		"compojure/compojure",
+		"metosin/reitit",
+		"io.pedestal/pedestal",
+		"http-kit/http-kit",
+		"aleph/aleph",
+	}
 )
 
 func goServerSignals() []string {
@@ -70,6 +86,8 @@ func manifestIsAPI(root string) (bool, error) {
 		pythonAPI,
 		nodeAPI,
 		rustAPI,
+		rubyAPI,
+		clojureAPI,
 	}
 	for _, check := range checks {
 		ok, err := check(root)
@@ -131,6 +149,27 @@ func rustAPI(root string) (bool, error) {
 		return false, err
 	}
 	return containsAny(data, rustAPIModules), nil
+}
+
+func rubyAPI(root string) (bool, error) {
+	for _, name := range []string{"Gemfile", "Gemfile.lock"} {
+		data, ok, err := readOptional(root, name)
+		if err != nil {
+			return false, err
+		}
+		if ok && containsAny(data, rubyAPIModules) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func clojureAPI(root string) (bool, error) {
+	data, ok, err := readOptional(root, "deps.edn")
+	if err != nil || !ok {
+		return false, err
+	}
+	return containsAny(data, clojureAPIModules), nil
 }
 
 func goListenAPI(root string) (bool, error) {
