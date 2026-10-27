@@ -55,6 +55,31 @@ func (p *Provider) SyncWorkspace(ctx context.Context, id sandbox.ID, archive io.
 	return nil
 }
 
+// RepoExists reports whether /home/modal/workspace/<repo> exists. Exit status 1
+// from test(1) means absent; any other failure is an error, not an answer.
+func (p *Provider) RepoExists(ctx context.Context, id sandbox.ID, repo string) (bool, error) {
+	if err := validateName(string(id)); err != nil {
+		return false, err
+	}
+	dir, err := p.RepoDir(repo)
+	if err != nil {
+		return false, err
+	}
+	opts := sandbox.ExecOptions{Command: asModal(nil, []string{"test", "-d", dir}), Stdout: io.Discard, Stderr: io.Discard}
+	err = p.run(ctx, id, "", opts)
+	if err == nil {
+		return true, nil
+	}
+	if exitErr, ok := errors.AsType[*sandbox.ExitError](err); ok {
+		if exitErr.Code == 1 {
+			return false, nil
+		}
+		// A plain error: the CLI turns an ExitError into a silent exit code.
+		return false, fmt.Errorf("test -d %s exited with status %d", dir, exitErr.Code)
+	}
+	return false, err
+}
+
 // SetupProjects installs missing toolchains as the modal user and runs each
 // detected project command in the synced repository.
 func (p *Provider) SetupProjects(ctx context.Context, id sandbox.ID, repoName string, steps []project.Step) error {
