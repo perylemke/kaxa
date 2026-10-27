@@ -86,6 +86,12 @@ type WorkspaceSyncer interface {
 	SyncWorkspace(ctx context.Context, id ID, archive io.Reader) error
 }
 
+// RepoChecker reports whether the directory SyncWorkspace would fill for repo
+// already exists in a sandbox. repo must be a single path segment.
+type RepoChecker interface {
+	RepoExists(ctx context.Context, id ID, repo string) (bool, error)
+}
+
 // ProjectSetup installs toolchains and project dependencies in a synced workspace.
 type ProjectSetup interface {
 	SetupProjects(ctx context.Context, id ID, repoName string, steps []project.Step) error
