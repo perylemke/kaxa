@@ -26,7 +26,7 @@ A client started from a terminal inherits your `PATH`, so `command` can be `kaxa
 
 `sync` uses the working directory of the `kaxa mcp` process, not the directory that contains the binary. The repository must contain that working directory or sit below it. A desktop client uses the opened project. Set `cwd` when the client has that field and might start elsewhere.
 
-The token stays in the environment of that process. Put `KAXA_DEFAULT_PROVIDER` and `KAXA_SPRITES_TOKEN` in the client's `env` block. Do not commit a file that contains the token, and do not paste the token into a prompt. See [Sprites account and token](sprites-account.md). `--provider` on the command also sets the default.
+The tokens stay in the environment of that process. Put `KAXA_DEFAULT_PROVIDER` and the token of each provider you use in the client's `env` block: `KAXA_SPRITES_TOKEN` for Sprites, and `KAXA_MODAL_TOKEN_ID` with `KAXA_MODAL_TOKEN_SECRET` for Modal. Do not commit a file that contains a token, and do not paste a token into a prompt. See [Sprites account and token](sprites-account.md) and [Modal account and token](modal-account.md). `--provider` on the command also sets the default.
 
 After the server is connected, ask the agent to call `list_providers`. Sprites and Modal are available. Modal supports create (with `sync`), list, inspect, exec, and destroy; its `capabilities` report `sync`, `setup`, and `workspace_layout` as true and the rest as false. On Modal, `exec` commands start in the image root unless the sandbox was created with `sync`; then they run as the `modal` user in `/home/modal/workspace`.
 
@@ -42,7 +42,9 @@ User config is `~/.cursor/mcp.json`. Project config is `.cursor/mcp.json`. Prefe
       "args": ["mcp"],
       "env": {
         "KAXA_DEFAULT_PROVIDER": "sprites",
-        "KAXA_SPRITES_TOKEN": "paste-the-dashboard-value"
+        "KAXA_SPRITES_TOKEN": "paste-the-dashboard-value",
+        "KAXA_MODAL_TOKEN_ID": "ak-paste-the-token-id",
+        "KAXA_MODAL_TOKEN_SECRET": "as-paste-the-token-secret"
       }
     }
   }
@@ -64,7 +66,9 @@ Project config is `.mcp.json` at the repository root. Claude Code asks you to ap
       "args": ["mcp"],
       "env": {
         "KAXA_DEFAULT_PROVIDER": "sprites",
-        "KAXA_SPRITES_TOKEN": "paste-the-dashboard-value"
+        "KAXA_SPRITES_TOKEN": "paste-the-dashboard-value",
+        "KAXA_MODAL_TOKEN_ID": "ak-paste-the-token-id",
+        "KAXA_MODAL_TOKEN_SECRET": "as-paste-the-token-secret"
       }
     }
   }
@@ -77,6 +81,8 @@ From a terminal:
 claude mcp add --transport stdio \
   --env KAXA_DEFAULT_PROVIDER=sprites \
   --env KAXA_SPRITES_TOKEN=paste-the-dashboard-value \
+  --env KAXA_MODAL_TOKEN_ID=ak-paste-the-token-id \
+  --env KAXA_MODAL_TOKEN_SECRET=as-paste-the-token-secret \
   kaxa -- /Users/you/go/bin/kaxa mcp
 ```
 
@@ -88,7 +94,7 @@ On macOS the file is `~/Library/Application Support/Claude/claude_desktop_config
 
 ### Gemini CLI
 
-User config is `~/.gemini/settings.json`. Project config is `.gemini/settings.json`. `env` values expand `$KAXA_SPRITES_TOKEN` and `${KAXA_SPRITES_TOKEN}` from the environment that launches Gemini. Set `cwd` to the project so `sync` can see it.
+User config is `~/.gemini/settings.json`. Project config is `.gemini/settings.json`. `env` values expand `$KAXA_SPRITES_TOKEN` and `${KAXA_SPRITES_TOKEN}`, and the Modal variables the same way, from the environment that launches Gemini. Set `cwd` to the project so `sync` can see it.
 
 ```json
 {
@@ -99,7 +105,9 @@ User config is `~/.gemini/settings.json`. Project config is `.gemini/settings.js
       "cwd": "/Users/you/projects/your-repo",
       "env": {
         "KAXA_DEFAULT_PROVIDER": "sprites",
-        "KAXA_SPRITES_TOKEN": "${KAXA_SPRITES_TOKEN}"
+        "KAXA_SPRITES_TOKEN": "${KAXA_SPRITES_TOKEN}",
+        "KAXA_MODAL_TOKEN_ID": "${KAXA_MODAL_TOKEN_ID}",
+        "KAXA_MODAL_TOKEN_SECRET": "${KAXA_MODAL_TOKEN_SECRET}"
       }
     }
   }
@@ -108,7 +116,7 @@ User config is `~/.gemini/settings.json`. Project config is `.gemini/settings.js
 
 ### Another client
 
-Use the stdio entry your client documents: a command, the argument `mcp`, and the two `KAXA_` variables. An HTTP URL is a different transport. `kaxa mcp` does not listen on a port.
+Use the stdio entry your client documents: a command, the argument `mcp`, and the `KAXA_` variables of the providers you use. An HTTP URL is a different transport. `kaxa mcp` does not listen on a port.
 
 ## Tools
 
@@ -120,12 +128,22 @@ Every tool that works on a sandbox takes an optional `provider`. Without it, the
 | `create_sandbox` | Create a sandbox. Same flow as [create](create.md), without the form |
 | `sync_repository` | Copy another Git repository into a sandbox created with `sync`. Same flow as [sync](sync.md) |
 | `exec` | Run an argv and return `stdout`, `stderr`, `exit_code` and `truncated` |
-| `list_sandboxes` | Sandboxes of one provider |
+| `list_sandboxes` | Sandboxes of every configured provider, or of one with `provider` |
 | `inspect` | Status, labels, URL and URL auth of one sandbox |
 | `restart`, `upgrade` | Same as [restart](restart.md) and [upgrade](upgrade.md) |
 | `destroy` | Delete a sandbox. The name is required |
 | `publish_api` | Start one HTTP service in an existing sandbox |
 | `set_url_auth` | Same as [url](url.md): `public` or `sprite` |
+
+### Use Modal
+
+Set `KAXA_MODAL_TOKEN_ID` and `KAXA_MODAL_TOKEN_SECRET` in the client, reload the server, and the flow is the same as on Sprites. Pass `provider: "modal"`, or set `KAXA_DEFAULT_PROVIDER=modal`:
+
+1. `create_sandbox` with `name`, `provider: "modal"`, and `sync: true`. The result has `work_dir`, for example `/home/modal/workspace/your-repo`. The repository is copied as the `modal` user and its toolchain is installed.
+2. `exec` with `command: ["bash", "-c", "cd <work_dir> && go test ./..."]`. The command runs as `modal` and starts in `/home/modal/workspace`.
+3. `destroy` when the work is done.
+
+Edit files in the sandbox with `exec`, for example `["bash", "-c", "cd <work_dir> && sed -i ... file"]`. The agent's local editor does not write there. Modal sandboxes live at most 24 hours and stop after one hour without activity; see [Modal account and token](modal-account.md). `--running`, `publish_api`, and public URLs are not available for Modal, and the error names the providers that have them.
 
 ### list_providers
 
@@ -179,6 +197,10 @@ The result has `id`, `provider` and `work_dir`, the directory of the new reposit
 
 The tool never replaces a directory. It fails before copying when the sandbox was not created with `sync`, when the provider cannot sync, or when a directory with the repository's name is already in the sandbox. A failed copy or install keeps the sandbox, because it holds other work. The error says which step failed. It can take minutes while dependencies install.
 
+### list_sandboxes
+
+Without `provider`, the tool lists every provider that has credentials, in provider name order, and each item names its provider. A provider that fails while another works is reported in `warnings`; if all fail, the call is an error. With `provider`, only that one is listed.
+
 ### exec
 
 `command` is an argv list. It never goes through a shell. To use shell syntax, pass `["bash", "-c", "..."]`.
@@ -195,7 +217,7 @@ On a sandbox created with `sync`, the command starts in the provider workspace d
 - `sync_repository` adds a repository but never refreshes one. To send new local changes, create a new sandbox or move the code with `git` inside `exec`.
 - `sync` and `sync_repository` copy only a repository that contains the server working directory or sits below it. This keeps a prompt from sending an unrelated repository to a remote provider. Start `kaxa mcp` from the project, or pass a `dir` inside it. A symlink that leaves the working directory is rejected.
 - Checkpoints, network policy and connectors are not exposed. Use the provider's own tools for them.
-- Only Sprites is implemented. `destroy` is permanent, and its tool is marked destructive so a client can ask first.
+- `destroy` is permanent, and its tool is marked destructive so a client can ask first.
 
 ## Errors
 

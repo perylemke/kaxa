@@ -280,11 +280,11 @@ func (s *service) exec(ctx context.Context, in execIn) (execOut, error) {
 }
 
 func (s *service) listSandboxes(ctx context.Context, in listIn) (listOut, error) {
-	p, err := s.provider(in.Provider)
+	providers, names, err := s.listTargets(in.Provider)
 	if err != nil {
 		return listOut{}, err
 	}
-	infos, err := p.List(ctx)
+	infos, failures, err := lifecycle.CollectSandboxes(ctx, providers, names)
 	if err != nil {
 		return listOut{}, err
 	}
@@ -297,7 +297,23 @@ func (s *service) listSandboxes(ctx context.Context, in listIn) (listOut, error)
 			Labels:   nonNil(info.Labels),
 		})
 	}
+	for _, failure := range failures {
+		out.Warnings = append(out.Warnings, "could not list "+failure.Error())
+	}
 	return out, nil
+}
+
+// listTargets is the named provider, or every configured provider when none is
+// named. The default provider does not narrow the search.
+func (s *service) listTargets(name string) (map[string]sandbox.Provider, []string, error) {
+	if strings.TrimSpace(name) != "" {
+		p, err := s.provider(name)
+		if err != nil {
+			return nil, nil, err
+		}
+		return map[string]sandbox.Provider{p.Name(): p}, []string{p.Name()}, nil
+	}
+	return lifecycle.ListTargets(s.reg, s.cfg)
 }
 
 func (s *service) inspect(ctx context.Context, in nameIn) (inspectOut, error) {

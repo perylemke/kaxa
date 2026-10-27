@@ -39,6 +39,7 @@ type fakeProvider struct {
 	syncErr   error
 	detail    sandbox.Detail
 	infos     []sandbox.Info
+	listErr   error
 }
 
 func (f *fakeProvider) Name() string           { return f.name }
@@ -60,7 +61,7 @@ func (f *fakeProvider) Create(_ context.Context, spec sandbox.Spec) (sandbox.ID,
 	return sandbox.ID(spec.Name), nil
 }
 
-func (f *fakeProvider) List(context.Context) ([]sandbox.Info, error) { return f.infos, nil }
+func (f *fakeProvider) List(context.Context) ([]sandbox.Info, error) { return f.infos, f.listErr }
 
 func (f *fakeProvider) Inspect(_ context.Context, id sandbox.ID) (sandbox.Detail, error) {
 	if f.detail.ID != "" {
@@ -532,6 +533,70 @@ func TestListAndInspect(t *testing.T) {
 	if err != nil || detail.CreatedAt != "2026-10-26T12:00:00Z" || detail.UpdatedAt != "" || detail.URL != testURL {
 		t.Fatalf("inspect = %+v err = %v", detail, err)
 	}
+}
+
+func TestListSandboxesAcrossProviders(t *testing.T) {
+	t.Parallel()
+
+	sprites := &fakeProvider{name: testSprites, infos: []sandbox.Info{{ID: "a", Status: testWarm}}}
+	modal := &fakeProvider{name: testModal, infos: []sandbox.Info{{ID: "b", Provider: testModal, Status: "running"}}}
+	svc := newTestService(t, t.TempDir(), testSprites, sprites, modal)
+	ctx := context.Background()
+
+	all, err := svc.listSandboxes(ctx, listIn{})
+	if err != nil || len(all.Sandboxes) != 2 || len(all.Warnings) != 0 {
+		t.Fatalf("all = %+v err = %v", all, err)
+	}
+	// The registry lists providers by name.
+	if got := all.Sandboxes[0]; got.ID != "b" || got.Provider != testModal {
+		t.Fatalf("first = %+v", got)
+	}
+	if got := all.Sandboxes[1]; got.ID != "a" || got.Provider != testSprites {
+		t.Fatalf("second = %+v", got)
+	}
+
+	only, err := svc.listSandboxes(ctx, listIn{Provider: testModal})
+	if err != nil || len(only.Sandboxes) != 1 || only.Sandboxes[0].ID != "b" {
+		t.Fatalf("filtered = %+v err = %v", only, err)
+	}
+}
+
+func TestListSandboxesOneProviderFailing(t *testing.T) {
+	t.Parallel()
+
+	sprites := &fakeProvider{name: testSprites, infos: []sandbox.Info{{ID: "a", Status: testWarm}}}
+	modal := &fakeProvider{name: testModal, listErr: errors.New("modal is down")}
+	svc := newTestService(t, t.TempDir(), testSprites, sprites, modal)
+
+	out, err := svc.listSandboxes(context.Background(), listIn{})
+	if err != nil || len(out.Sandboxes) != 1 || out.Sandboxes[0].ID != "a" {
+		t.Fatalf("out = %+v err = %v", out, err)
+	}
+	if len(out.Warnings) != 1 || !strings.Contains(out.Warnings[0], "modal: modal is down") {
+		t.Fatalf("warnings = %v", out.Warnings)
+	}
+}
+
+func TestListSandboxesAllFailing(t *testing.T) {
+	t.Parallel()
+
+	sprites := &fakeProvider{name: testSprites, listErr: errors.New("sprites is down")}
+	modal := &fakeProvider{name: testModal, listErr: errors.New("modal is down")}
+	svc := newTestService(t, t.TempDir(), testSprites, sprites, modal)
+
+	_, err := svc.listSandboxes(context.Background(), listIn{})
+	if err == nil || !strings.Contains(err.Error(), "sprites is down") || !strings.Contains(err.Error(), "modal is down") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestListSandboxesUnknownProvider(t *testing.T) {
+	t.Parallel()
+
+	svc := newTestService(t, t.TempDir(), testSprites, &fakeProvider{name: testSprites})
+
+	_, err := svc.listSandboxes(context.Background(), listIn{Provider: "nope"})
+	wantErr(t, err, `unknown provider "nope"`)
 }
 
 func TestActions(t *testing.T) {

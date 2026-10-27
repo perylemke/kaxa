@@ -69,7 +69,7 @@ func (s *service) register(srv *sdk.Server) {
 		"Run an argv in a sandbox and return its stdout, stderr and exit code. A non-zero exit code is a result, not a tool error. Each stream is capped at 256 KiB.",
 		openEnded, s.exec)
 	addTool(s, srv, "list_sandboxes", "List sandboxes",
-		"List the sandboxes of a provider.",
+		"List the sandboxes of every configured provider, or only of the provider argument. A provider that fails is reported in warnings while the others are still listed.",
 		readOnly, s.listSandboxes)
 	addTool(s, srv, "inspect", "Inspect a sandbox",
 		"Show status, labels, URL and URL auth of a sandbox.",

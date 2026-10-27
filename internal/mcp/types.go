@@ -62,7 +62,7 @@ type execOut struct {
 }
 
 type listIn struct {
-	Provider string `json:"provider,omitempty" jsonschema:"Provider name from list_providers. Defaults to KAXA_DEFAULT_PROVIDER."`
+	Provider string `json:"provider,omitempty" jsonschema:"Provider name from list_providers. Without it, every configured provider is listed."`
 }
 
 type sandboxInfo struct {
@@ -74,6 +74,7 @@ type sandboxInfo struct {
 
 type listOut struct {
 	Sandboxes []sandboxInfo `json:"sandboxes"`
+	Warnings  []string      `json:"warnings,omitempty"`
 }
 
 type nameIn struct {

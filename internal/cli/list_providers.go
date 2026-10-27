@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 
@@ -11,7 +10,6 @@ import (
 	"github.com/perylemke/kaxa/internal/lifecycle"
 	"github.com/perylemke/kaxa/internal/registry"
 	"github.com/perylemke/kaxa/internal/sandbox"
-	"github.com/perylemke/kaxa/internal/usererr"
 )
 
 // listTargets returns the providers that list queries, keyed by name, and their
@@ -30,61 +28,21 @@ func listTargets(cmd *cobra.Command, reg *registry.Registry) (map[string]sandbox
 	if err != nil {
 		return nil, nil, err
 	}
-	providers := map[string]sandbox.Provider{}
-	var names []string
-	for _, name := range reg.Names() {
-		p, err := lifecycle.ResolveProvider(reg, cfg, name)
-		if errors.Is(err, sandbox.ErrNotConfigured) {
-			continue
-		}
-		if err != nil {
-			return nil, nil, err
-		}
-		if !sandbox.IsAvailable(p) {
-			continue
-		}
-		providers[name] = p
-		names = append(names, name)
-	}
-	if len(names) == 0 {
-		return nil, nil, usererr.New(
-			"no provider is configured",
-			"set KAXA_SPRITES_TOKEN, or KAXA_MODAL_TOKEN_ID and KAXA_MODAL_TOKEN_SECRET",
-		)
-	}
-	return providers, names, nil
+	return lifecycle.ListTargets(reg, cfg)
 }
 
 // collectSandboxes lists every named provider, in order. A provider that fails
 // is reported on errOut and skipped while another succeeds; if all fail, the
 // errors are returned.
 func collectSandboxes(ctx context.Context, errOut io.Writer, providers map[string]sandbox.Provider, names []string) ([]sandbox.Info, error) {
-	var (
-		all  []sandbox.Info
-		errs []error
-		ok   int
-	)
-	for _, name := range names {
-		infos, err := providers[name].List(ctx)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("%s: %w", name, err))
-			continue
-		}
-		ok++
-		for _, info := range infos {
-			if info.Provider == "" {
-				info.Provider = name
-			}
-			all = append(all, info)
-		}
+	infos, failures, err := lifecycle.CollectSandboxes(ctx, providers, names)
+	if err != nil {
+		return nil, err
 	}
-	if ok == 0 {
-		return nil, errors.Join(errs...)
-	}
-	for _, err := range errs {
-		if _, werr := fmt.Fprintf(errOut, "warning: could not list %v\n", err); werr != nil {
+	for _, failure := range failures {
+		if _, werr := fmt.Fprintf(errOut, "warning: could not list %v\n", failure); werr != nil {
 			return nil, werr
 		}
 	}
-	return all, nil
+	return infos, nil
 }
