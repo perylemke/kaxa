@@ -20,6 +20,14 @@ const (
 	idleTimeout    = time.Hour
 )
 
+// syncImageCommands extend the base image for sandboxes created with --sync:
+// the tools the toolchain installer needs, and the unprivileged user that owns
+// the workspace.
+var syncImageCommands = []string{
+	"RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git build-essential && rm -rf /var/lib/apt/lists/*",
+	"RUN useradd --create-home --shell /bin/bash " + modalUser + " && install -d -o " + modalUser + " -g " + modalUser + " " + workspaceDir,
+}
+
 // Record is one Modal sandbox as kaxa sees it.
 type Record struct {
 	ID     string
@@ -49,7 +57,9 @@ type Process interface {
 }
 
 type sdkClient interface {
-	Create(ctx context.Context, name string, labels []string) (Record, error)
+	// Create starts a sandbox. withTools picks the image with a build toolchain and
+	// the modal user, used by --sync; Modal builds it once and caches it.
+	Create(ctx context.Context, name string, labels []string, withTools bool) (Record, error)
 	List(ctx context.Context) ([]Record, error)
 	Get(ctx context.Context, name string) (Record, error)
 	Terminate(ctx context.Context, name string) error
@@ -72,12 +82,12 @@ func newSDKClient(tokenID, tokenSecret string) (*realSDKClient, error) {
 
 func (r *realSDKClient) Close() { r.c.Close() }
 
-func (r *realSDKClient) Create(ctx context.Context, name string, labels []string) (Record, error) {
+func (r *realSDKClient) Create(ctx context.Context, name string, labels []string, withTools bool) (Record, error) {
 	app, err := r.c.Apps.FromName(ctx, appName, &sdk.AppFromNameParams{CreateIfMissing: true})
 	if err != nil {
 		return Record{}, err
 	}
-	sb, err := r.c.Sandboxes.Create(ctx, app, r.c.Images.FromRegistry(imageTag, nil), &sdk.SandboxCreateParams{
+	sb, err := r.c.Sandboxes.Create(ctx, app, r.image(withTools), &sdk.SandboxCreateParams{
 		Name:        name,
 		Tags:        tagsFor(name, labels),
 		Command:     []string{"sleep", "infinity"},
@@ -92,6 +102,14 @@ func (r *realSDKClient) Create(ctx context.Context, name string, labels []string
 	}
 	defer func() { _ = sb.Detach() }()
 	return Record{ID: sb.SandboxID, Name: name, Labels: slices.Clone(labels)}, nil
+}
+
+func (r *realSDKClient) image(withTools bool) *sdk.Image {
+	base := r.c.Images.FromRegistry(imageTag, nil)
+	if !withTools {
+		return base
+	}
+	return base.DockerfileCommands(syncImageCommands, nil)
 }
 
 func (r *realSDKClient) List(ctx context.Context) ([]Record, error) {

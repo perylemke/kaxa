@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/subtle"
 	"fmt"
+	"slices"
 	"sort"
 	"sync"
 
@@ -74,7 +75,7 @@ func (p *Provider) Create(ctx context.Context, spec sandbox.Spec) (sandbox.ID, e
 	if err != nil {
 		return "", err
 	}
-	if _, err := c.Create(ctx, spec.Name, spec.Labels); err != nil {
+	if _, err := c.Create(ctx, spec.Name, spec.Labels, slices.Contains(spec.Labels, sandbox.SyncLabel)); err != nil {
 		return "", userErr(err, spec.Name, secrets...)
 	}
 	return sandbox.ID(spec.Name), nil

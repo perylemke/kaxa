@@ -3,15 +3,20 @@
 package modal_test
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"io"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/perylemke/kaxa/internal/project"
 	"github.com/perylemke/kaxa/internal/provider/modal"
 	"github.com/perylemke/kaxa/internal/sandbox"
 )
@@ -141,4 +146,75 @@ func randomSuffix(t *testing.T) string {
 		t.Fatalf("rand: %v", err)
 	}
 	return hex.EncodeToString(b)
+}
+
+// TestRealModalSync creates a sandbox with the sync label, which builds the
+// sync image on first use, copies a tiny repository, and installs its toolchain.
+// It is skipped without credentials and can take several minutes the first time.
+func TestRealModalSync(t *testing.T) {
+	id, secret := os.Getenv("KAXA_MODAL_TOKEN_ID"), os.Getenv("KAXA_MODAL_TOKEN_SECRET")
+	if id == "" || secret == "" {
+		t.Skip("KAXA_MODAL_TOKEN_ID and KAXA_MODAL_TOKEN_SECRET are not set")
+	}
+
+	p := modal.New()
+	if err := p.ConfigureCredentials(id, secret); err != nil {
+		t.Fatalf("configure: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	defer cancel()
+
+	name := "kaxa-it-sync-" + randomSuffix(t)
+	sid, err := p.Create(ctx, sandbox.Spec{Name: name, Labels: []string{"kaxa", sandbox.SyncLabel}})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	t.Cleanup(func() {
+		cleanup, stop := context.WithTimeout(context.Background(), time.Minute)
+		defer stop()
+		_ = p.Destroy(cleanup, sid)
+	})
+
+	if err := p.SyncWorkspace(ctx, sid, tinyRepoArchive(t)); err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+
+	var out strings.Builder
+	err = p.Exec(ctx, sid, sandbox.ExecOptions{
+		Command: []string{"sh", "-c", "pwd; id -un; cat demo/hello.txt"},
+		Stdout:  &out,
+	})
+	if err != nil {
+		t.Fatalf("exec: %v", err)
+	}
+	if got := strings.Fields(out.String()); len(got) != 3 || got[0] != "/home/modal/workspace" || got[1] != "modal" || got[2] != "hi" {
+		t.Fatalf("exec output = %q, want workspace, modal, hi", out.String())
+	}
+
+	steps := []project.Step{{Kind: project.KindGo, Commands: [][]string{{"go", "version"}}}}
+	if err := p.SetupProjects(ctx, sid, "demo", steps); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+}
+
+// tinyRepoArchive is a gzip tar holding demo/hello.txt.
+func tinyRepoArchive(t *testing.T) io.Reader {
+	t.Helper()
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gz)
+	body := []byte("hi\n")
+	if err := tw.WriteHeader(&tar.Header{Name: "demo/hello.txt", Mode: 0o644, Size: int64(len(body))}); err != nil {
+		t.Fatalf("tar header: %v", err)
+	}
+	if _, err := tw.Write(body); err != nil {
+		t.Fatalf("tar write: %v", err)
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatalf("tar close: %v", err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatalf("gzip close: %v", err)
+	}
+	return &buf
 }

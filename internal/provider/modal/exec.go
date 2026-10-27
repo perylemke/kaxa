@@ -24,6 +24,10 @@ const sttyWrapper = `stty rows "$1" cols "$2" 2>/dev/null; shift 2; exec "$@"`
 // Exec runs a command in a running sandbox and returns when it exits. A non-zero
 // exit code is returned as *sandbox.ExitError.
 //
+// A sandbox created with --sync runs the command as the modal user in
+// /home/modal/workspace; any other sandbox runs it as root in the image's
+// default directory.
+//
 // With TTY, Modal merges stderr into stdout, and the terminal size is applied once
 // at start: the Modal SDK has no way to resize a running terminal, so opts.Resize
 // is ignored.
@@ -46,6 +50,10 @@ func (p *Provider) Exec(ctx context.Context, id sandbox.ID, opts sandbox.ExecOpt
 	}
 	if rec.ExitCode != nil {
 		return userErr(ErrNotFound, name, secrets...)
+	}
+	if isSynced(rec) {
+		opts.Command = asModal(nil, opts.Command)
+		return p.run(ctx, id, workspaceDir, opts)
 	}
 	return p.run(ctx, id, "", opts)
 }
