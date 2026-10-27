@@ -3,6 +3,7 @@ package sprites
 
 import (
 	"context"
+	"crypto/subtle"
 	"errors"
 	"sync"
 
@@ -24,12 +25,17 @@ func New() *Provider {
 }
 
 // Configure sets the Sprites API token and builds the SDK client.
+// Configuring the same token again keeps the existing client, so concurrent
+// callers (such as the MCP server) do not close a client that is in use.
 func (p *Provider) Configure(token string) error {
 	if token == "" {
 		return missingTokenErr()
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	if p.client != nil && subtle.ConstantTimeCompare([]byte(token), []byte(p.token)) == 1 {
+		return nil
+	}
 	if p.client != nil {
 		_ = p.client.Close()
 	}
