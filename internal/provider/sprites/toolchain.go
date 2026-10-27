@@ -23,7 +23,15 @@ const (
 	uvBin       = localBin + "/uv"
 	npmBin      = localBin + "/npm"
 	nodePrefix  = localPrefix + "/node"
-	pathScript  = "export PATH=\"$HOME/.local/bin:$HOME/.local/go/bin:$HOME/.cargo/bin:$PATH\"\n"
+	rubyPrefix  = localPrefix + "/ruby"
+	bundleBin   = localBin + "/bundle"
+	jdkPrefix   = localPrefix + "/jdk"
+	javaBin     = localBin + "/java"
+	// clojurePrefix holds the launcher scripts and libexec jars of the Clojure CLI.
+	clojurePrefix = localPrefix + "/lib/clojure"
+	clojureBin    = localBin + "/clojure"
+	argvVersion   = "--version"
+	pathScript    = "export PATH=\"$HOME/.local/bin:$HOME/.local/go/bin:$HOME/.cargo/bin:$PATH\"\n"
 )
 
 // SetupProjects installs missing toolchains and runs each detected project command.
@@ -118,11 +126,15 @@ func toolPaths(kind project.Kind) (probe []string, bin string, err error) {
 	case project.KindGo:
 		return []string{"go", "version"}, goBin, nil
 	case project.KindRust:
-		return []string{"cargo", "--version"}, cargoBin, nil
+		return []string{"cargo", argvVersion}, cargoBin, nil
 	case project.KindPython:
-		return []string{"uv", "--version"}, uvBin, nil
+		return []string{"uv", argvVersion}, uvBin, nil
 	case project.KindNode:
-		return []string{"npm", "--version"}, npmBin, nil
+		return []string{"npm", argvVersion}, npmBin, nil
+	case project.KindRuby:
+		return []string{"bundle", argvVersion}, bundleBin, nil
+	case project.KindClojure:
+		return []string{"clojure", argvVersion}, clojureBin, nil
 	default:
 		return nil, "", fmt.Errorf("unknown project kind %q", kind)
 	}
@@ -150,6 +162,10 @@ func installToolchain(ctx context.Context, c sdkClient, name, token string, kind
 		return installUV(ctx, c, name, token, arch)
 	case project.KindNode:
 		return installNode(ctx, c, name, token, arch)
+	case project.KindRuby:
+		return installRuby(ctx, c, name, token, arch)
+	case project.KindClojure:
+		return installClojure(ctx, c, name, token, arch)
 	default:
 		return fmt.Errorf("unknown project kind %q", kind)
 	}
