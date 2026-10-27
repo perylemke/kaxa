@@ -98,6 +98,12 @@ With no sandboxes, `list` prints `no sandboxes created` and exits. In a terminal
 
 `restart` and `upgrade` without a name open a picker. `destroy` without a name opens a form where you can select one or more sandboxes. When stdin is not a terminal, enter numbers to toggle and `0` to confirm. Named sandboxes and `destroy --all` still ask for `[y/N]`, unless `--force` or `-f` is set.
 
+### AI agents
+
+`sbox mcp` serves sandboxes to an AI agent over the Model Context Protocol. Cursor, Claude Code, Claude Desktop, and Gemini CLI each start that binary on stdin and stdout. The agent stays in the client and calls tools to create a sandbox from your Git repository, run commands in it, and destroy it.
+
+Point `command` at the installed binary. `go install` puts it on `$(go env GOPATH)/bin`. A desktop app needs that absolute path. The token stays in the client's environment, not in a committed file. Client files, `cwd`, and the tool list are in [docs/agent.md](docs/agent.md).
+
 ## Documentation
 
 | Manual | What it covers |
@@ -112,6 +118,7 @@ With no sandboxes, `list` prints `no sandboxes created` and exits. In a terminal
 | [upgrade](docs/upgrade.md) | `sbox upgrade` |
 | [url](docs/url.md) | `sbox url` |
 | [destroy](docs/destroy.md) | `sbox destroy` (`rm`) |
+| [mcp](docs/agent.md) | `sbox mcp`, sandboxes for AI agents |
 
 The same index, plus configuration, is in [docs/README.md](docs/README.md).
 

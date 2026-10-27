@@ -29,3 +29,4 @@ Every command except `version` and `--help` loads configuration before it runs.
 | `sbox restart` | [restart](restart.md) |
 | `sbox upgrade` | [upgrade](upgrade.md) |
 | `sbox url` | [url](url.md) |
+| `sbox mcp` | [mcp](agent.md) |
