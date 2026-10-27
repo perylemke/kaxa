@@ -12,7 +12,12 @@ import (
 	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
-const workspaceDir = "/home/sprite/workspace"
+const (
+	workspaceDir = "/home/sprite/workspace"
+	argvMkdir    = "mkdir"
+	argvTar      = "tar"
+	tarGzip      = "-xzf"
+)
 
 // HomeDir is the default working directory of a sprite.
 func (p *Provider) HomeDir() string {
