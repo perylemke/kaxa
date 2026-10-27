@@ -14,3 +14,5 @@ Without a name, upgrade opens a picker. Choose a number or a name from the list,
 kaxa upgrade my-sprite
 kaxa upgrade
 ```
+
+Upgrade is not available for Modal: Modal has no per-sandbox platform upgrade. kaxa says so and lists the providers that support it, such as Sprites.

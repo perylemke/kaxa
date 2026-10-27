@@ -9,14 +9,16 @@ kaxa new [name]
 
 Without a name, a form asks for the name, provider, and the same yes/no choices as the flags. When API is yes, the form asks for the command and the port. The form uses the Dracula theme. It does not ask for `--dir`; pass that flag if you need it.
 
-Sprites implements create. Sync, API publish, and public URLs are rejected for Modal.
+Sprites and Modal implement create. `--running`, API publish, and public URLs exist only for Sprites; Modal rejects them with a message that names the providers that have them. `--sync` works on both; see [Sync](#sync).
+
+Modal sandboxes use a Debian image, live for up to 24 hours, and stop after one idle hour. Names are DNS labels. See [Modal account and token](modal-account.md).
 
 ## Flags
 
 | Flag | Meaning |
 | --- | --- |
 | `--running` | Keep the sandbox up for one hour, serve tmux on its URL, and open that URL in a browser |
-| `--sync` | Copy the current Git repository into `/home/sprite/workspace/<repo>` |
+| `--sync` | Copy the current Git repository into `/home/sprite/workspace/<repo>` (Sprites) or `/home/modal/workspace/<repo>` (Modal) |
 | `--dir` | Git repository to copy. Requires `--sync`. Default: the current directory |
 | `--api` | Publish one HTTP service on the Sprites URL. Requires `--api-cmd` |
 | `--api-cmd` | Comma-separated argv. The first item is the binary |
@@ -37,7 +39,19 @@ kaxa create --sync my-sprite
 kaxa create --sync --dir ~/projects/api-python my-sprite
 ```
 
-`exec` and `console` on a sandbox created with `--sync` start in `/home/sprite/workspace`.
+`exec` and `console` on a sandbox created with `--sync` start in the workspace: `/home/sprite/workspace` on Sprites, `/home/modal/workspace` on Modal.
+
+### Sync on Modal
+
+```bash
+kaxa create --provider modal --sync my-box
+```
+
+A Modal sandbox created with `--sync` uses a larger image than a plain one: Debian with `ca-certificates`, `curl`, `git`, and `build-essential`, plus an unprivileged user `modal` whose home is `/home/modal`. The repository lands in `/home/modal/workspace/<repo>`, owned by `modal`. Toolchains (Go, Rust, Python `uv`, Node, Ruby, Clojure) are installed under `/home/modal/.local` and `/home/modal/.cargo` and put on the `PATH` of the shell, the same way as on Sprites. Downloads are checked against pinned SHA-256 hashes.
+
+`exec` and `console` on a synced Modal sandbox run as `modal`, not root, starting in `/home/modal/workspace`. A Modal sandbox created without `--sync` is unchanged: root, starting in the image root.
+
+Modal builds the sync image the first time you use `--sync` and caches it, so that first create can take a few minutes. Later creates start as fast as a plain sandbox, plus the copy and the install.
 
 ## API
 

@@ -14,3 +14,5 @@ Without a name, restart opens a picker. Choose a number or a name from the list,
 kaxa restart my-sprite
 kaxa restart
 ```
+
+Restart is not available for Modal: a Modal sandbox cannot be rebooted in place. kaxa says so and lists the providers that support it, such as Sprites.

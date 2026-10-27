@@ -28,7 +28,7 @@ A client started from a terminal inherits your `PATH`, so `command` can be `kaxa
 
 The token stays in the environment of that process. Put `KAXA_DEFAULT_PROVIDER` and `KAXA_SPRITES_TOKEN` in the client's `env` block. Do not commit a file that contains the token, and do not paste the token into a prompt. See [Sprites account and token](sprites-account.md). `--provider` on the command also sets the default.
 
-After the server is connected, ask the agent to call `list_providers`. Sprites is available. Modal is registered and reports `available: false`.
+After the server is connected, ask the agent to call `list_providers`. Sprites and Modal are available. Modal supports create (with `sync`), list, inspect, exec, and destroy; its `capabilities` report `sync`, `setup`, and `workspace_layout` as true and the rest as false. On Modal, `exec` commands start in the image root unless the sandbox was created with `sync`; then they run as the `modal` user in `/home/modal/workspace`.
 
 ### Cursor
 
@@ -128,7 +128,7 @@ Every tool that works on a sandbox takes an optional `provider`. Without it, the
 
 ### list_providers
 
-Call this first. A provider is `available: false` when it cannot serve requests yet. Modal is a stub today, so it reports false and the other tools reject it before calling it.
+Call this first. A provider is `available: false` when it cannot serve requests yet. The other tools reject an unavailable provider before calling it.
 
 `capabilities` lists the optional features a provider implements:
 
@@ -138,9 +138,12 @@ Call this first. A provider is `available: false` when it cannot serve requests 
 | `setup` | Dependency install after a sync |
 | `api` | `create_sandbox` with `api`, and `publish_api` |
 | `public_url` | `create_sandbox` with `public`, and `set_url_auth` |
+| `restart` | `restart` |
+| `upgrade` | `upgrade` |
+| `running` | `create_sandbox` with `running` |
 | `workspace_layout` | `work_dir` in the result, and the default directory of `publish_api` |
 
-A request that needs a missing capability fails before anything is created, with `the <provider> provider does not support <feature>`.
+A request that needs a missing capability fails before anything is created, with `<feature> is not available for <provider>`, and a hint that names the providers that do offer the feature.
 
 ### create_sandbox
 
@@ -169,7 +172,7 @@ A command that exits non-zero is a result: the tool succeeds and `exit_code` is 
 
 Each of `stdout` and `stderr` keeps the first 256 KiB. When more is produced, the rest is dropped, a marker line ends the text, and `truncated` is true. The command is not interrupted. There is no stdin, so a command that reads input sees end of file.
 
-On a sandbox created with `sync`, the command starts in the provider workspace directory, which contains the repository. For Sprites that is `/home/sprite/workspace`, and `work_dir` is a subdirectory of it. Run project commands from `work_dir`, for example `["bash", "-c", "cd <work_dir> && go test ./..."]`.
+On a sandbox created with `sync`, the command starts in the provider workspace directory, which contains the repository. For Sprites that is `/home/sprite/workspace` and for Modal `/home/modal/workspace`, and `work_dir` is a subdirectory of it. Run project commands from `work_dir`, for example `["bash", "-c", "cd <work_dir> && go test ./..."]`.
 
 ## Limits
 
