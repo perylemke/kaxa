@@ -118,6 +118,7 @@ Every tool that works on a sandbox takes an optional `provider`. Without it, the
 | --- | --- |
 | `list_providers` | Registered providers, whether each is available, which one is the default, and its capabilities |
 | `create_sandbox` | Create a sandbox. Same flow as [create](create.md), without the form |
+| `sync_repository` | Copy another Git repository into a sandbox created with `sync`. Same flow as [sync](sync.md) |
 | `exec` | Run an argv and return `stdout`, `stderr`, `exit_code` and `truncated` |
 | `list_sandboxes` | Sandboxes of one provider |
 | `inspect` | Status, labels, URL and URL auth of one sandbox |
@@ -134,7 +135,7 @@ Call this first. A provider is `available: false` when it cannot serve requests 
 
 | Capability | Needed for |
 | --- | --- |
-| `sync` | `create_sandbox` with `sync` |
+| `sync` | `create_sandbox` with `sync`, and `sync_repository` |
 | `setup` | Dependency install after a sync |
 | `api` | `create_sandbox` with `api`, and `publish_api` |
 | `public_url` | `create_sandbox` with `public`, and `set_url_auth` |
@@ -164,6 +165,20 @@ The result has `id`, `provider`, `work_dir`, `url` and `auth`. `work_dir` is whe
 
 A failed copy, install or API publish deletes the sandbox. A failed `public` change keeps it, and the error says so. Create can take minutes when `sync` installs toolchains. The server writes each step to stderr while it waits.
 
+### sync_repository
+
+Adds one more Git repository to a sandbox that was created with `sync`.
+
+| Argument | Meaning |
+| --- | --- |
+| `name` | Required. The sandbox |
+| `provider` | Provider name. Defaults to the server default |
+| `dir` | A directory inside the repository to copy. Default: the server working directory |
+
+The result has `id`, `provider` and `work_dir`, the directory of the new repository in the sandbox. The repository is subject to the same working directory rule as `create_sandbox`.
+
+The tool never replaces a directory. It fails before copying when the sandbox was not created with `sync`, when the provider cannot sync, or when a directory with the repository's name is already in the sandbox. A failed copy or install keeps the sandbox, because it holds other work. The error says which step failed. It can take minutes while dependencies install.
+
 ### exec
 
 `command` is an argv list. It never goes through a shell. To use shell syntax, pass `["bash", "-c", "..."]`.
@@ -176,9 +191,9 @@ On a sandbox created with `sync`, the command starts in the provider workspace d
 
 ## Limits
 
-- Edits made with the agent's local file tools are not in the sandbox. Edits made in the sandbox are not copied back. Move code with `git` inside `exec`, or run `sync` again by creating a new sandbox. There is no pull tool yet.
-- `sync` copies the Git repository only at create time. The MCP server has no tool to add another repository later. The CLI can: run `kaxa sync <name>` yourself; see [sync](sync.md).
-- `sync` copies only a repository that contains the server working directory or sits below it. This keeps a prompt from sending an unrelated repository to a remote provider. Start `kaxa mcp` from the project, or pass a `dir` inside it. A symlink that leaves the working directory is rejected.
+- Edits made with the agent's local file tools are not in the sandbox. Edits made in the sandbox are not copied back. Move code with `git` inside `exec`, or create a new sandbox with `sync`. There is no pull tool yet.
+- `sync_repository` adds a repository but never refreshes one. To send new local changes, create a new sandbox or move the code with `git` inside `exec`.
+- `sync` and `sync_repository` copy only a repository that contains the server working directory or sits below it. This keeps a prompt from sending an unrelated repository to a remote provider. Start `kaxa mcp` from the project, or pass a `dir` inside it. A symlink that leaves the working directory is rejected.
 - Checkpoints, network policy and connectors are not exposed. Use the provider's own tools for them.
 - Only Sprites is implemented. `destroy` is permanent, and its tool is marked destructive so a client can ask first.
 

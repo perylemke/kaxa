@@ -83,7 +83,7 @@ func TestSyncRequiresSyncLabel(t *testing.T) {
 	root, name := gitRepo(t)
 
 	_, err := lifecycle.Sync(context.Background(), p, lifecycle.SyncRequest{Name: boxName, Root: root, Repo: name}, nil)
-	if err == nil || !strings.Contains(err.Error(), "was not created with --sync") {
+	if err == nil || !strings.Contains(err.Error(), "was not created with sync") {
 		t.Fatalf("err = %v", err)
 	}
 	if rec.synced || len(rec.destroyed) != 0 {

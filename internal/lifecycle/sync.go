@@ -76,8 +76,8 @@ func checkSyncTarget(ctx context.Context, p sandbox.Provider, checker sandbox.Re
 	}
 	if !slices.Contains(detail.Labels, sandbox.SyncLabel) {
 		return usererr.New(
-			fmt.Sprintf("sandbox %s was not created with --sync", req.Name),
-			"only a sandbox created with kaxa create --sync has a workspace; create a new one",
+			fmt.Sprintf("sandbox %s was not created with sync", req.Name),
+			"only a sandbox created with sync has a workspace; create a new one",
 		)
 	}
 	exists, err := checker.RepoExists(ctx, id, req.Repo)
@@ -87,7 +87,7 @@ func checkSyncTarget(ctx context.Context, p sandbox.Provider, checker sandbox.Re
 	if exists {
 		return usererr.New(
 			fmt.Sprintf("%s already exists in sandbox %s", req.Repo, req.Name),
-			"rename the local directory, or remove it in the sandbox with kaxa exec",
+			"rename the local directory, or remove the old copy with exec",
 		)
 	}
 	return nil

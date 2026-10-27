@@ -22,7 +22,8 @@ const instructions = `Run work in an isolated sandbox instead of on the host.
 1. Call list_providers and pick a provider that is available.
 2. create_sandbox with sync=true copies the local Git repository and installs its dependencies. The response work_dir is where the code lives inside the sandbox.
 3. Run builds, tests and edits with exec (argv, no shell). exec starts above the repository, so run project commands from work_dir, for example ["bash", "-c", "cd <work_dir> && go test ./..."]. Files you change with local editor tools are not in the sandbox, and files changed in the sandbox are not copied back.
-4. Call destroy only when the user asks for it.`
+4. To add another Git repository to a sandbox that was created with sync, call sync_repository. It never replaces a directory.
+5. Call destroy only when the user asks for it.`
 
 // Options configures the server.
 type Options struct {
@@ -61,6 +62,9 @@ func (s *service) register(srv *sdk.Server) {
 	addTool(s, srv, "create_sandbox", "Create a sandbox",
 		"Create a sandbox. With sync it copies a local Git repository into the sandbox and installs its dependencies; a failed copy, install or API publish deletes the sandbox. Can take minutes.",
 		additive, s.create)
+	addTool(s, srv, "sync_repository", "Copy another repository into a sandbox",
+		"Copy another local Git repository into a sandbox that was created with sync, then install its dependencies. It never replaces a directory: a repository already in the sandbox is an error. A failure keeps the sandbox. Can take minutes.",
+		additive, s.syncRepository)
 	addTool(s, srv, "exec", "Run a command",
 		"Run an argv in a sandbox and return its stdout, stderr and exit code. A non-zero exit code is a result, not a tool error. Each stream is capped at 256 KiB.",
 		openEnded, s.exec)

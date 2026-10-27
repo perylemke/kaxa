@@ -18,9 +18,9 @@ The repository lands in `/home/sprite/workspace/<repo>` on Sprites and `/home/mo
 
 ## Limits
 
-- A sandbox created without `--sync` is rejected: `sandbox <name> was not created with --sync`. On Modal that choice is final. The image with the `modal` user, the workspace directory, `git`, and the build tools is picked when the sandbox is created, and kaxa cannot change it later. Create a new sandbox with `--sync`.
+- A sandbox created without `--sync` is rejected: `sandbox <name> was not created with sync`. On Modal that choice is final. The image with the `modal` user, the workspace directory, `git`, and the build tools is picked when the sandbox is created, and kaxa cannot change it later. Create a new sandbox with `--sync`.
 - `sync` never replaces a directory. If `<repo>` already exists in the sandbox, it stops before copying with `<repo> already exists in sandbox <name>`. Two local repositories with the same directory name collide; rename one, or remove the old copy with `kaxa exec <name> -- rm -rf <path>`.
 - A failed copy or install keeps the sandbox, because it holds other work. `create --sync` deletes a sandbox it just made; `sync` does not. After a failed install the files are already in the sandbox. Fix the cause and run the install there with `kaxa exec`, or remove the directory and sync again.
 - `sync` copies the repository once. It does not update a copy that is already there.
 - A `.git` file, used by linked worktrees, is rejected, and submodule directories are omitted, as in `create --sync`.
-- The MCP server has no `sync` tool yet. See [kaxa mcp](agent.md#limits).
+- An AI agent does the same with the `sync_repository` tool. See [kaxa mcp](agent.md#sync_repository).

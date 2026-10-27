@@ -121,7 +121,7 @@ func TestSyncRejectsSandboxWithoutWorkspace(t *testing.T) {
 
 	fp := newRepoSyncProvider("kaxa")
 	_, _, err := runSync(t, fp, testBoxName)
-	if err == nil || !strings.Contains(err.Error(), "was not created with --sync") {
+	if err == nil || !strings.Contains(err.Error(), "was not created with sync") {
 		t.Fatalf("err = %v", err)
 	}
 	if fp.synced {

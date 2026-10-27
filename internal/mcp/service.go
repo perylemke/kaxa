@@ -149,19 +149,48 @@ func (s *service) createRequest(name string, in createIn) (lifecycle.Request, er
 		}
 		return req, nil
 	}
-	dir := in.Dir
-	if dir == "" {
-		dir = s.root
-	}
-	root, repo, err := lifecycle.ResolveRepo(dir, true)
+	root, repo, err := s.repoInScope(in.Dir)
 	if err != nil {
-		return lifecycle.Request{}, err
-	}
-	if err := checkRepoScope(root, s.root); err != nil {
 		return lifecycle.Request{}, err
 	}
 	req.Root, req.Repo = root, repo
 	return req, nil
+}
+
+// repoInScope resolves the Git repository to copy: dir, or the server working
+// directory when dir is empty. It refuses a repository unrelated to that directory.
+func (s *service) repoInScope(dir string) (root, repo string, err error) {
+	if dir == "" {
+		dir = s.root
+	}
+	root, repo, err = lifecycle.ResolveRepo(dir, true)
+	if err != nil {
+		return "", "", err
+	}
+	if err := checkRepoScope(root, s.root); err != nil {
+		return "", "", err
+	}
+	return root, repo, nil
+}
+
+func (s *service) syncRepository(ctx context.Context, in syncIn) (syncOut, error) {
+	p, err := s.provider(in.Provider)
+	if err != nil {
+		return syncOut{}, err
+	}
+	name, err := requireName(in.Name)
+	if err != nil {
+		return syncOut{}, err
+	}
+	root, repo, err := s.repoInScope(in.Dir)
+	if err != nil {
+		return syncOut{}, err
+	}
+	res, err := lifecycle.Sync(ctx, p, lifecycle.SyncRequest{Name: string(name), Root: root, Repo: repo}, s.progress)
+	if err != nil {
+		return syncOut{}, err
+	}
+	return syncOut{ID: string(res.ID), Provider: p.Name(), WorkDir: res.WorkDir}, nil
 }
 
 func applyAPI(req *lifecycle.Request, in createIn) error {
