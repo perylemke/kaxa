@@ -18,6 +18,8 @@ import (
 	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
+const testPlain = "plain"
+
 // fakeProvider implements every optional interface.
 type fakeProvider struct {
 	name        string
@@ -43,6 +45,10 @@ func (f *fakeProvider) Name() string           { return f.name }
 func (f *fakeProvider) Available() bool        { return !f.unavailable }
 func (f *fakeProvider) HomeDir() string        { return "/home/box" }
 func (f *fakeProvider) Configure(string) error { return nil }
+
+func (f *fakeProvider) SupportsRunning() {}
+
+func (f *fakeProvider) ConfigureCredentials(string, string) error { return nil }
 
 func (f *fakeProvider) RepoDir(repo string) (string, error) { return "/home/box/ws/" + repo, nil }
 
@@ -114,8 +120,7 @@ func (plainProvider) List(context.Context) ([]sandbox.Info, error) { return nil,
 func (plainProvider) Inspect(context.Context, sandbox.ID) (sandbox.Detail, error) {
 	return sandbox.Detail{}, nil
 }
-func (plainProvider) Restart(context.Context, sandbox.ID) error { return nil }
-func (plainProvider) Upgrade(context.Context, sandbox.ID) error { return nil }
+
 func (plainProvider) Exec(context.Context, sandbox.ID, sandbox.ExecOptions) error {
 	return nil
 }
@@ -161,7 +166,7 @@ func TestListProvidersReportsAvailabilityAndCapabilities(t *testing.T) {
 	svc := newTestService(t, t.TempDir(), testSprites,
 		&fakeProvider{name: testSprites},
 		&fakeProvider{name: testModal, unavailable: true},
-		plainProvider{name: "plain"},
+		plainProvider{name: testPlain},
 	)
 	out, err := svc.listProviders(context.Background(), listProvidersIn{})
 	if err != nil {
@@ -181,7 +186,7 @@ func TestListProvidersReportsAvailabilityAndCapabilities(t *testing.T) {
 	if modal := byName[testModal]; modal.Available || modal.Default {
 		t.Fatalf("modal = %+v", modal)
 	}
-	if plain := byName["plain"]; !plain.Available || plain.Capabilities != (sandbox.Capabilities{}) {
+	if plain := byName[testPlain]; !plain.Available || plain.Capabilities != (sandbox.Capabilities{}) {
 		t.Fatalf("plain = %+v", plain)
 	}
 }
@@ -280,9 +285,9 @@ func TestCreateRejectsUnavailableProvider(t *testing.T) {
 func TestCreateRejectsProviderWithoutCapability(t *testing.T) {
 	t.Parallel()
 
-	svc := newTestService(t, t.TempDir(), "plain", plainProvider{name: "plain"})
+	svc := newTestService(t, t.TempDir(), testPlain, plainProvider{name: testPlain})
 	_, err := svc.create(context.Background(), createIn{Name: testBox, Public: true})
-	wantErr(t, err, "plain provider does not support public urls")
+	wantErr(t, err, "public urls is not available for plain")
 }
 
 func TestCreateSyncReturnsWorkDir(t *testing.T) {
@@ -596,13 +601,34 @@ func TestPublishAPIPassesEnv(t *testing.T) {
 func TestPublishAPIAndURLAuthNeedCapabilities(t *testing.T) {
 	t.Parallel()
 
-	svc := newTestService(t, t.TempDir(), "plain", plainProvider{name: "plain"})
+	svc := newTestService(t, t.TempDir(), testPlain, plainProvider{name: testPlain})
 	ctx := context.Background()
 
 	_, err := svc.publishAPI(ctx, publishIn{Name: testBox, APICmd: []string{"x"}})
-	wantErr(t, err, "plain provider does not support api publish")
+	wantErr(t, err, "api publish is not available for plain")
 	_, err = svc.setURLAuth(ctx, urlAuthIn{Name: testBox, Auth: sandbox.URLAuthPublic})
-	wantErr(t, err, "plain provider does not support url auth")
+	wantErr(t, err, "url auth is not available for plain")
+}
+
+func TestRestartAndUpgradeNeedCapabilities(t *testing.T) {
+	t.Parallel()
+
+	svc := newTestService(t, t.TempDir(), testPlain,
+		plainProvider{name: testPlain}, &fakeProvider{name: testSprites})
+	ctx := context.Background()
+
+	_, err := svc.restart(ctx, nameIn{Name: testBox})
+	wantErr(t, err, "restart is not available for plain")
+	_, err = svc.upgrade(ctx, nameIn{Name: testBox})
+	wantErr(t, err, "upgrade is not available for plain")
+	if !errors.Is(err, sandbox.ErrUnsupported) {
+		t.Fatalf("err = %v, want ErrUnsupported", err)
+	}
+
+	out, err := svc.restart(ctx, nameIn{Name: testBox, Provider: testSprites})
+	if err != nil || out.Status != "restarted" {
+		t.Fatalf("out=%+v err=%v", out, err)
+	}
 }
 
 func TestSetURLAuth(t *testing.T) {

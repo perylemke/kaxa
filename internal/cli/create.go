@@ -128,13 +128,14 @@ func resolveCreateRequest(cmd *cobra.Command, reg *registry.Registry, args []str
 }
 
 func writeCreated(cmd *cobra.Command, p sandbox.Provider, id sandbox.ID, req createRequest) error {
-	msg := fmt.Sprintf("sandbox %s is ready", id)
+	ref := sandboxLabel(p.Name(), id)
+	msg := fmt.Sprintf("sandbox %s is ready", ref)
 	if req.Running || req.API || req.Public {
 		detail, err := p.Inspect(cmd.Context(), id)
 		if err != nil {
 			return err
 		}
-		msg = createdMessage(id, detail.URL, req)
+		msg = createdMessage(ref, detail.URL, req)
 		if req.Running && !req.API {
 			_ = openBrowserFn(detail.URL)
 		}

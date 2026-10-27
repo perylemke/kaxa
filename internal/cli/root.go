@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/perylemke/kaxa/internal/config"
+	"github.com/perylemke/kaxa/internal/lifecycle"
 	"github.com/perylemke/kaxa/internal/registry"
 	"github.com/perylemke/kaxa/internal/sandbox"
 )
@@ -20,7 +21,7 @@ func Execute(reg *registry.Registry) int {
 		if exitErr, ok := errors.AsType[*sandbox.ExitError](err); ok {
 			return remoteExitCode(exitErr.Code)
 		}
-		_ = WriteError(os.Stderr, err)
+		_ = WriteError(os.Stderr, lifecycle.WithAlternatives(reg, err))
 		return 1
 	}
 	return 0

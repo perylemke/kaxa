@@ -14,7 +14,7 @@ import (
 func TestDestroyFormViewListsSandboxes(t *testing.T) {
 	t.Parallel()
 
-	var selected []sandbox.ID
+	var selected []int
 	form := newDestroyForm([]sandbox.Info{
 		{ID: fixturePery, Status: fixtureCold},
 		{ID: fixtureOther, Status: fixtureWarm},
@@ -42,7 +42,7 @@ func TestDestroyFormAccessibleSelectsOne(t *testing.T) {
 	if err != nil {
 		t.Fatalf("form: %v", err)
 	}
-	if len(got) != 1 || got[0] != "b" {
+	if len(got) != 1 || got[0].ID != "b" {
 		t.Fatalf("selected = %v", got)
 	}
 }
@@ -61,7 +61,7 @@ func TestDestroyFormAccessibleSelectsMultiple(t *testing.T) {
 	if err != nil {
 		t.Fatalf("form: %v", err)
 	}
-	if len(got) != 2 || got[0] != fixturePery || got[1] != fixtureOther {
+	if len(got) != 2 || got[0].ID != fixturePery || got[1].ID != fixtureOther {
 		t.Fatalf("selected = %v", got)
 	}
 }

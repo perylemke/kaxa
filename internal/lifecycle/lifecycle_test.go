@@ -45,8 +45,7 @@ func (basicProvider) List(context.Context) ([]sandbox.Info, error) { return nil,
 func (basicProvider) Inspect(context.Context, sandbox.ID) (sandbox.Detail, error) {
 	return sandbox.Detail{}, nil
 }
-func (basicProvider) Restart(context.Context, sandbox.ID) error { return nil }
-func (basicProvider) Upgrade(context.Context, sandbox.ID) error { return nil }
+
 func (basicProvider) Exec(context.Context, sandbox.ID, sandbox.ExecOptions) error {
 	return nil
 }
@@ -269,7 +268,7 @@ func TestCreateRunnerLabelsEachSlowStep(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
-	want := []string{"creating box…", "syncing " + name + "…", "installing " + name + "…"}
+	want := []string{"creating box on fake…", "syncing " + name + "…", "installing " + name + "…"}
 	if !slices.Equal(labels, want) {
 		t.Fatalf("labels = %v, want %v", labels, want)
 	}
@@ -285,7 +284,8 @@ func TestCheckRejectsMissingCapabilities(t *testing.T) {
 	}{
 		{name: "sync", req: lifecycle.Request{Name: boxName, Sync: true}, want: "sync"},
 		{name: "api", req: lifecycle.Request{Name: boxName, API: true}, want: "api publish"},
-		{name: "public", req: lifecycle.Request{Name: boxName, Public: true}, want: "public url"},
+		{name: "public", req: lifecycle.Request{Name: boxName, Public: true}, want: "public urls"},
+		{name: "running", req: lifecycle.Request{Name: boxName, Running: true}, want: "running"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -293,7 +293,7 @@ func TestCheckRejectsMissingCapabilities(t *testing.T) {
 			rec := &recorder{}
 			p := basicProvider{rec: rec}
 			_, err := lifecycle.Create(context.Background(), p, tt.req, nil)
-			if err == nil || !strings.Contains(err.Error(), "fake provider does not support "+tt.want) {
+			if err == nil || !strings.Contains(err.Error(), tt.want+" is not available for fake") {
 				t.Fatalf("err = %v", err)
 			}
 			if rec.created.Name != "" {

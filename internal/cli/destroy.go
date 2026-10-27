@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -24,17 +25,18 @@ func newDestroyCmd(reg *registry.Registry) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "destroy [name]",
 		Aliases: []string{"rm"},
-		Short:   "Destroy a sandbox",
+		Short:   "Destroy sandboxes",
+		Long: `Destroy sandboxes.
+
+With a name, destroy that sandbox on the selected provider.
+With no name, choose from the sandboxes of every configured provider.
+With --all, destroy every sandbox of every configured provider, after two
+confirmations. Add --provider to limit the scope to one provider.`,
 		Args: func(_ *cobra.Command, args []string) error {
 			return destroyArgError(destroyAll, args)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			p, err := providerFromCmd(cmd, reg)
-			if err != nil {
-				return err
-			}
-
-			ids, picked, err := destroyTargets(cmd.Context(), p, destroyAll, args, cmd.InOrStdin(), cmd.ErrOrStderr())
+			plan, err := resolveDestroyPlan(cmd, reg, destroyAll, args)
 			if errors.Is(err, errDestroyCancelled) {
 				_, err = fmt.Fprintln(cmd.OutOrStdout(), "destroy cancelled")
 				return err
@@ -42,13 +44,13 @@ func newDestroyCmd(reg *registry.Registry) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if len(ids) == 0 {
+			if len(plan.targets) == 0 {
 				_, err = fmt.Fprintln(cmd.OutOrStdout(), "no sandboxes to destroy")
 				return err
 			}
 
-			if !picked && !force {
-				ok, err := confirmAction(cmd.InOrStdin(), cmd.ErrOrStderr(), destroyPrompt(destroyAll, ids))
+			if !plan.picked && !force {
+				ok, err := confirmDestroy(cmd, plan, destroyAll)
 				if err != nil {
 					return err
 				}
@@ -58,21 +60,14 @@ func newDestroyCmd(reg *registry.Registry) *cobra.Command {
 				}
 			}
 
-			err = runTaskWithSpinner(cmd.Context(), cmd.ErrOrStderr(), destroySpinnerLabel(ids), func(ctx context.Context) error {
-				for _, id := range ids {
-					if err := p.Destroy(ctx, id); err != nil {
-						return err
-					}
-				}
-				return nil
-			})
+			err = runTaskWithSpinner(cmd.Context(), cmd.ErrOrStderr(), destroySpinnerLabel(plan.targets), plan.run)
 			if err != nil {
 				return err
 			}
-			return WriteSuccess(cmd.OutOrStdout(), "destroyed", destroySuccessMessage(ids))
+			return WriteSuccess(cmd.OutOrStdout(), "destroyed", destroySuccessMessage(plan.targets))
 		},
 	}
-	cmd.Flags().BoolVar(&destroyAll, "all", false, "destroy every sandbox")
+	cmd.Flags().BoolVar(&destroyAll, "all", false, "destroy every sandbox of every provider (or of --provider)")
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "destroy without confirmation")
 	return cmd
 }
@@ -90,26 +85,71 @@ func destroyArgError(destroyAll bool, args []string) error {
 	return rejectExtraName("destroy", args)
 }
 
-func destroyTargets(ctx context.Context, p sandbox.Provider, destroyAll bool, args []string, in io.Reader, errOut io.Writer) ([]sandbox.ID, bool, error) {
+// destroyPlan is what a destroy run will remove and the providers to ask.
+type destroyPlan struct {
+	targets   []sandbox.Info
+	providers map[string]sandbox.Provider
+	// picked means the user chose the targets in the form, which is the confirmation.
+	picked bool
+	// allProviders means --all with no --provider, the widest scope.
+	allProviders bool
+}
+
+func (d destroyPlan) run(ctx context.Context) error {
+	for _, t := range d.targets {
+		if err := d.providers[t.Provider].Destroy(ctx, t.ID); err != nil {
+			if len(d.targets) == 1 {
+				return err
+			}
+			return fmt.Errorf("destroy %s: %w", sandboxLabel(t.Provider, t.ID), err)
+		}
+	}
+	return nil
+}
+
+func resolveDestroyPlan(cmd *cobra.Command, reg *registry.Registry, destroyAll bool, args []string) (destroyPlan, error) {
 	if !destroyAll && len(args) == 1 {
-		return []sandbox.ID{sandbox.ID(args[0])}, false, nil
+		p, err := providerFromCmd(cmd, reg)
+		if err != nil {
+			return destroyPlan{}, err
+		}
+		return destroyPlan{
+			targets:   []sandbox.Info{{Provider: p.Name(), ID: sandbox.ID(args[0])}},
+			providers: map[string]sandbox.Provider{p.Name(): p},
+		}, nil
 	}
-	infos, err := p.List(ctx)
+
+	providers, names, err := listTargets(cmd, reg)
 	if err != nil {
-		return nil, false, err
+		return destroyPlan{}, err
 	}
+	infos, err := collectSandboxes(cmd.Context(), cmd.ErrOrStderr(), providers, names)
+	if err != nil {
+		return destroyPlan{}, err
+	}
+	plan := destroyPlan{providers: providers}
 	if len(infos) == 0 {
-		return nil, false, nil
+		return plan, nil
 	}
 	if destroyAll {
-		ids := make([]sandbox.ID, 0, len(infos))
-		for _, info := range infos {
-			ids = append(ids, info.ID)
-		}
-		return ids, false, nil
+		plan.targets = infos
+		plan.allProviders = !cmd.Flags().Changed("provider")
+		return plan, nil
 	}
-	ids, err := collectDestroyForm(in, errOut, infos)
-	return ids, true, err
+	plan.targets, err = collectDestroyForm(cmd.InOrStdin(), cmd.ErrOrStderr(), infos)
+	plan.picked = true
+	return plan, err
+}
+
+// confirmDestroy asks before destroying. --all across every provider asks twice:
+// the second is a last warning.
+func confirmDestroy(cmd *cobra.Command, plan destroyPlan, destroyAll bool) (bool, error) {
+	in, errOut := cmd.InOrStdin(), cmd.ErrOrStderr()
+	ok, err := confirmAction(in, errOut, destroyPrompt(plan.targets, destroyAll))
+	if err != nil || !ok || !plan.allProviders {
+		return ok, err
+	}
+	return confirmAction(in, errOut, destroyFinalPrompt(plan.targets))
 }
 
 func chooseSandbox(in io.Reader, out io.Writer, prompt string, infos []sandbox.Info) (sandbox.ID, error) {
@@ -144,31 +184,68 @@ func unknownSandboxChoice(answer string) error {
 	return usererr.New(fmt.Sprintf("unknown sandbox %q", answer), "enter a number from the list")
 }
 
-func destroyPrompt(destroyAll bool, ids []sandbox.ID) string {
+func destroyPrompt(targets []sandbox.Info, destroyAll bool) string {
 	if destroyAll {
-		return fmt.Sprintf("Destroy all %d sandboxes?", len(ids))
+		return fmt.Sprintf("Destroy %s %s?", allSandboxes(len(targets)), providersPhrase(targets))
 	}
-	return fmt.Sprintf("Destroy sandbox %s?", ids[0])
+	return fmt.Sprintf("Destroy sandbox %s?", sandboxLabel(targets[0].Provider, targets[0].ID))
 }
 
-func destroySpinnerLabel(ids []sandbox.ID) string {
-	if len(ids) > 1 {
-		return fmt.Sprintf("destroying %d sandboxes…", len(ids))
-	}
-	return fmt.Sprintf("destroying %s…", ids[0])
+func destroyFinalPrompt(targets []sandbox.Info) string {
+	return fmt.Sprintf("This cannot be undone. Really destroy %s %s?", allSandboxes(len(targets)), providersPhrase(targets))
 }
 
-func destroySuccessMessage(ids []sandbox.ID) string {
-	if len(ids) == 1 {
-		return fmt.Sprintf("sandbox %s was destroyed", ids[0])
+func destroySpinnerLabel(targets []sandbox.Info) string {
+	if len(targets) > 1 {
+		return fmt.Sprintf("destroying %d sandboxes %s…", len(targets), providersPhrase(targets))
 	}
+	return fmt.Sprintf("destroying %s…", sandboxLabel(targets[0].Provider, targets[0].ID))
+}
+
+func destroySuccessMessage(targets []sandbox.Info) string {
+	if len(targets) == 1 {
+		return fmt.Sprintf("sandbox %s was destroyed", sandboxLabel(targets[0].Provider, targets[0].ID))
+	}
+	multi := len(providerNames(targets)) > 1
 	var b strings.Builder
-	fmt.Fprintf(&b, "%d sandboxes were destroyed", len(ids))
-	for _, id := range ids {
+	fmt.Fprintf(&b, "%d sandboxes %s were destroyed", len(targets), providersPhrase(targets))
+	for _, t := range targets {
 		b.WriteString("\n  ")
-		b.WriteString(string(id))
+		if multi {
+			b.WriteString(sandboxLabel(t.Provider, t.ID))
+			continue
+		}
+		b.WriteString(string(t.ID))
 	}
 	return b.String()
+}
+
+// allSandboxes reads "all 3 sandboxes", or "1 sandbox" when there is only one.
+func allSandboxes(n int) string {
+	if n == 1 {
+		return "1 sandbox"
+	}
+	return fmt.Sprintf("all %d sandboxes", n)
+}
+
+// providerNames returns the distinct providers of targets, in first-seen order.
+func providerNames(targets []sandbox.Info) []string {
+	var names []string
+	for _, t := range targets {
+		if !slices.Contains(names, t.Provider) {
+			names = append(names, t.Provider)
+		}
+	}
+	return names
+}
+
+// providersPhrase reads "on modal" for one provider, "across modal, sprites" for more.
+func providersPhrase(targets []sandbox.Info) string {
+	names := providerNames(targets)
+	if len(names) == 1 {
+		return "on " + names[0]
+	}
+	return "across " + strings.Join(names, ", ")
 }
 
 func confirmAction(in io.Reader, out io.Writer, prompt string) (bool, error) {
@@ -185,4 +262,9 @@ func confirmAction(in io.Reader, out io.Writer, prompt string) (bool, error) {
 	default:
 		return false, nil
 	}
+}
+
+// sandboxLabel names a sandbox with its provider, as in "demo on modal".
+func sandboxLabel(provider string, id sandbox.ID) string {
+	return fmt.Sprintf("%s on %s", id, provider)
 }

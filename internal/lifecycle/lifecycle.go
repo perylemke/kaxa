@@ -65,9 +65,14 @@ func Direct(ctx context.Context, _ string, task func(context.Context) error) err
 
 // Check rejects a request the provider cannot serve, before anything is created.
 func Check(p sandbox.Provider, req Request) error {
+	if req.Running {
+		if _, ok := p.(sandbox.RunningSupport); !ok {
+			return Unsupported(p, sandbox.FeatureRunning)
+		}
+	}
 	if req.Sync {
 		if _, ok := p.(sandbox.WorkspaceSyncer); !ok {
-			return Unsupported(p, "sync")
+			return Unsupported(p, sandbox.FeatureSync)
 		}
 	}
 	if req.API {
@@ -77,7 +82,7 @@ func Check(p sandbox.Provider, req Request) error {
 	}
 	if req.Public {
 		if _, ok := p.(sandbox.PublicURL); !ok {
-			return Unsupported(p, "public urls")
+			return Unsupported(p, sandbox.FeaturePublicURLs)
 		}
 	}
 	return nil
@@ -85,7 +90,7 @@ func Check(p sandbox.Provider, req Request) error {
 
 func checkAPI(p sandbox.Provider, req Request) error {
 	if _, ok := p.(sandbox.APIPublisher); !ok {
-		return Unsupported(p, "api publish")
+		return Unsupported(p, sandbox.FeatureAPIPublish)
 	}
 	if _, err := apiWorkDir(p, req); err != nil {
 		return err
@@ -141,7 +146,7 @@ func Create(ctx context.Context, p sandbox.Provider, req Request, run Runner) (R
 
 func createSandbox(ctx context.Context, p sandbox.Provider, req Request, run Runner) (sandbox.ID, error) {
 	var id sandbox.ID
-	err := run(ctx, "creating "+req.Name+"…", func(ctx context.Context) error {
+	err := run(ctx, "creating "+req.Name+" on "+p.Name()+"…", func(ctx context.Context) error {
 		var createErr error
 		id, createErr = p.Create(ctx, sandbox.Spec{
 			Name:      req.Name,
@@ -160,7 +165,7 @@ func syncAndInstall(ctx context.Context, p sandbox.Provider, id sandbox.ID, req 
 	}
 	syncer, ok := p.(sandbox.WorkspaceSyncer)
 	if !ok {
-		return destroyAfterFailure(ctx, p, id, Unsupported(p, "sync"), "sync workspace")
+		return destroyAfterFailure(ctx, p, id, Unsupported(p, sandbox.FeatureSync), "sync workspace")
 	}
 	err := run(ctx, "syncing "+req.Repo+"…", func(ctx context.Context) error {
 		return copyWorkspace(ctx, syncer, id, req.Root, req.Repo)
@@ -181,7 +186,7 @@ func installProjects(ctx context.Context, p sandbox.Provider, id sandbox.ID, req
 	}
 	setup, ok := p.(sandbox.ProjectSetup)
 	if !ok {
-		return destroyAfterFailure(ctx, p, id, Unsupported(p, "dependency install"), "install dependencies")
+		return destroyAfterFailure(ctx, p, id, Unsupported(p, sandbox.FeatureDependencyInstall), "install dependencies")
 	}
 	err = run(ctx, "installing "+req.Repo+"…", func(ctx context.Context) error {
 		return setup.SetupProjects(ctx, id, req.Repo, steps)
@@ -214,7 +219,7 @@ func publishAPI(ctx context.Context, p sandbox.Provider, id sandbox.ID, req Requ
 	}
 	publisher, ok := p.(sandbox.APIPublisher)
 	if !ok {
-		return destroyAfterFailure(ctx, p, id, Unsupported(p, "api publish"), "publish api")
+		return destroyAfterFailure(ctx, p, id, Unsupported(p, sandbox.FeatureAPIPublish), "publish api")
 	}
 	workDir, err := apiWorkDir(p, req)
 	if err != nil {
@@ -235,7 +240,7 @@ func makePublic(ctx context.Context, p sandbox.Provider, id sandbox.ID, req Requ
 	}
 	setter, ok := p.(sandbox.PublicURL)
 	if !ok {
-		return Unsupported(p, "public urls")
+		return Unsupported(p, sandbox.FeaturePublicURLs)
 	}
 	if err := setter.SetURLAuth(ctx, id, sandbox.URLAuthPublic); err != nil {
 		return fmt.Errorf("set public url: %w", err)
@@ -267,10 +272,10 @@ func destroyAfterFailure(ctx context.Context, p sandbox.Provider, id sandbox.ID,
 	return wrapped
 }
 
-// Unsupported reports that p does not implement a capability.
-func Unsupported(p sandbox.Provider, capability string) error {
-	return usererr.New(
-		fmt.Sprintf("the %s provider does not support %s", p.Name(), capability),
-		"choose a provider that supports it",
-	)
+// Unsupported reports that p does not implement feature. The error wraps a
+// sandbox.UnsupportedError; adapters call WithAlternatives to name the
+// providers that do implement it.
+func Unsupported(p sandbox.Provider, feature sandbox.Feature) error {
+	cause := &sandbox.UnsupportedError{Provider: p.Name(), Feature: feature}
+	return usererr.Wrap(cause, cause.Error(), "choose a provider that supports it")
 }

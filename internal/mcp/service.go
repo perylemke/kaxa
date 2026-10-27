@@ -302,11 +302,23 @@ func (s *service) destroy(ctx context.Context, in nameIn) (actionOut, error) {
 }
 
 func (s *service) restart(ctx context.Context, in nameIn) (actionOut, error) {
-	return s.act(ctx, in, "restarted", sandbox.Provider.Restart)
+	return s.act(ctx, in, "restarted", func(p sandbox.Provider, ctx context.Context, id sandbox.ID) error {
+		r, ok := p.(sandbox.Restarter)
+		if !ok {
+			return lifecycle.Unsupported(p, sandbox.FeatureRestart)
+		}
+		return r.Restart(ctx, id)
+	})
 }
 
 func (s *service) upgrade(ctx context.Context, in nameIn) (actionOut, error) {
-	return s.act(ctx, in, "upgraded", sandbox.Provider.Upgrade)
+	return s.act(ctx, in, "upgraded", func(p sandbox.Provider, ctx context.Context, id sandbox.ID) error {
+		u, ok := p.(sandbox.Upgrader)
+		if !ok {
+			return lifecycle.Unsupported(p, sandbox.FeatureUpgrade)
+		}
+		return u.Upgrade(ctx, id)
+	})
 }
 
 func (s *service) act(ctx context.Context, in nameIn, status string, run func(sandbox.Provider, context.Context, sandbox.ID) error) (actionOut, error) {
@@ -335,7 +347,7 @@ func (s *service) publishAPI(ctx context.Context, in publishIn) (actionOut, erro
 	}
 	publisher, ok := p.(sandbox.APIPublisher)
 	if !ok {
-		return actionOut{}, lifecycle.Unsupported(p, "api publish")
+		return actionOut{}, lifecycle.Unsupported(p, sandbox.FeatureAPIPublish)
 	}
 	port := in.APIPort
 	if port == 0 {
@@ -392,7 +404,7 @@ func (s *service) setURLAuth(ctx context.Context, in urlAuthIn) (urlAuthOut, err
 	}
 	setter, ok := p.(sandbox.PublicURL)
 	if !ok {
-		return urlAuthOut{}, lifecycle.Unsupported(p, "url auth")
+		return urlAuthOut{}, lifecycle.Unsupported(p, sandbox.FeatureURLAuth)
 	}
 	if err := setter.SetURLAuth(ctx, id, in.Auth); err != nil {
 		return urlAuthOut{}, err

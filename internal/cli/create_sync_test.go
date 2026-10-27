@@ -49,7 +49,7 @@ func TestCreateSyncRejectsProviderWithoutSync(t *testing.T) {
 	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdCreate, testBoxName, testSyncFlag})
 
 	err := cmd.Execute()
-	if err == nil || !strings.Contains(err.Error(), "does not support sync") {
+	if err == nil || !strings.Contains(err.Error(), "sync is not available for") {
 		t.Fatalf("err = %v", err)
 	}
 	if fp.lastCreate.Name != "" {
@@ -233,7 +233,7 @@ func TestCreateSyncDirRejectsProviderWithoutSync(t *testing.T) {
 	})
 
 	err := cmd.Execute()
-	if err == nil || !strings.Contains(err.Error(), "does not support sync") {
+	if err == nil || !strings.Contains(err.Error(), "sync is not available for") {
 		t.Fatalf("err = %v", err)
 	}
 	if fp.lastCreate.Name != "" {

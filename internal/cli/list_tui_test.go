@@ -134,7 +134,7 @@ func TestRunListURLAuthRejectsProvider(t *testing.T) {
 		id:   fixtureDemo,
 		auth: sandbox.URLAuthPublic,
 	})
-	if err == nil || !strings.Contains(err.Error(), "does not support url auth") {
+	if err == nil || !strings.Contains(err.Error(), "url auth is not available for") {
 		t.Fatalf("err = %v", err)
 	}
 }
@@ -177,4 +177,20 @@ func (p *recordingURLProvider) SetURLAuth(_ context.Context, id sandbox.ID, auth
 	p.called = true
 	p.auth = auth
 	return nil
+}
+
+func TestListDetailActionKeepsRowProvider(t *testing.T) {
+	t.Parallel()
+
+	m := newListInteractiveModel(context.TODO(), nil, []sandbox.Info{
+		{ID: "a", Status: fixtureWarm, Provider: spritesProviderName},
+	})
+	m.mode = listModeDetail
+	m.detail = sandbox.Detail{ID: "a"}
+
+	next, _ := m.updateDetailKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	got := authModel(t, next)
+	if got.postAction != listPostDestroy || got.postID != "a" || got.postProv != spritesProviderName {
+		t.Fatalf("action=%v id=%q provider=%q", got.postAction, got.postID, got.postProv)
+	}
 }

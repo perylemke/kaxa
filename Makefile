@@ -43,7 +43,7 @@ test: ## Unit tests (default go test ./...)
 
 .PHONY: test-integration
 test-integration: ## Integration tests
-	$(GO) test -race -count=1 -tags=integration ./internal/config/...
+	$(GO) test -race -count=1 -tags=integration ./internal/config/... ./internal/provider/modal/...
 
 .PHONY: test-e2e
 test-e2e: ## End-to-end tests (builds binary)

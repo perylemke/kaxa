@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 
+	"github.com/perylemke/kaxa/internal/lifecycle"
 	"github.com/perylemke/kaxa/internal/registry"
 	"github.com/perylemke/kaxa/internal/sandbox"
 )
@@ -17,10 +18,12 @@ import (
 var errSandboxPickCancelled = errors.New("sandbox pick cancelled")
 
 type sandboxActionSpec struct {
-	verb   string
-	past   string
-	gerund string
-	title  string
+	// feature is the optional provider capability the action needs.
+	feature sandbox.Feature
+	verb    string
+	past    string
+	gerund  string
+	title   string
 }
 
 func (s sandboxActionSpec) listTitle() string { return s.title + " sandbox" }
@@ -44,6 +47,10 @@ func newSandboxActionCmd(
 				return err
 			}
 
+			if !sandbox.CapabilitiesOf(p).Has(spec.feature) {
+				return lifecycle.Unsupported(p, spec.feature)
+			}
+
 			id, picked, err := pickSandbox(cmd.Context(), p, args, cmd.InOrStdin(), cmd.ErrOrStderr(), spec)
 			if errors.Is(err, errSandboxPickCancelled) {
 				_, err = fmt.Fprintln(cmd.OutOrStdout(), spec.verb+" cancelled")
@@ -57,25 +64,25 @@ func newSandboxActionCmd(
 				return err
 			}
 
-			name := string(id)
+			ref := sandboxLabel(p.Name(), id)
 			run := func(ctx context.Context) error {
 				return action(ctx, p, id)
 			}
 			if picked {
-				if err := runTaskWithSpinner(cmd.Context(), cmd.ErrOrStderr(), fmt.Sprintf("%s %s…", spec.gerund, name), run); err != nil {
+				if err := runTaskWithSpinner(cmd.Context(), cmd.ErrOrStderr(), fmt.Sprintf("%s %s…", spec.gerund, ref), run); err != nil {
 					return err
 				}
-				return WriteSuccess(cmd.OutOrStdout(), spec.past, fmt.Sprintf("sandbox %s was %s", name, spec.past))
+				return WriteSuccess(cmd.OutOrStdout(), spec.past, fmt.Sprintf("sandbox %s was %s", ref, spec.past))
 			}
 			return runConfirmedSandboxAction(
 				cmd.Context(),
 				cmd.InOrStdin(),
 				cmd.ErrOrStderr(),
 				cmd.OutOrStdout(),
-				fmt.Sprintf("%s sandbox %s?", spec.title, name),
-				fmt.Sprintf("%s %s…", spec.gerund, name),
+				fmt.Sprintf("%s sandbox %s?", spec.title, ref),
+				fmt.Sprintf("%s %s…", spec.gerund, ref),
 				spec.past,
-				fmt.Sprintf("sandbox %s was %s", name, spec.past),
+				fmt.Sprintf("sandbox %s was %s", ref, spec.past),
 				run,
 			)
 		},

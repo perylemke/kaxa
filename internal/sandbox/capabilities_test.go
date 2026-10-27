@@ -2,6 +2,7 @@ package sandbox_test
 
 import (
 	"context"
+	"errors"
 	"io"
 	"testing"
 
@@ -19,8 +20,7 @@ func (bareProvider) List(context.Context) ([]sandbox.Info, error) { return nil, 
 func (bareProvider) Inspect(context.Context, sandbox.ID) (sandbox.Detail, error) {
 	return sandbox.Detail{}, nil
 }
-func (bareProvider) Restart(context.Context, sandbox.ID) error { return nil }
-func (bareProvider) Upgrade(context.Context, sandbox.ID) error { return nil }
+
 func (bareProvider) Exec(context.Context, sandbox.ID, sandbox.ExecOptions) error {
 	return nil
 }
@@ -30,6 +30,10 @@ type fullProvider struct {
 	bareProvider
 	unavailable bool
 }
+
+func (fullProvider) SupportsRunning()                          {}
+func (fullProvider) Restart(context.Context, sandbox.ID) error { return nil }
+func (fullProvider) Upgrade(context.Context, sandbox.ID) error { return nil }
 
 func (fullProvider) SyncWorkspace(context.Context, sandbox.ID, io.Reader) error { return nil }
 func (fullProvider) SetupProjects(context.Context, sandbox.ID, string, []project.Step) error {
@@ -57,7 +61,7 @@ func TestCapabilitiesOfFullProvider(t *testing.T) {
 	t.Parallel()
 
 	got := sandbox.CapabilitiesOf(fullProvider{})
-	want := sandbox.Capabilities{Sync: true, Setup: true, API: true, PublicURL: true, Layout: true}
+	want := sandbox.Capabilities{Sync: true, Setup: true, API: true, PublicURL: true, Layout: true, Restart: true, Upgrade: true, Running: true}
 	if got != want {
 		t.Fatalf("capabilities = %+v, want %+v", got, want)
 	}
@@ -82,5 +86,45 @@ func TestIsAvailable(t *testing.T) {
 				t.Fatalf("IsAvailable = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestCapabilitiesHas(t *testing.T) {
+	t.Parallel()
+
+	caps := sandbox.Capabilities{Restart: true, PublicURL: true}
+	tests := []struct {
+		feature sandbox.Feature
+		want    bool
+	}{
+		{sandbox.FeatureRestart, true},
+		{sandbox.FeatureURLAuth, true},
+		{sandbox.FeaturePublicURLs, true},
+		{sandbox.FeatureUpgrade, false},
+		{sandbox.FeatureRunning, false},
+		{sandbox.FeatureSync, false},
+		{sandbox.FeatureDependencyInstall, false},
+		{sandbox.FeatureAPIPublish, false},
+		{sandbox.Feature("unknown"), false},
+	}
+	for _, tt := range tests {
+		t.Run(string(tt.feature), func(t *testing.T) {
+			t.Parallel()
+			if got := caps.Has(tt.feature); got != tt.want {
+				t.Fatalf("Has(%q) = %v, want %v", tt.feature, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestUnsupportedError(t *testing.T) {
+	t.Parallel()
+
+	err := error(&sandbox.UnsupportedError{Provider: "modal", Feature: sandbox.FeatureRestart})
+	if !errors.Is(err, sandbox.ErrUnsupported) {
+		t.Fatal("UnsupportedError should wrap ErrUnsupported")
+	}
+	if got, want := err.Error(), "restart is not available for modal"; got != want {
+		t.Fatalf("message = %q, want %q", got, want)
 	}
 }

@@ -2,13 +2,15 @@ package sprites
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
+	"github.com/perylemke/kaxa/internal/sandbox"
 	"github.com/perylemke/kaxa/internal/usererr"
 )
 
 // ErrMissingToken indicates Sprites credentials were not configured.
-var ErrMissingToken = errors.New("sprites: missing API token")
+var ErrMissingToken = fmt.Errorf("sprites: missing API token: %w", sandbox.ErrNotConfigured)
 
 func missingTokenErr() error {
 	return usererr.Wrap(ErrMissingToken, "missing Sprites API token", "set KAXA_SPRITES_TOKEN")

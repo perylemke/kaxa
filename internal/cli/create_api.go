@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/perylemke/kaxa/internal/lifecycle"
-	"github.com/perylemke/kaxa/internal/sandbox"
 	"github.com/perylemke/kaxa/internal/usererr"
 )
 
@@ -82,12 +81,12 @@ func parseAPICommand(raw string) ([]string, error) {
 	return argv, nil
 }
 
-func createdMessage(id sandbox.ID, url string, req createRequest) string {
+func createdMessage(ref, url string, req createRequest) string {
 	if !req.API && !req.Public {
-		return fmt.Sprintf("sandbox %s is ready and will stay running for 1 hour\n%s", id, url)
+		return fmt.Sprintf("sandbox %s is ready and will stay running for 1 hour\n%s", ref, url)
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "sandbox %s is ready", id)
+	fmt.Fprintf(&b, "sandbox %s is ready", ref)
 	if req.Running {
 		b.WriteString(" and will stay running for 1 hour")
 	}
