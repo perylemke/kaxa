@@ -68,6 +68,7 @@ Configure Sprites or Modal credentials via KAXA_* environment variables (see REA
 	root.AddCommand(newListCmd(reg))
 	root.AddCommand(newExecCmd(reg))
 	root.AddCommand(newConsoleCmd(reg))
+	root.AddCommand(newSyncCmd(reg))
 	root.AddCommand(newDestroyCmd(reg))
 	root.AddCommand(newRestartCmd(reg))
 	root.AddCommand(newUpgradeCmd(reg))
