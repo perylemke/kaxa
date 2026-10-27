@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/perylemke/sbox/internal/config"
-	"github.com/perylemke/sbox/internal/project"
-	"github.com/perylemke/sbox/internal/registry"
-	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/config"
+	"github.com/perylemke/kaxa/internal/project"
+	"github.com/perylemke/kaxa/internal/registry"
+	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
 // fakeProvider implements every optional interface.
@@ -227,7 +227,7 @@ func TestCreateWithoutSync(t *testing.T) {
 	if out.ID != testBox || out.Provider != testSprites || out.WorkDir != "" || out.URL != testURL || out.Auth != sandbox.URLAuthSprite {
 		t.Fatalf("out = %+v", out)
 	}
-	if len(fp.created) != 1 || !fp.created[0].Running || !slices.Contains(fp.created[0].Labels, "sbox") {
+	if len(fp.created) != 1 || !fp.created[0].Running || !slices.Contains(fp.created[0].Labels, "kaxa") {
 		t.Fatalf("spec = %+v", fp.created)
 	}
 }

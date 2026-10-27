@@ -3,7 +3,7 @@ package sprites_test
 const (
 	spriteName          = "demo"
 	lifecycleSpriteName = "created-one"
-	lifecycleSboxLabel  = "sbox"
+	lifecycleKaxaLabel  = "kaxa"
 	spriteStatusWarm    = "warm"
 	spriteStatusCold    = "cold"
 	spriteJSONFieldName = "name"

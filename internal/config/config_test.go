@@ -4,10 +4,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/perylemke/sbox/internal/config"
-	"github.com/perylemke/sbox/internal/provider/modal"
-	"github.com/perylemke/sbox/internal/provider/sprites"
-	"github.com/perylemke/sbox/internal/registry"
+	"github.com/perylemke/kaxa/internal/config"
+	"github.com/perylemke/kaxa/internal/provider/modal"
+	"github.com/perylemke/kaxa/internal/provider/sprites"
+	"github.com/perylemke/kaxa/internal/registry"
 )
 
 func testRegistry(t *testing.T) *registry.Registry {
@@ -24,7 +24,7 @@ func testRegistry(t *testing.T) *registry.Registry {
 
 func TestLoadFlagOverridesEnv(t *testing.T) {
 	reg := testRegistry(t)
-	t.Setenv("SBOX_DEFAULT_PROVIDER", "sprites")
+	t.Setenv("KAXA_DEFAULT_PROVIDER", "sprites")
 
 	cfg, err := config.Load(config.LoadOptions{Provider: "modal"}, reg)
 	if err != nil {
@@ -38,10 +38,10 @@ func TestLoadFlagOverridesEnv(t *testing.T) {
 func TestLoadFromEnv(t *testing.T) {
 	reg := testRegistry(t)
 	const token = "sprites-env-token" // #nosec G101 -- test fixture, not a real credential
-	t.Setenv("SBOX_DEFAULT_PROVIDER", "sprites")
-	t.Setenv("SBOX_SPRITES_TOKEN", token)
-	t.Setenv("SBOX_MODAL_TOKEN_ID", "modal-id")
-	t.Setenv("SBOX_MODAL_TOKEN_SECRET", "modal-secret")
+	t.Setenv("KAXA_DEFAULT_PROVIDER", "sprites")
+	t.Setenv("KAXA_SPRITES_TOKEN", token)
+	t.Setenv("KAXA_MODAL_TOKEN_ID", "modal-id")
+	t.Setenv("KAXA_MODAL_TOKEN_SECRET", "modal-secret")
 
 	cfg, err := config.Load(config.LoadOptions{}, reg)
 	if err != nil {
@@ -61,7 +61,7 @@ func TestLoadFromEnv(t *testing.T) {
 func TestValidateUnknownProvider(t *testing.T) {
 	reg := testRegistry(t)
 	const secret = "must-not-leak-token"
-	t.Setenv("SBOX_SPRITES_TOKEN", secret)
+	t.Setenv("KAXA_SPRITES_TOKEN", secret)
 
 	_, err := config.Load(config.LoadOptions{Provider: "unknown"}, reg)
 	if err == nil {

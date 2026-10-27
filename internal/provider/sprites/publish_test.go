@@ -12,8 +12,8 @@ import (
 
 	spritesdk "github.com/superfly/sprites-go"
 
-	"github.com/perylemke/sbox/internal/provider/sprites"
-	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/provider/sprites"
+	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
 func TestPublishAPIBuildsServiceCommand(t *testing.T) {
@@ -38,7 +38,7 @@ func TestPublishAPIBuildsServiceCommand(t *testing.T) {
 		t.Fatalf("PublishAPI: %v", err)
 	}
 	want := []string{
-		"sprite-env", "services", "create", "sbox-api",
+		"sprite-env", "services", "create", "kaxa-api",
 		"--cmd", ".venv/bin/uvicorn",
 		"--args", "app.main:app,--host,0.0.0.0,--port,8000",
 		"--dir", "/home/sprite/workspace/api-python",
@@ -69,7 +69,7 @@ func TestCreateRunningWithAPILeavesURLForAPI(t *testing.T) {
 			case "uname":
 				_, _ = io.WriteString(stdout, "x86_64\n")
 			case "sha256sum":
-				_, _ = io.WriteString(stdout, "bb69984aab06d9463ed5da46a81b71d2d1582ba75c9c07c65f49fecbb52f7b7b  /tmp/sbox-webtmux.tar.gz\n")
+				_, _ = io.WriteString(stdout, "bb69984aab06d9463ed5da46a81b71d2d1582ba75c9c07c65f49fecbb52f7b7b  /tmp/kaxa-webtmux.tar.gz\n")
 			}
 			return nil
 		},

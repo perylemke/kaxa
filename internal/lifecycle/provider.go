@@ -3,10 +3,10 @@ package lifecycle
 import (
 	"fmt"
 
-	"github.com/perylemke/sbox/internal/config"
-	"github.com/perylemke/sbox/internal/registry"
-	"github.com/perylemke/sbox/internal/sandbox"
-	"github.com/perylemke/sbox/internal/usererr"
+	"github.com/perylemke/kaxa/internal/config"
+	"github.com/perylemke/kaxa/internal/registry"
+	"github.com/perylemke/kaxa/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/usererr"
 )
 
 const spritesProvider = "sprites"
@@ -21,7 +21,7 @@ func ResolveProvider(reg *registry.Registry, cfg config.Config, name string) (sa
 	if name == "" {
 		return nil, usererr.New(
 			"missing sandbox provider",
-			"pass --provider or set SBOX_DEFAULT_PROVIDER",
+			"pass --provider or set KAXA_DEFAULT_PROVIDER",
 		)
 	}
 

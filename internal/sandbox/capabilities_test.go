@@ -5,8 +5,8 @@ import (
 	"io"
 	"testing"
 
-	"github.com/perylemke/sbox/internal/project"
-	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/project"
+	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
 type bareProvider struct{}

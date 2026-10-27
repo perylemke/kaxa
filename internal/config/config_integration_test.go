@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/perylemke/sbox/internal/config"
+	"github.com/perylemke/kaxa/internal/config"
 )
 
 func TestLoadIgnoresXDGConfigFile(t *testing.T) {
 	dir := t.TempDir()
-	configDir := filepath.Join(dir, "sbox")
+	configDir := filepath.Join(dir, "kaxa")
 	if err := os.MkdirAll(configDir, 0o700); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
@@ -26,8 +26,8 @@ func TestLoadIgnoresXDGConfigFile(t *testing.T) {
 
 	const envSecret = "sprites-secret-from-env"
 	t.Setenv("XDG_CONFIG_HOME", dir)
-	t.Setenv("SBOX_DEFAULT_PROVIDER", "sprites")
-	t.Setenv("SBOX_SPRITES_TOKEN", envSecret)
+	t.Setenv("KAXA_DEFAULT_PROVIDER", "sprites")
+	t.Setenv("KAXA_SPRITES_TOKEN", envSecret)
 
 	reg := testRegistry(t)
 	cfg, err := config.Load(config.LoadOptions{}, reg)

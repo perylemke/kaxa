@@ -9,7 +9,7 @@ import (
 
 	spritesdk "github.com/superfly/sprites-go"
 
-	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
 const workspaceDir = "/home/sprite/workspace"

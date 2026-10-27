@@ -11,7 +11,7 @@ import (
 	"github.com/muesli/termenv"
 	"golang.org/x/term"
 
-	"github.com/perylemke/sbox/internal/usererr"
+	"github.com/perylemke/kaxa/internal/usererr"
 )
 
 // WriteError renders err to w as a styled block (plain text when w is not a color TTY).

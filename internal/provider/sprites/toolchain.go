@@ -6,16 +6,16 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/perylemke/sbox/internal/project"
-	"github.com/perylemke/sbox/internal/sandbox"
-	"github.com/perylemke/sbox/internal/usererr"
+	"github.com/perylemke/kaxa/internal/project"
+	"github.com/perylemke/kaxa/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/usererr"
 )
 
 const (
 	spriteHome  = "/home/sprite"
 	localPrefix = spriteHome + "/.local"
 	localBin    = localPrefix + "/bin"
-	configDir   = spriteHome + "/.config/sbox"
+	configDir   = spriteHome + "/.config/kaxa"
 	pathFile    = configDir + "/path.sh"
 	bashrcFile  = spriteHome + "/.bashrc"
 	goBin       = localPrefix + "/go/bin/go"
@@ -225,7 +225,7 @@ func installUV(ctx context.Context, c sdkClient, name, token string, arch sprite
 	if err := downloadVerified(ctx, c, name, token, asset); err != nil {
 		return installFailed("uv", err)
 	}
-	const extractDir = "/tmp/sbox-uv"
+	const extractDir = "/tmp/kaxa-uv"
 	if err := extractStrip(ctx, c, name, token, asset.archive, extractDir); err != nil {
 		return installFailed("uv", err)
 	}

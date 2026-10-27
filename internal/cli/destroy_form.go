@@ -7,7 +7,7 @@ import (
 
 	"charm.land/huh/v2"
 
-	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
 func newDestroyForm(infos []sandbox.Info, selected *[]sandbox.ID) *huh.Form {

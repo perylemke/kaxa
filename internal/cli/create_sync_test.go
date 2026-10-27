@@ -14,10 +14,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/perylemke/sbox/internal/cli"
-	"github.com/perylemke/sbox/internal/project"
-	"github.com/perylemke/sbox/internal/reposync"
-	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/cli"
+	"github.com/perylemke/kaxa/internal/project"
+	"github.com/perylemke/kaxa/internal/reposync"
+	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
 const (
@@ -341,7 +341,7 @@ func newCreateCmd(t *testing.T, p sandbox.Provider) *cobra.Command {
 	cmd := cli.NewRootCmd(reg)
 	cmd.SetOut(new(bytes.Buffer))
 	cmd.SetErr(new(bytes.Buffer))
-	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 	return cmd
 }
 

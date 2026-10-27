@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/perylemke/sbox/internal/config"
-	"github.com/perylemke/sbox/internal/lifecycle"
-	"github.com/perylemke/sbox/internal/registry"
-	"github.com/perylemke/sbox/internal/sandbox"
-	"github.com/perylemke/sbox/internal/usererr"
+	"github.com/perylemke/kaxa/internal/config"
+	"github.com/perylemke/kaxa/internal/lifecycle"
+	"github.com/perylemke/kaxa/internal/registry"
+	"github.com/perylemke/kaxa/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/usererr"
 )
 
 const defaultAPIPort = 8000
@@ -201,7 +201,7 @@ func checkRepoScope(repoRoot, scope string) error {
 	}
 	return usererr.New(
 		fmt.Sprintf("repository %s is outside the server working directory", repoRoot),
-		"start sbox mcp from the project, or pass a dir inside it",
+		"start kaxa mcp from the project, or pass a dir inside it",
 	)
 }
 

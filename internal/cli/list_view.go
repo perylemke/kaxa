@@ -9,7 +9,7 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 	"golang.org/x/term"
 
-	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
 const (

@@ -11,8 +11,8 @@ import (
 
 	spritesdk "github.com/superfly/sprites-go"
 
-	"github.com/perylemke/sbox/internal/provider/sprites"
-	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/provider/sprites"
+	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
 func TestHTTPInspectRestartUpgrade(t *testing.T) {
@@ -44,7 +44,7 @@ func TestHTTPInspectRestartUpgrade(t *testing.T) {
 	if detail.Auth != "sprite · admins" {
 		t.Fatalf("auth = %q", detail.Auth)
 	}
-	if len(detail.Labels) != 1 || detail.Labels[0] != lifecycleSboxLabel {
+	if len(detail.Labels) != 1 || detail.Labels[0] != lifecycleKaxaLabel {
 		t.Fatalf("labels = %v", detail.Labels)
 	}
 
@@ -92,7 +92,7 @@ func writeSpriteDetail(w http.ResponseWriter) {
 			"auth":           "sprite",
 			"private_access": "admins",
 		},
-		"labels":     []string{lifecycleSboxLabel},
+		"labels":     []string{lifecycleKaxaLabel},
 		"created_at": time.Now().Add(-2 * time.Hour).Format(time.RFC3339),
 		"updated_at": time.Now().Add(-10 * time.Minute).Format(time.RFC3339),
 	})

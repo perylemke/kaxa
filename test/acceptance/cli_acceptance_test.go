@@ -24,7 +24,7 @@ func TestUnknownProviderNonZeroExit(t *testing.T) {
 	const secret = "acceptance-test-secret-token"
 
 	res := runWithEnv(t, bin, map[string]string{
-		"SBOX_SPRITES_TOKEN": secret,
+		"KAXA_SPRITES_TOKEN": secret,
 	}, "--provider", "unknown")
 	if res.exitCode == 0 {
 		t.Fatal("expected non-zero exit for unknown provider")
@@ -37,8 +37,8 @@ func TestUnknownProviderNonZeroExit(t *testing.T) {
 func buildBinary(t *testing.T) string {
 	t.Helper()
 	root := repoRoot(t)
-	out := filepath.Join(t.TempDir(), "sbox")
-	cmd := exec.Command("go", "build", "-o", out, "./cmd/sbox")
+	out := filepath.Join(t.TempDir(), "kaxa")
+	cmd := exec.Command("go", "build", "-o", out, "./cmd/kaxa")
 	cmd.Dir = root
 	outBytes, err := cmd.CombinedOutput()
 	if err != nil {

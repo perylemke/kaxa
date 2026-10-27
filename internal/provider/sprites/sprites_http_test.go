@@ -10,8 +10,8 @@ import (
 
 	spritesdk "github.com/superfly/sprites-go"
 
-	"github.com/perylemke/sbox/internal/provider/sprites"
-	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/provider/sprites"
+	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
 func assertLifecycleList(t *testing.T, list []sandbox.Info) {
@@ -43,7 +43,7 @@ func newLifecycleProbe(t *testing.T, token string) *lifecycleProbe {
 	probe := &lifecycleProbe{}
 	probe.client = &fakeSDKClient{
 		create: func(_ context.Context, name string, labels []string) (*spritesdk.Sprite, error) {
-			if name != lifecycleSpriteName || len(labels) != 1 || labels[0] != lifecycleSboxLabel {
+			if name != lifecycleSpriteName || len(labels) != 1 || labels[0] != lifecycleKaxaLabel {
 				t.Fatalf("create name=%q labels=%v", name, labels)
 			}
 			probe.createdName = name
@@ -80,14 +80,14 @@ func TestHTTPLifecycle(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	id, err := p.Create(ctx, sandbox.Spec{Name: lifecycleSpriteName, Labels: []string{lifecycleSboxLabel}})
+	id, err := p.Create(ctx, sandbox.Spec{Name: lifecycleSpriteName, Labels: []string{lifecycleKaxaLabel}})
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
 	if id != lifecycleSpriteName {
 		t.Fatalf("id = %q", id)
 	}
-	if probe.createdName != lifecycleSpriteName || len(probe.createdLabels) != 1 || probe.createdLabels[0] != lifecycleSboxLabel {
+	if probe.createdName != lifecycleSpriteName || len(probe.createdLabels) != 1 || probe.createdLabels[0] != lifecycleKaxaLabel {
 		t.Fatalf("create payload name=%q labels=%v", probe.createdName, probe.createdLabels)
 	}
 	if probe.getCalls < 2 {

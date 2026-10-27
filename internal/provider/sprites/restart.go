@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
 // Restart reboots a sprite.

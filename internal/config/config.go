@@ -1,4 +1,4 @@
-// Package config loads sbox settings from environment variables and CLI flags.
+// Package config loads kaxa settings from environment variables and CLI flags.
 package config
 
 import (
@@ -6,15 +6,15 @@ import (
 	"os"
 	"strings"
 
-	"github.com/perylemke/sbox/internal/registry"
-	"github.com/perylemke/sbox/internal/usererr"
+	"github.com/perylemke/kaxa/internal/registry"
+	"github.com/perylemke/kaxa/internal/usererr"
 )
 
 const (
-	envDefaultProvider  = "SBOX_DEFAULT_PROVIDER"
-	envSpritesToken     = "SBOX_SPRITES_TOKEN"      // #nosec G101 -- env var name, not a credential value
-	envModalTokenID     = "SBOX_MODAL_TOKEN_ID"     // #nosec G101 -- env var name, not a credential value
-	envModalTokenSecret = "SBOX_MODAL_TOKEN_SECRET" // #nosec G101 -- env var name, not a credential value
+	envDefaultProvider  = "KAXA_DEFAULT_PROVIDER"
+	envSpritesToken     = "KAXA_SPRITES_TOKEN"      // #nosec G101 -- env var name, not a credential value
+	envModalTokenID     = "KAXA_MODAL_TOKEN_ID"     // #nosec G101 -- env var name, not a credential value
+	envModalTokenSecret = "KAXA_MODAL_TOKEN_SECRET" // #nosec G101 -- env var name, not a credential value
 )
 
 // Config holds resolved CLI settings (secrets are never logged via String).

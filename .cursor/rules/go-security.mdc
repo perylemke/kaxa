@@ -1,5 +1,5 @@
 ---
-description: Security practices for sbox CLI
+description: Security practices for kaxa CLI
 globs: "**/*.go"
 alwaysApply: false
 ---

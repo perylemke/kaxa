@@ -1,14 +1,14 @@
-// Package main is the sbox CLI entrypoint.
+// Package main is the kaxa CLI entrypoint.
 package main
 
 import (
 	"fmt"
 	"os"
 
-	"github.com/perylemke/sbox/internal/cli"
-	"github.com/perylemke/sbox/internal/provider/modal"
-	"github.com/perylemke/sbox/internal/provider/sprites"
-	"github.com/perylemke/sbox/internal/registry"
+	"github.com/perylemke/kaxa/internal/cli"
+	"github.com/perylemke/kaxa/internal/provider/modal"
+	"github.com/perylemke/kaxa/internal/provider/sprites"
+	"github.com/perylemke/kaxa/internal/registry"
 )
 
 func main() {

@@ -5,10 +5,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/perylemke/sbox/internal/cli"
-	"github.com/perylemke/sbox/internal/provider/modal"
-	"github.com/perylemke/sbox/internal/provider/sprites"
-	"github.com/perylemke/sbox/internal/registry"
+	"github.com/perylemke/kaxa/internal/cli"
+	"github.com/perylemke/kaxa/internal/provider/modal"
+	"github.com/perylemke/kaxa/internal/provider/sprites"
+	"github.com/perylemke/kaxa/internal/registry"
 )
 
 func testRegistry(t *testing.T) *registry.Registry {
@@ -71,7 +71,7 @@ func TestVersionCommand(t *testing.T) {
 		t.Fatalf("execute: %v", err)
 	}
 	got := out.String()
-	if !strings.Contains(got, "sbox dev") {
+	if !strings.Contains(got, "kaxa dev") {
 		t.Fatalf("version output = %q", got)
 	}
 	if !strings.Contains(got, "on ") {

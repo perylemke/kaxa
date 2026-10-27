@@ -7,8 +7,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/perylemke/sbox/internal/provider/sprites"
-	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/provider/sprites"
+	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
 func TestSyncWorkspaceExtractsArchive(t *testing.T) {

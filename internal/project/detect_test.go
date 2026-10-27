@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/perylemke/sbox/internal/project"
+	"github.com/perylemke/kaxa/internal/project"
 )
 
 const (

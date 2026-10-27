@@ -3,8 +3,8 @@ package sprites_test
 import (
 	"testing"
 
-	"github.com/perylemke/sbox/internal/provider/sprites"
-	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/provider/sprites"
+	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
 func TestWorkspaceLayout(t *testing.T) {

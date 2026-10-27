@@ -9,7 +9,7 @@ import (
 
 	spritesdk "github.com/superfly/sprites-go"
 
-	"github.com/perylemke/sbox/internal/project"
+	"github.com/perylemke/kaxa/internal/project"
 )
 
 const projectBuild = "build"
@@ -42,7 +42,7 @@ func TestSetupProjectsInstallsMissingGo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SetupProjects: %v", err)
 	}
-	if !sawArgv(client.calls, []string{"curl", "-fsSL", "-o", "/tmp/sbox-go.tar.gz", goAsset(spriteArch{goArch: archAMD64, node: "x64", triple: "x86_64-unknown-linux-gnu"}).url}) {
+	if !sawArgv(client.calls, []string{"curl", "-fsSL", "-o", "/tmp/kaxa-go.tar.gz", goAsset(spriteArch{goArch: archAMD64, node: "x64", triple: "x86_64-unknown-linux-gnu"}).url}) {
 		t.Fatalf("curl calls = %#v", argvOf(client.calls))
 	}
 	var build remoteCall

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
 func TestURLSetsSpritesAuth(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/perylemke/sbox/internal/usererr"
+	"github.com/perylemke/kaxa/internal/usererr"
 )
 
 // TmuxPort is the HTTP port the tmux service uses when a sandbox is created with Running.

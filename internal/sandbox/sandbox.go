@@ -8,7 +8,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/perylemke/sbox/internal/project"
+	"github.com/perylemke/kaxa/internal/project"
 )
 
 // ErrNotImplemented indicates a provider method is not yet implemented.

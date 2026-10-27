@@ -1,5 +1,5 @@
 ---
-description: TDD and test layout for Go code in sbox
+description: TDD and test layout for Go code in kaxa
 globs: "**/*.go"
 alwaysApply: false
 ---

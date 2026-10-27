@@ -11,10 +11,10 @@ import (
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/perylemke/sbox/internal/config"
-	"github.com/perylemke/sbox/internal/registry"
-	"github.com/perylemke/sbox/internal/usererr"
-	"github.com/perylemke/sbox/internal/version"
+	"github.com/perylemke/kaxa/internal/config"
+	"github.com/perylemke/kaxa/internal/registry"
+	"github.com/perylemke/kaxa/internal/usererr"
+	"github.com/perylemke/kaxa/internal/version"
 )
 
 const instructions = `Run work in an isolated sandbox instead of on the host.
@@ -37,7 +37,7 @@ func New(reg *registry.Registry, cfg config.Config, opts Options) (*sdk.Server, 
 	if err != nil {
 		return nil, err
 	}
-	srv := sdk.NewServer(&sdk.Implementation{Name: "sbox", Title: "sbox sandboxes", Version: version.Version}, &sdk.ServerOptions{
+	srv := sdk.NewServer(&sdk.Implementation{Name: "kaxa", Title: "kaxa sandboxes", Version: version.Version}, &sdk.ServerOptions{
 		Instructions: instructions,
 	})
 	svc.register(srv)

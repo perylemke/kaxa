@@ -6,7 +6,7 @@ alwaysApply: false
 
 # Single responsibility
 
-- `cmd/sbox/main.go` only builds the provider registry and calls `cli.Execute`; no business logic.
+- `cmd/kaxa/main.go` only builds the provider registry and calls `cli.Execute`; no business logic.
 - Cobra commands live in `internal/cli`; they must not import provider HTTP or SDK packages.
 - Configuration loading and validation live in `internal/config`.
 - Provider contracts live in `internal/sandbox`; registration in `internal/registry`.

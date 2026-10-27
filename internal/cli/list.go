@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/perylemke/sbox/internal/registry"
+	"github.com/perylemke/kaxa/internal/registry"
 )
 
 func newListCmd(reg *registry.Registry) *cobra.Command {

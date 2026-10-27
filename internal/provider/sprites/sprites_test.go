@@ -10,8 +10,8 @@ import (
 
 	spritesdk "github.com/superfly/sprites-go"
 
-	"github.com/perylemke/sbox/internal/provider/sprites"
-	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/provider/sprites"
+	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
 type fakeSDKClient struct {
@@ -167,7 +167,7 @@ func TestCreateRunningRegistersHoldAndHTTPService(t *testing.T) {
 			case "uname":
 				_, _ = io.WriteString(stdout, "x86_64\n")
 			case "sha256sum":
-				_, _ = io.WriteString(stdout, "bb69984aab06d9463ed5da46a81b71d2d1582ba75c9c07c65f49fecbb52f7b7b  /tmp/sbox-webtmux.tar.gz\n")
+				_, _ = io.WriteString(stdout, "bb69984aab06d9463ed5da46a81b71d2d1582ba75c9c07c65f49fecbb52f7b7b  /tmp/kaxa-webtmux.tar.gz\n")
 			}
 			return nil
 		},
@@ -219,7 +219,7 @@ func TestCreateRunningRejectsBadWebtmuxChecksum(t *testing.T) {
 			case "uname":
 				_, _ = io.WriteString(stdout, "x86_64\n")
 			case "sha256sum":
-				_, _ = io.WriteString(stdout, "0000000000000000000000000000000000000000000000000000000000000000  /tmp/sbox-webtmux.tar.gz\n")
+				_, _ = io.WriteString(stdout, "0000000000000000000000000000000000000000000000000000000000000000  /tmp/kaxa-webtmux.tar.gz\n")
 			}
 			return nil
 		},

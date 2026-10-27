@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/perylemke/sbox/internal/registry"
-	"github.com/perylemke/sbox/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/registry"
+	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
 type createRunningTestProvider struct {
@@ -66,7 +66,7 @@ func TestCreateRunningOpensBrowserURL(t *testing.T) {
 	cmd.SetOut(out)
 	cmd.SetErr(new(bytes.Buffer))
 	cmd.SetArgs([]string{"--provider", spritesProviderName, "create", fixtureDemo, "--running"})
-	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
@@ -94,7 +94,7 @@ func TestCreateWithoutRunningDoesNotOpenBrowser(t *testing.T) {
 	cmd.SetOut(new(bytes.Buffer))
 	cmd.SetErr(new(bytes.Buffer))
 	cmd.SetArgs([]string{"--provider", spritesProviderName, "create", fixtureDemo})
-	t.Setenv("SBOX_SPRITES_TOKEN", "tok")
+	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)

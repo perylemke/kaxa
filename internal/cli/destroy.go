@@ -10,9 +10,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/perylemke/sbox/internal/registry"
-	"github.com/perylemke/sbox/internal/sandbox"
-	"github.com/perylemke/sbox/internal/usererr"
+	"github.com/perylemke/kaxa/internal/registry"
+	"github.com/perylemke/kaxa/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/usererr"
 )
 
 var errDestroyCancelled = errors.New("destroy cancelled")
@@ -84,7 +84,7 @@ func destroyArgError(destroyAll bool, args []string) error {
 		}
 		return usererr.New(
 			"destroy --all does not take a sandbox name",
-			"sbox destroy --all",
+			"kaxa destroy --all",
 		)
 	}
 	return rejectExtraName("destroy", args)

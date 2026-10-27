@@ -59,7 +59,7 @@ func goAsset(arch spriteArch) toolAsset {
 	return toolAsset{
 		url:     "https://dl.google.com/go/" + name,
 		sha256:  sha,
-		archive: "/tmp/sbox-go.tar.gz",
+		archive: "/tmp/kaxa-go.tar.gz",
 	}
 }
 
@@ -72,7 +72,7 @@ func nodeAsset(arch spriteArch) toolAsset {
 	return toolAsset{
 		url:     "https://nodejs.org/dist/" + nodeVersion + "/" + name,
 		sha256:  sha,
-		archive: "/tmp/sbox-node.tar.gz",
+		archive: "/tmp/kaxa-node.tar.gz",
 	}
 }
 
@@ -85,7 +85,7 @@ func uvAsset(arch spriteArch) toolAsset {
 	return toolAsset{
 		url:     "https://github.com/astral-sh/uv/releases/download/" + uvVersion + "/" + name,
 		sha256:  sha,
-		archive: "/tmp/sbox-uv.tar.gz",
+		archive: "/tmp/kaxa-uv.tar.gz",
 	}
 }
 
@@ -97,6 +97,6 @@ func rustupAsset(arch spriteArch) toolAsset {
 	return toolAsset{
 		url:     "https://static.rust-lang.org/rustup/archive/" + rustupVersion + "/" + arch.triple + "/rustup-init",
 		sha256:  sha,
-		archive: "/tmp/sbox-rustup-init",
+		archive: "/tmp/kaxa-rustup-init",
 	}
 }

@@ -17,7 +17,7 @@ func TestFindRootWalksUpToGitDir(t *testing.T) {
 	t.Parallel()
 
 	root := filepath.Join(t.TempDir(), "api")
-	nested := filepath.Join(root, "cmd", "sbox")
+	nested := filepath.Join(root, "cmd", "kaxa")
 	if err := os.MkdirAll(nested, 0o750); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
@@ -189,10 +189,10 @@ func git(t *testing.T, dir string, args ...string) {
 	cmd.Env = append(os.Environ(),
 		"GIT_CONFIG_NOSYSTEM=1",
 		"GIT_CONFIG_GLOBAL="+filepath.Join(dir, ".gitconfig-none"),
-		"GIT_AUTHOR_NAME=sbox",
-		"GIT_AUTHOR_EMAIL=sbox@example.com",
-		"GIT_COMMITTER_NAME=sbox",
-		"GIT_COMMITTER_EMAIL=sbox@example.com",
+		"GIT_AUTHOR_NAME=kaxa",
+		"GIT_AUTHOR_EMAIL=kaxa@example.com",
+		"GIT_COMMITTER_NAME=kaxa",
+		"GIT_COMMITTER_EMAIL=kaxa@example.com",
 	)
 	out, err := cmd.CombinedOutput()
 	if err != nil {

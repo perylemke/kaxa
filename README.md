@@ -1,10 +1,10 @@
-# sbox
+# kaxa
 
-[![CI](https://github.com/perylemke/sbox/actions/workflows/ci.yml/badge.svg)](https://github.com/perylemke/sbox/actions/workflows/ci.yml)
-[![Lint](https://github.com/perylemke/sbox/actions/workflows/lint.yml/badge.svg)](https://github.com/perylemke/sbox/actions/workflows/lint.yml)
-[![Sec](https://github.com/perylemke/sbox/actions/workflows/sec.yml/badge.svg)](https://github.com/perylemke/sbox/actions/workflows/sec.yml)
+[![CI](https://github.com/perylemke/kaxa/actions/workflows/ci.yml/badge.svg)](https://github.com/perylemke/kaxa/actions/workflows/ci.yml)
+[![Lint](https://github.com/perylemke/kaxa/actions/workflows/lint.yml/badge.svg)](https://github.com/perylemke/kaxa/actions/workflows/lint.yml)
+[![Sec](https://github.com/perylemke/kaxa/actions/workflows/sec.yml/badge.svg)](https://github.com/perylemke/kaxa/actions/workflows/sec.yml)
 
-Unified CLI for sandbox providers. **sbox** aggregates isolated execution environments behind one command-line interface, starting with [Fly.io Sprites](https://docs.fly.io/sprites) and [Modal Sandboxes](https://modal.com/docs/guide/sdk-javascript-go).
+Unified CLI for sandbox providers. **kaxa** aggregates isolated execution environments behind one command-line interface, starting with [Fly.io Sprites](https://docs.fly.io/sprites) and [Modal Sandboxes](https://modal.com/docs/guide/sdk-javascript-go).
 
 Sprites lifecycle commands (`create`, `list`, `exec`, `console`, `restart`, `upgrade`, `destroy`) are implemented when using `--provider sprites`. Modal remains a stub.
 
@@ -16,7 +16,7 @@ Sprites lifecycle commands (`create`, `list`, `exec`, `console`, `restart`, `upg
 ## Install (from source)
 
 ```bash
-go install ./cmd/sbox
+go install ./cmd/kaxa
 ```
 
 ## Configuration
@@ -24,7 +24,7 @@ go install ./cmd/sbox
 Configuration is loaded from environment variables. CLI flags override environment when set (highest priority first):
 
 1. CLI flags (`--provider`)
-2. Environment variables with prefix `SBOX_`
+2. Environment variables with prefix `KAXA_`
 
 Never commit real tokens.
 
@@ -32,59 +32,59 @@ Never commit real tokens.
 
 | Variable | Description |
 | --- | --- |
-| `SBOX_DEFAULT_PROVIDER` | Default provider (`sprites` or `modal`) |
-| `SBOX_SPRITES_TOKEN` | Sprites API token |
-| `SBOX_MODAL_TOKEN_ID` | Modal token ID |
-| `SBOX_MODAL_TOKEN_SECRET` | Modal token secret |
+| `KAXA_DEFAULT_PROVIDER` | Default provider (`sprites` or `modal`) |
+| `KAXA_SPRITES_TOKEN` | Sprites API token |
+| `KAXA_MODAL_TOKEN_ID` | Modal token ID |
+| `KAXA_MODAL_TOKEN_SECRET` | Modal token secret |
 
 ## Usage
 
 ```bash
-sbox --help
-sbox version
+kaxa --help
+kaxa version
 
-export SBOX_DEFAULT_PROVIDER=sprites
-export SBOX_SPRITES_TOKEN=...   # never commit real tokens
+export KAXA_DEFAULT_PROVIDER=sprites
+export KAXA_SPRITES_TOKEN=...   # never commit real tokens
 
-sbox create                     # form for name, provider, running, sync, and API
-sbox create my-sprite
-sbox create --running my-sprite  # stay up for 1 hour and open a tmux terminal in the browser
-sbox create --sync my-sprite     # copy this git repository into /home/sprite/workspace/<repo>
-sbox create --sync --dir ~/projects/api-python my-sprite
-sbox create --sync --api --public --api-cmd .venv/bin/uvicorn,app.main:app,--host,0.0.0.0,--port,8000 my-sprite
-sbox new my-sprite               # alias of create
+kaxa create                     # form for name, provider, running, sync, and API
+kaxa create my-sprite
+kaxa create --running my-sprite  # stay up for 1 hour and open a tmux terminal in the browser
+kaxa create --sync my-sprite     # copy this git repository into /home/sprite/workspace/<repo>
+kaxa create --sync --dir ~/projects/api-python my-sprite
+kaxa create --sync --api --public --api-cmd .venv/bin/uvicorn,app.main:app,--host,0.0.0.0,--port,8000 my-sprite
+kaxa new my-sprite               # alias of create
 
-sbox list                        # interactive table in a terminal; plain columns when piped
-sbox ls                          # alias of list
+kaxa list                        # interactive table in a terminal; plain columns when piped
+kaxa ls                          # alias of list
 
-sbox exec my-sprite -- ls -la    # run a command; remote exit code is propagated
-sbox console my-sprite           # interactive bash (requires a terminal)
-sbox ssh my-sprite               # alias of console
+kaxa exec my-sprite -- ls -la    # run a command; remote exit code is propagated
+kaxa console my-sprite           # interactive bash (requires a terminal)
+kaxa ssh my-sprite               # alias of console
 
-sbox restart                     # pick a sandbox when no name is given
-sbox restart my-sprite
-sbox upgrade my-sprite
+kaxa restart                     # pick a sandbox when no name is given
+kaxa restart my-sprite
+kaxa upgrade my-sprite
 
-sbox url my-sprite public          # open the Sprites URL without an account
-sbox url my-sprite sprite          # require a Sprites account again
+kaxa url my-sprite public          # open the Sprites URL without an account
+kaxa url my-sprite sprite          # require a Sprites account again
 
-sbox destroy                     # pick sandboxes when no name is given
-sbox destroy my-sprite
-sbox destroy --force my-sprite   # skip the confirmation
-sbox destroy -f --all
-sbox rm my-sprite                # alias of destroy
+kaxa destroy                     # pick sandboxes when no name is given
+kaxa destroy my-sprite
+kaxa destroy --force my-sprite   # skip the confirmation
+kaxa destroy -f --all
+kaxa rm my-sprite                # alias of destroy
 ```
 
-You can pass `--provider sprites` instead of `SBOX_DEFAULT_PROVIDER`.
+You can pass `--provider sprites` instead of `KAXA_DEFAULT_PROVIDER`.
 
 ### create
 
-`create` labels the sandbox `sbox`.
+`create` labels the sandbox `kaxa`.
 
 - `--running` keeps the sandbox up for one hour, serves tmux on its URL, and opens that URL.
 - `--sync` copies the Git repository, including `.git` and excluding ignored files, into `/home/sprite/workspace/<repo>`. `--dir` selects another repository. A subdirectory still copies the whole repository. The root selects Go, Rust, Python, and Node; missing tools are installed, then project dependencies. A failed copy or install deletes the sandbox.
 - `--api` publishes one HTTP service on the Sprites URL. `--api-cmd` is comma-separated argv, and the process must listen on `0.0.0.0` and on `--api-port` (8000 by default). With `--sync`, the repository must be an HTTP API; a CLI project is rejected before create. Create waits until the service is running, for up to 30 seconds, and deletes the sandbox if it does not. With `--running`, port `8080` stays with tmux and the URL forwards to the API.
-- `--public` makes that URL reachable without a Sprites account. A failed auth change leaves the sandbox in place. Change it later with `sbox url <name> public` or `sbox url <name> sprite`. Only the sprites provider accepts `url`.
+- `--public` makes that URL reachable without a Sprites account. A failed auth change leaves the sandbox in place. Change it later with `kaxa url <name> public` or `kaxa url <name> sprite`. Only the sprites provider accepts `url`.
 
 ### exec and console
 
@@ -100,7 +100,7 @@ With no sandboxes, `list` prints `no sandboxes created` and exits. In a terminal
 
 ### AI agents
 
-`sbox mcp` serves sandboxes to an AI agent over the Model Context Protocol. Cursor, Claude Code, Claude Desktop, and Gemini CLI each start that binary on stdin and stdout. The agent stays in the client and calls tools to create a sandbox from your Git repository, run commands in it, and destroy it.
+`kaxa mcp` serves sandboxes to an AI agent over the Model Context Protocol. Cursor, Claude Code, Claude Desktop, and Gemini CLI each start that binary on stdin and stdout. The agent stays in the client and calls tools to create a sandbox from your Git repository, run commands in it, and destroy it.
 
 Point `command` at the installed binary. `go install` puts it on `$(go env GOPATH)/bin`. A desktop app needs that absolute path. The token stays in the client's environment, not in a committed file. Client files, `cwd`, and the tool list are in [docs/agent.md](docs/agent.md).
 
@@ -109,16 +109,16 @@ Point `command` at the installed binary. `go install` puts it on `$(go env GOPAT
 | Manual | What it covers |
 | --- | --- |
 | [Sprites account](docs/sprites-account.md) | Account and API token |
-| [version](docs/version.md) | `sbox version` |
-| [create](docs/create.md) | `sbox create` (`new`) |
-| [list](docs/list.md) | `sbox list` (`ls`) |
-| [exec](docs/exec.md) | `sbox exec` |
-| [console](docs/console.md) | `sbox console` (`ssh`) |
-| [restart](docs/restart.md) | `sbox restart` |
-| [upgrade](docs/upgrade.md) | `sbox upgrade` |
-| [url](docs/url.md) | `sbox url` |
-| [destroy](docs/destroy.md) | `sbox destroy` (`rm`) |
-| [mcp](docs/agent.md) | `sbox mcp`, sandboxes for AI agents |
+| [version](docs/version.md) | `kaxa version` |
+| [create](docs/create.md) | `kaxa create` (`new`) |
+| [list](docs/list.md) | `kaxa list` (`ls`) |
+| [exec](docs/exec.md) | `kaxa exec` |
+| [console](docs/console.md) | `kaxa console` (`ssh`) |
+| [restart](docs/restart.md) | `kaxa restart` |
+| [upgrade](docs/upgrade.md) | `kaxa upgrade` |
+| [url](docs/url.md) | `kaxa url` |
+| [destroy](docs/destroy.md) | `kaxa destroy` (`rm`) |
+| [mcp](docs/agent.md) | `kaxa mcp`, sandboxes for AI agents |
 
 The same index, plus configuration, is in [docs/README.md](docs/README.md).
 
@@ -128,7 +128,7 @@ Run `make help` for all targets. Quick local build:
 
 ```bash
 make build
-./bin/sbox --help
+./bin/kaxa --help
 ```
 
 ```bash

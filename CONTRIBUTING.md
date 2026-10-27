@@ -1,6 +1,6 @@
-# Contributing to sbox
+# Contributing to kaxa
 
-Thank you for contributing to **sbox**. We appreciate your time and help.
+Thank you for contributing to **kaxa**. We appreciate your time and help.
 Here are some guidelines to help you get started.
 
 ## Code of Conduct
@@ -10,12 +10,12 @@ others who are seeking help. Harassment of any kind will not be tolerated.
 
 ## Questions
 
-If you have questions about sbox, open a [GitHub Discussion](https://github.com/perylemke/sbox/discussions) or a [GitHub Issue](https://github.com/perylemke/sbox/issues) with a clear title and as much context as you need.
+If you have questions about kaxa, open a [GitHub Discussion](https://github.com/perylemke/kaxa/discussions) or a [GitHub Issue](https://github.com/perylemke/kaxa/issues) with a clear title and as much context as you need.
 
 ## Filing a bug or feature
 
-1. Before filing an issue, check [existing issues](https://github.com/perylemke/sbox/issues) for duplicates. If one exists, comment there instead of opening a new issue.
-1. For bugs, include detailed steps to reproduce, the output of `sbox version`, your OS, and anything else useful (environment variables **names** only—never paste Sprites or Modal tokens). Describe current behavior vs. expected behavior.
+1. Before filing an issue, check [existing issues](https://github.com/perylemke/kaxa/issues) for duplicates. If one exists, comment there instead of opening a new issue.
+1. For bugs, include detailed steps to reproduce, the output of `kaxa version`, your OS, and anything else useful (environment variables **names** only—never paste Sprites or Modal tokens). Describe current behavior vs. expected behavior.
 1. For features or enhancements, use a clear title and description of what you want and why it would help the project and its users.
 
 ## Submitting changes
@@ -27,7 +27,7 @@ If you have questions about sbox, open a [GitHub Discussion](https://github.com/
 ### Quick steps to contribute
 
 1. Fork the project.
-1. Clone your fork (`git clone https://github.com/your_username/sbox.git && cd sbox`)
+1. Clone your fork (`git clone https://github.com/your_username/kaxa.git && cd kaxa`)
 1. Create a feature branch (`git checkout -b my-new-feature`)
 1. Make changes and run tests (`make test`)
 1. Stage changes (`git add .`)

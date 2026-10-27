@@ -5,10 +5,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/perylemke/sbox/internal/lifecycle"
-	"github.com/perylemke/sbox/internal/registry"
-	"github.com/perylemke/sbox/internal/sandbox"
-	"github.com/perylemke/sbox/internal/usererr"
+	"github.com/perylemke/kaxa/internal/lifecycle"
+	"github.com/perylemke/kaxa/internal/registry"
+	"github.com/perylemke/kaxa/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/usererr"
 )
 
 func newURLCmd(reg *registry.Registry) *cobra.Command {
@@ -18,8 +18,8 @@ func newURLCmd(reg *registry.Registry) *cobra.Command {
 		Long: `Set a Sprites sandbox URL to public or sprite.
 
 public lets anyone with the address open the URL. sprite requires a Sprites account. This command is only supported for the sprites provider.`,
-		Example: `  sbox url my-sprite public
-  sbox url my-sprite sprite`,
+		Example: `  kaxa url my-sprite public
+  kaxa url my-sprite sprite`,
 		Args: requireURLArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runURL(cmd, reg, args[0], args[1])
@@ -28,7 +28,7 @@ public lets anyone with the address open the URL. sprite requires a Sprites acco
 }
 
 func requireURLArgs(_ *cobra.Command, args []string) error {
-	const hint = "sbox url <name> public|sprite"
+	const hint = "kaxa url <name> public|sprite"
 	switch len(args) {
 	case 2:
 		return nil

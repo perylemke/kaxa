@@ -1,6 +1,6 @@
 package mcp
 
-import "github.com/perylemke/sbox/internal/sandbox"
+import "github.com/perylemke/kaxa/internal/sandbox"
 
 type providerInfo struct {
 	Name         string               `json:"name"`
@@ -16,7 +16,7 @@ type listProvidersOut struct {
 }
 
 type createIn struct {
-	Provider string   `json:"provider,omitempty" jsonschema:"Provider name from list_providers. Defaults to SBOX_DEFAULT_PROVIDER."`
+	Provider string   `json:"provider,omitempty" jsonschema:"Provider name from list_providers. Defaults to KAXA_DEFAULT_PROVIDER."`
 	Name     string   `json:"name" jsonschema:"Sandbox name. Lowercase letters, digits and hyphens."`
 	Sync     bool     `json:"sync,omitempty" jsonschema:"Copy a local Git repository into the sandbox and install its dependencies."`
 	Dir      string   `json:"dir,omitempty" jsonschema:"Directory inside the Git repository to copy. Requires sync. Defaults to the server working directory. Must be related to the server working directory."`
@@ -36,7 +36,7 @@ type createOut struct {
 }
 
 type execIn struct {
-	Provider string   `json:"provider,omitempty" jsonschema:"Provider name from list_providers. Defaults to SBOX_DEFAULT_PROVIDER."`
+	Provider string   `json:"provider,omitempty" jsonschema:"Provider name from list_providers. Defaults to KAXA_DEFAULT_PROVIDER."`
 	Name     string   `json:"name" jsonschema:"Sandbox name."`
 	Command  []string `json:"command" jsonschema:"Argv to run. The first item is the binary. It is never passed through a shell; use bash and -c explicitly if you need one."`
 }
@@ -49,7 +49,7 @@ type execOut struct {
 }
 
 type listIn struct {
-	Provider string `json:"provider,omitempty" jsonschema:"Provider name from list_providers. Defaults to SBOX_DEFAULT_PROVIDER."`
+	Provider string `json:"provider,omitempty" jsonschema:"Provider name from list_providers. Defaults to KAXA_DEFAULT_PROVIDER."`
 }
 
 type sandboxInfo struct {
@@ -64,7 +64,7 @@ type listOut struct {
 }
 
 type nameIn struct {
-	Provider string `json:"provider,omitempty" jsonschema:"Provider name from list_providers. Defaults to SBOX_DEFAULT_PROVIDER."`
+	Provider string `json:"provider,omitempty" jsonschema:"Provider name from list_providers. Defaults to KAXA_DEFAULT_PROVIDER."`
 	Name     string `json:"name" jsonschema:"Sandbox name."`
 }
 
@@ -87,7 +87,7 @@ type actionOut struct {
 }
 
 type publishIn struct {
-	Provider string   `json:"provider,omitempty" jsonschema:"Provider name from list_providers. Defaults to SBOX_DEFAULT_PROVIDER."`
+	Provider string   `json:"provider,omitempty" jsonschema:"Provider name from list_providers. Defaults to KAXA_DEFAULT_PROVIDER."`
 	Name     string   `json:"name" jsonschema:"Sandbox name."`
 	APICmd   []string `json:"api_cmd" jsonschema:"Argv of the HTTP service. The first item is the binary. The process must listen on 0.0.0.0 and on api_port."`
 	APIPort  int      `json:"api_port,omitempty" jsonschema:"Port the HTTP service listens on. Defaults to 8000."`
@@ -95,7 +95,7 @@ type publishIn struct {
 }
 
 type urlAuthIn struct {
-	Provider string `json:"provider,omitempty" jsonschema:"Provider name from list_providers. Defaults to SBOX_DEFAULT_PROVIDER."`
+	Provider string `json:"provider,omitempty" jsonschema:"Provider name from list_providers. Defaults to KAXA_DEFAULT_PROVIDER."`
 	Name     string `json:"name" jsonschema:"Sandbox name."`
 	Auth     string `json:"auth" jsonschema:"public lets anyone with the URL open it. sprite requires a Sprites account."`
 }
