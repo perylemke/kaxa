@@ -10,10 +10,22 @@ Sprites lifecycle commands (`create`, `list`, `exec`, `console`, `restart`, `upg
 
 ## Requirements
 
-- Go 1.27+
+- Go 1.27+ (only to build from source)
 - Accounts and API tokens for Sprites and/or Modal when you start using provider commands
 
-## Install (from source)
+## Install
+
+### Homebrew (macOS)
+
+```bash
+brew install --cask perylemke/tap/kaxa
+brew upgrade --cask kaxa
+brew uninstall --cask kaxa
+```
+
+The cask verifies the SHA-256 of the release archive and clears the macOS quarantine flag on the unsigned binary after install. See [install](docs/install.md).
+
+### From source
 
 ```bash
 go install ./cmd/kaxa
@@ -112,12 +124,13 @@ With no sandboxes, `list` prints `no sandboxes created` and exits. In a terminal
 
 `kaxa mcp` serves sandboxes to an AI agent over the Model Context Protocol. Cursor, Claude Code, Claude Desktop, and Gemini CLI each start that binary on stdin and stdout. The agent stays in the client and calls tools to create a sandbox from your Git repository, add more repositories to it, run commands in it, and destroy it.
 
-Point `command` at the installed binary. `go install` puts it on `$(go env GOPATH)/bin`. A desktop app needs that absolute path. The token stays in the client's environment, not in a committed file. Client files, `cwd`, and the tool list are in [docs/agent.md](docs/agent.md).
+Point `command` at the installed binary. `go install` puts it on `$(go env GOPATH)/bin`, and Homebrew links it at `$(brew --prefix)/bin/kaxa`. A desktop app needs that absolute path. The token stays in the client's environment, not in a committed file. Client files, `cwd`, and the tool list are in [docs/agent.md](docs/agent.md).
 
 ## Documentation
 
 | Manual | What it covers |
 | --- | --- |
+| [install](docs/install.md) | Homebrew, source build, Gatekeeper |
 | [Sprites account](docs/sprites-account.md) | Account and API token |
 | [version](docs/version.md) | `kaxa version` |
 | [create](docs/create.md) | `kaxa create` (`new`) |

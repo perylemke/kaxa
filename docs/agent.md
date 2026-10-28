@@ -20,7 +20,7 @@ Install the binary wherever you keep commands:
 go install ./cmd/kaxa
 ```
 
-`go install` writes it to `$(go env GOPATH)/bin/kaxa`, or to `$GOBIN` when that variable is set. `make build` writes `./bin/kaxa` inside this repository. `command` is that path. The folder of the binary does not matter.
+`go install` writes it to `$(go env GOPATH)/bin/kaxa`, or to `$GOBIN` when that variable is set. `make build` writes `./bin/kaxa` inside this repository. A Homebrew install (see [install](install.md)) links it at `$(brew --prefix)/bin/kaxa`, for example `/opt/homebrew/bin/kaxa` on Apple Silicon. `command` is that path. The folder of the binary does not matter.
 
 A client started from a terminal inherits your `PATH`, so `command` can be `kaxa`. Cursor and Claude Desktop, started from the desktop, do not inherit that `PATH`. Give them the absolute path, for example `/Users/you/go/bin/kaxa`. A missing file shows the server as disconnected.
 
