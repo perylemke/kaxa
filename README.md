@@ -13,7 +13,7 @@
 
 Unified CLI for sandbox providers. **kaxa** aggregates isolated execution environments behind one command-line interface, starting with [Fly.io Sprites](https://docs.fly.io/sprites) and [Modal Sandboxes](https://modal.com/docs/guide/sdk-javascript-go).
 
-Sprites lifecycle commands (`create`, `list`, `exec`, `console`, `restart`, `upgrade`, `destroy`) are implemented when using `--provider sprites`. Modal implements `create`, `list`, `exec`, `console`, and `destroy`; set it up with [Modal account and token](docs/modal-account.md). Features that only exist for Sprites (`restart`, `upgrade`, `url`, `--running`, `--public`) print that they are not available for Modal and name the providers that have them. `--sync` works on Modal too, with the workspace in `/home/modal/workspace`.
+Sprites lifecycle commands (`create`, `list`, `exec`, `console`, `restart`, `upgrade`, `snapshot`, `destroy`) are implemented when using `--provider sprites`. Modal implements `create`, `list`, `exec`, `console`, `snapshot`, and `destroy`; set it up with [Modal account and token](docs/modal-account.md). Features that only exist for Sprites (`restart`, `upgrade`, `url`, `--running`, `--public`) print that they are not available for Modal and name the providers that have them. `--sync` works on Modal too, with the workspace in `/home/modal/workspace`.
 
 ## Requirements
 
@@ -104,6 +104,12 @@ kaxa restart                     # pick a sandbox when no name is given
 kaxa restart my-sprite
 kaxa upgrade my-sprite
 
+kaxa snapshot create my-sprite --comment "before the migration"
+kaxa snapshot list my-sprite
+kaxa snapshot restore my-sprite v7                       # Sprites: restores in place
+kaxa snapshot restore my-box im-abc123 --to my-box-copy --provider modal   # Modal: new sandbox
+kaxa snapshot delete my-sprite v7
+
 kaxa url my-sprite public          # open the Sprites URL without an account
 kaxa url my-sprite sprite          # require a Sprites account again
 
@@ -143,6 +149,10 @@ With no sandboxes, `list` prints `no sandboxes created` and exits. In a terminal
 
 `restart` and `upgrade` without a name open a picker. `destroy` without a name opens a form with the sandboxes of every configured provider (name, status, provider), where you can select one or more. When stdin is not a terminal, enter numbers to toggle and `0` to confirm. A named sandbox asks for `[y/N]`. `destroy --all` removes every sandbox of every provider and asks twice; `--provider` narrows it to one provider and one question. `--force` or `-f` skips the questions.
 
+### snapshot
+
+`snapshot create|list|restore|delete` saves the filesystem of a sandbox and brings it back. Sprites restores the same sandbox in place (after a `[y/N]` question). Modal creates a new sandbox named by `--to` and keeps the source; its snapshots are images that Modal keeps for 30 days, listed from an index on this machine. `destroy` does not delete snapshots. A snapshot holds everything in the sandbox, including secrets written there. A provider without snapshots prints that they are not available and names the providers that have them. See [snapshot](docs/snapshot.md).
+
 ### AI agents
 
 `kaxa mcp` serves sandboxes to an AI agent over the Model Context Protocol. Cursor, Claude Code, Claude Desktop, and Gemini CLI each start that binary on stdin and stdout. The agent stays in the client and calls tools to create a sandbox from your Git repository, add more repositories to it, run commands in it, and destroy it.
@@ -163,6 +173,7 @@ Point `command` at the installed binary. `go install` puts it on `$(go env GOPAT
 | [sync](docs/sync.md) | `kaxa sync` |
 | [restart](docs/restart.md) | `kaxa restart` |
 | [upgrade](docs/upgrade.md) | `kaxa upgrade` |
+| [snapshot](docs/snapshot.md) | `kaxa snapshot` (create, list, restore, delete) |
 | [url](docs/url.md) | `kaxa url` |
 | [destroy](docs/destroy.md) | `kaxa destroy` (`rm`) |
 | [mcp](docs/agent.md) | `kaxa mcp`, sandboxes for AI agents |

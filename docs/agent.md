@@ -28,7 +28,7 @@ A client started from a terminal inherits your `PATH`, so `command` can be `kaxa
 
 The tokens stay in the environment of that process. Put `KAXA_DEFAULT_PROVIDER` and the token of each provider you use in the client's `env` block: `KAXA_SPRITES_TOKEN` for Sprites, and `KAXA_MODAL_TOKEN_ID` with `KAXA_MODAL_TOKEN_SECRET` for Modal. Do not commit a file that contains a token, and do not paste a token into a prompt. See [Sprites account and token](sprites-account.md) and [Modal account and token](modal-account.md). `--provider` on the command also sets the default.
 
-After the server is connected, ask the agent to call `list_providers`. Sprites and Modal are available. Modal supports create (with `sync`), list, inspect, exec, and destroy; its `capabilities` report `sync`, `setup`, and `workspace_layout` as true and the rest as false. On Modal, `exec` commands start in the image root unless the sandbox was created with `sync`; then they run as the `modal` user in `/home/modal/workspace`.
+After the server is connected, ask the agent to call `list_providers`. Sprites and Modal are available. Modal supports create (with `sync`), list, inspect, exec, snapshots, and destroy; its `capabilities` report `sync`, `setup`, `workspace_layout`, and `snapshot` as true and the rest as false. On Modal, `exec` commands start in the image root unless the sandbox was created with `sync`; then they run as the `modal` user in `/home/modal/workspace`.
 
 ### Cursor
 
@@ -132,6 +132,7 @@ Every tool that works on a sandbox takes an optional `provider`. Without it, the
 | `inspect` | Status, labels, URL and URL auth of one sandbox |
 | `restart`, `upgrade` | Same as [restart](restart.md) and [upgrade](upgrade.md) |
 | `destroy` | Delete a sandbox. The name is required |
+| `create_snapshot`, `list_snapshots`, `restore_snapshot`, `delete_snapshot` | Save, list, restore, and delete sandbox snapshots. See [snapshot](snapshot.md) and [Snapshots](#snapshots) |
 | `publish_api` | Start one HTTP service in an existing sandbox |
 | `set_url_auth` | Same as [url](url.md): `public` or `sprite` |
 
@@ -161,6 +162,8 @@ Call this first. A provider is `available: false` when it cannot serve requests 
 | `upgrade` | `upgrade` |
 | `running` | `create_sandbox` with `running` |
 | `workspace_layout` | `work_dir` in the result, and the default directory of `publish_api` |
+| `snapshot` | `create_snapshot`, `list_snapshots`, `restore_snapshot`, and `delete_snapshot` |
+| `snapshot_restore` | Not a flag: `in_place` or `new_sandbox`, set when `snapshot` is true. It decides how `restore_snapshot` behaves |
 
 A request that needs a missing capability fails before anything is created, with `<feature> is not available for <provider>`, and a hint that names the providers that do offer the feature.
 
@@ -211,13 +214,26 @@ Each of `stdout` and `stderr` keeps the first 256 KiB. When more is produced, th
 
 On a sandbox created with `sync`, the command starts in the provider workspace directory, which contains the repository. For Sprites that is `/home/sprite/workspace` and for Modal `/home/modal/workspace`, and `work_dir` is a subdirectory of it. Run project commands from `work_dir`, for example `["bash", "-c", "cd <work_dir> && go test ./..."]`.
 
+### Snapshots
+
+`create_snapshot` takes `name`, an optional `comment`, and an optional `provider`. It returns the snapshot `id`, `sandbox`, `provider`, `comment`, and `created_at`. `list_snapshots` takes `name` and returns `snapshots`, newest first. `delete_snapshot` takes `name` and `snapshot`, and is permanent.
+
+`restore_snapshot` takes `name`, `snapshot`, and `target`. Read `snapshot_restore` in `list_providers` first:
+
+| `snapshot_restore` | Provider | `target` | Effect |
+| --- | --- | --- | --- |
+| `in_place` | Sprites | Rejected | Overwrites the sandbox and discards what changed after the snapshot |
+| `new_sandbox` | Modal | Required, and different from `name` | Creates `target` from the snapshot and keeps the source |
+
+The result has `sandbox` (the one that holds the restored state), `snapshot`, `provider`, and `status`. `restore_snapshot` and `delete_snapshot` are marked destructive so a client can ask first; call them only when the user asks. A snapshot holds everything in the sandbox, including secrets written there. Modal snapshots are kept for 30 days and are listed only on the machine that took them. See [snapshot](snapshot.md).
+
 ## Limits
 
 - Edits made with the agent's local file tools are not in the sandbox. Edits made in the sandbox are not copied back. Move code with `git` inside `exec`, or create a new sandbox with `sync`. There is no pull tool yet.
 - `sync_repository` adds a repository but never refreshes one. To send new local changes, create a new sandbox or move the code with `git` inside `exec`.
 - `sync` and `sync_repository` copy only a repository that contains the server working directory or sits below it. This keeps a prompt from sending an unrelated repository to a remote provider. Start `kaxa mcp` from the project, or pass a `dir` inside it. A symlink that leaves the working directory is rejected.
-- Checkpoints, network policy and connectors are not exposed. Use the provider's own tools for them.
-- `destroy` is permanent, and its tool is marked destructive so a client can ask first.
+- Network policy and connectors are not exposed. Use the provider's own tools for them. Memory snapshots are not supported.
+- `destroy` is permanent, and its tool is marked destructive so a client can ask first. It does not delete snapshots.
 
 ## Errors
 
