@@ -49,6 +49,9 @@ func (p *Provider) Name() string {
 	return "sprites"
 }
 
+// SupportsRunning marks that Sprites can keep a sandbox up and serve tmux.
+func (p *Provider) SupportsRunning() {}
+
 // Create provisions a new sprite.
 func (p *Provider) Create(ctx context.Context, spec sandbox.Spec) (sandbox.ID, error) {
 	if err := validateName(spec.Name); err != nil {

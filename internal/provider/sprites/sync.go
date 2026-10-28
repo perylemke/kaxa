@@ -12,7 +12,12 @@ import (
 	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
-const workspaceDir = "/home/sprite/workspace"
+const (
+	workspaceDir = "/home/sprite/workspace"
+	argvMkdir    = "mkdir"
+	argvTar      = "tar"
+	tarGzip      = "-xzf"
+)
 
 // HomeDir is the default working directory of a sprite.
 func (p *Provider) HomeDir() string {
@@ -44,6 +49,35 @@ func spriteLabels(sp *spritesdk.Sprite) []string {
 		return nil
 	}
 	return sp.Labels
+}
+
+// RepoExists reports whether /home/sprite/workspace/<repo> exists. Exit status 1
+// from test(1) means absent; any other failure is an error, not an answer.
+func (p *Provider) RepoExists(ctx context.Context, id sandbox.ID, repo string) (bool, error) {
+	if err := validateName(string(id)); err != nil {
+		return false, err
+	}
+	dir, err := p.RepoDir(repo)
+	if err != nil {
+		return false, err
+	}
+	c, token, err := p.clientAndToken()
+	if err != nil {
+		return false, err
+	}
+	err = c.RunIn(ctx, string(id), "", nil, []string{"test", "-d", dir}, nil, io.Discard, io.Discard)
+	if err == nil {
+		return true, nil
+	}
+	mapped := mapExecErr(err, token)
+	if exitErr, ok := errors.AsType[*sandbox.ExitError](mapped); ok {
+		if exitErr.Code == 1 {
+			return false, nil
+		}
+		// A plain error: the CLI turns an ExitError into a silent exit code.
+		return false, fmt.Errorf("test -d %s exited with status %d", dir, exitErr.Code)
+	}
+	return false, mapped
 }
 
 // SyncWorkspace extracts a gzip tar from archive into /home/sprite/workspace.

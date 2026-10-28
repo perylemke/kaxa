@@ -77,8 +77,8 @@ func TestMCPServerSpeaksOnlyProtocolOnStdout(t *testing.T) {
 			t.Errorf("provider %s default = %v", p.Name, p.Default)
 		}
 	}
-	if !got["sprites"] || got["modal"] {
-		t.Fatalf("availability = %v, want sprites available and modal not", got)
+	if !got["sprites"] || !got["modal"] {
+		t.Fatalf("availability = %v, want sprites and modal available", got)
 	}
 
 	if strings.Contains(stderr.String(), "e2e-not-a-real-token") {

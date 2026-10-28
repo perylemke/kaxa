@@ -9,10 +9,17 @@ import (
 	"github.com/perylemke/kaxa/internal/usererr"
 )
 
-const spritesProvider = "sprites"
+const (
+	spritesProvider = "sprites"
+	modalProvider   = "modal"
+)
 
 type tokenConfigurer interface {
 	Configure(token string) error
+}
+
+type credentialsConfigurer interface {
+	ConfigureCredentials(tokenID, tokenSecret string) error
 }
 
 // ResolveProvider returns the registered provider called name, with the
@@ -30,12 +37,21 @@ func ResolveProvider(reg *registry.Registry, cfg config.Config, name string) (sa
 		return nil, err
 	}
 
-	if name == spritesProvider {
+	switch name {
+	case spritesProvider:
 		c, ok := p.(tokenConfigurer)
 		if !ok {
 			return nil, fmt.Errorf("sprites provider %T does not support Configure", p)
 		}
 		if err := c.Configure(cfg.Sprites.Token); err != nil {
+			return nil, err
+		}
+	case modalProvider:
+		c, ok := p.(credentialsConfigurer)
+		if !ok {
+			return nil, fmt.Errorf("modal provider %T does not support ConfigureCredentials", p)
+		}
+		if err := c.ConfigureCredentials(cfg.Modal.TokenID, cfg.Modal.TokenSecret); err != nil {
 			return nil, err
 		}
 	}

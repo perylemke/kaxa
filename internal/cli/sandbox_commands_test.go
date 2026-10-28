@@ -41,6 +41,8 @@ type fakeProvider struct {
 
 func (f *fakeProvider) Name() string { return f.name }
 
+func (f *fakeProvider) SupportsRunning() {}
+
 func (f *fakeProvider) Configure(token string) error {
 	f.configureToken = token
 	if token == "" {
@@ -427,7 +429,7 @@ func TestDestroyForceSkipsConfirm(t *testing.T) {
 			if strings.Contains(errOut.String(), "[y/N]") {
 				t.Fatalf("prompt = %q", errOut.String())
 			}
-			if !strings.Contains(out.String(), "sandbox "+testBoxName+" was destroyed") {
+			if !strings.Contains(out.String(), "sandbox "+testBoxName+" on sprites was destroyed") {
 				t.Fatalf("output = %q", out.String())
 			}
 		})
@@ -457,7 +459,7 @@ func TestDestroyAllForce(t *testing.T) {
 	if strings.Contains(errOut.String(), "[y/N]") {
 		t.Fatalf("prompt = %q", errOut.String())
 	}
-	if !strings.Contains(out.String(), "2 sandboxes were destroyed") {
+	if !strings.Contains(out.String(), "2 sandboxes on sprites were destroyed") {
 		t.Fatalf("output = %q", out.String())
 	}
 }
@@ -505,7 +507,7 @@ func TestDestroyAll(t *testing.T) {
 		t.Fatalf("destroyed = %v", fp.destroyedIDs)
 	}
 	got := out.String()
-	if !strings.Contains(got, "2 sandboxes were destroyed") || !strings.Contains(got, "  a") || !strings.Contains(got, "  b") {
+	if !strings.Contains(got, "2 sandboxes on sprites were destroyed") || !strings.Contains(got, "  a") || !strings.Contains(got, "  b") {
 		t.Fatalf("output = %q", got)
 	}
 }
@@ -534,7 +536,7 @@ func TestDestroyChooseFromList(t *testing.T) {
 	if !strings.Contains(errOut.String(), "a") || !strings.Contains(errOut.String(), "b") {
 		t.Fatalf("choices = %q", errOut.String())
 	}
-	if !strings.Contains(out.String(), "sandbox b was destroyed") {
+	if !strings.Contains(out.String(), "sandbox b on sprites was destroyed") {
 		t.Fatalf("output = %q", out.String())
 	}
 }
@@ -589,7 +591,7 @@ func TestRestartWithConfirm(t *testing.T) {
 }
 
 func TestRestartWithoutNameChoosesFromList(t *testing.T) {
-	testActionFromList(t, testCmdRestart, "Restart which sandbox?", "sandbox b was restarted", func(fp *fakeProvider) sandbox.ID {
+	testActionFromList(t, testCmdRestart, "Restart which sandbox?", "sandbox b on sprites was restarted", func(fp *fakeProvider) sandbox.ID {
 		return fp.restarted
 	})
 }
@@ -620,7 +622,7 @@ func TestUpgradeCancelledWithoutConfirm(t *testing.T) {
 }
 
 func TestUpgradeWithoutNameChoosesFromList(t *testing.T) {
-	testActionFromList(t, testCmdUpgrade, "Upgrade which sandbox?", "sandbox b was upgraded", func(fp *fakeProvider) sandbox.ID {
+	testActionFromList(t, testCmdUpgrade, "Upgrade which sandbox?", "sandbox b on sprites was upgraded", func(fp *fakeProvider) sandbox.ID {
 		return fp.upgraded
 	})
 }

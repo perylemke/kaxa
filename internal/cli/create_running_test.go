@@ -18,6 +18,8 @@ func (p *createRunningTestProvider) Name() string { return spritesProviderName }
 
 func (p *createRunningTestProvider) Configure(string) error { return nil }
 
+func (p *createRunningTestProvider) SupportsRunning() {}
+
 func (p *createRunningTestProvider) Create(_ context.Context, spec sandbox.Spec) (sandbox.ID, error) {
 	return sandbox.ID(spec.Name), nil
 }

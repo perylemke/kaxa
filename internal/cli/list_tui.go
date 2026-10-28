@@ -29,6 +29,7 @@ const (
 type listTUIResult struct {
 	postAction listPostAction
 	id         sandbox.ID
+	provider   string
 	auth       string
 }
 
@@ -44,7 +45,7 @@ const (
 )
 
 type listInteractiveModel struct {
-	inspect    func(sandbox.ID) tea.Cmd
+	inspect    func(sandbox.Info) tea.Cmd
 	infos      []sandbox.Info
 	table      table.Model
 	mode       int
@@ -52,6 +53,7 @@ type listInteractiveModel struct {
 	detailErr  error
 	postAction listPostAction
 	postID     sandbox.ID
+	postProv   string
 	auth       string
 }
 
@@ -60,10 +62,10 @@ type detailLoadedMsg struct {
 	err    error
 }
 
-func newListInteractiveModel(ctx context.Context, p sandbox.Provider, infos []sandbox.Info) listInteractiveModel {
+func newListInteractiveModel(ctx context.Context, providers map[string]sandbox.Provider, infos []sandbox.Info) listInteractiveModel {
 	return listInteractiveModel{
-		inspect: func(id sandbox.ID) tea.Cmd {
-			return inspectCmd(ctx, p, id)
+		inspect: func(info sandbox.Info) tea.Cmd {
+			return inspectCmd(ctx, providers[info.Provider], info)
 		},
 		infos: infos,
 		table: newListTable(infos, true, listTableHeight(len(infos))),
@@ -129,7 +131,7 @@ func (m listInteractiveModel) updateTableKey(msg tea.KeyMsg) (tea.Model, tea.Cmd
 			return m, nil
 		}
 		m.mode = listModeDetailLoading
-		return m, m.inspect(m.infos[row].ID)
+		return m, m.inspect(m.infos[row])
 	case "q", keyInterrupt:
 		return m, tea.Quit
 	default:
@@ -141,6 +143,7 @@ func (m listInteractiveModel) updateTableKey(msg tea.KeyMsg) (tea.Model, tea.Cmd
 
 func (m listInteractiveModel) updateDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	id := m.detailID()
+	prov := m.detailProvider()
 	switch msg.String() {
 	case "esc":
 		m.mode = listModeTable
@@ -151,14 +154,17 @@ func (m listInteractiveModel) updateDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cm
 	case "r":
 		m.postAction = listPostRestart
 		m.postID = id
+		m.postProv = prov
 		return m, tea.Quit
 	case "u":
 		m.postAction = listPostUpgrade
 		m.postID = id
+		m.postProv = prov
 		return m, tea.Quit
 	case "d":
 		m.postAction = listPostDestroy
 		m.postID = id
+		m.postProv = prov
 		return m, tea.Quit
 	case keyEnter:
 		if id == "" || m.detailErr != nil {
@@ -166,6 +172,7 @@ func (m listInteractiveModel) updateDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cm
 		}
 		m.postAction = listPostURLAuth
 		m.postID = id
+		m.postProv = prov
 		m.auth = selectedURLAuth(m.detail.Auth)
 		return m, tea.Quit
 	default:
@@ -191,9 +198,21 @@ func (m listInteractiveModel) detailID() sandbox.ID {
 	return m.infos[row].ID
 }
 
-func inspectCmd(ctx context.Context, p sandbox.Provider, id sandbox.ID) tea.Cmd {
+// detailProvider names the provider of the sandbox whose detail is open.
+func (m listInteractiveModel) detailProvider() string {
+	row := m.table.Cursor()
+	if row >= 0 && row < len(m.infos) {
+		return m.infos[row].Provider
+	}
+	return m.detail.Provider
+}
+
+func inspectCmd(ctx context.Context, p sandbox.Provider, info sandbox.Info) tea.Cmd {
 	return func() tea.Msg {
-		d, err := p.Inspect(ctx, id)
+		if p == nil {
+			return detailLoadedMsg{err: fmt.Errorf("provider %q is not configured", info.Provider)}
+		}
+		d, err := p.Inspect(ctx, info.ID)
 		return detailLoadedMsg{detail: d, err: err}
 	}
 }
@@ -249,8 +268,8 @@ func formatRelativeTime(t time.Time) string {
 	return fmt.Sprintf("%s ago", time.Since(t).Truncate(time.Second))
 }
 
-func runListInteractive(ctx context.Context, p sandbox.Provider, infos []sandbox.Info) (listTUIResult, error) {
-	program := tea.NewProgram(newListInteractiveModel(ctx, p, infos), tea.WithAltScreen())
+func runListInteractive(ctx context.Context, providers map[string]sandbox.Provider, infos []sandbox.Info) (listTUIResult, error) {
+	program := tea.NewProgram(newListInteractiveModel(ctx, providers, infos), tea.WithAltScreen())
 	final, err := program.Run()
 	if err != nil {
 		return listTUIResult{}, err
@@ -259,14 +278,18 @@ func runListInteractive(ctx context.Context, p sandbox.Provider, infos []sandbox
 	if !ok {
 		return listTUIResult{}, errors.New("list interactive failed")
 	}
-	return listTUIResult{postAction: model.postAction, id: model.postID, auth: model.auth}, nil
+	return listTUIResult{postAction: model.postAction, id: model.postID, provider: model.postProv, auth: model.auth}, nil
 }
 
-func handleListPostAction(cmd *cobra.Command, p sandbox.Provider, res listTUIResult) error {
+func handleListPostAction(cmd *cobra.Command, providers map[string]sandbox.Provider, res listTUIResult) error {
 	if res.postAction == listPostNone || res.id == "" {
 		return nil
 	}
-	name := string(res.id)
+	p, ok := providers[res.provider]
+	if !ok {
+		return fmt.Errorf("provider %q is not configured", res.provider)
+	}
+	ref := sandboxLabel(p.Name(), res.id)
 	ctx := cmd.Context()
 	in := cmd.InOrStdin()
 	errOut := cmd.ErrOrStderr()
@@ -276,27 +299,36 @@ func handleListPostAction(cmd *cobra.Command, p sandbox.Provider, res listTUIRes
 	case listPostNone:
 		return nil
 	case listPostRestart:
+		r, ok := p.(sandbox.Restarter)
+		if !ok {
+			return lifecycle.Unsupported(p, sandbox.FeatureRestart)
+		}
 		return runConfirmedSandboxAction(ctx, in, errOut, out,
-			fmt.Sprintf("Restart sandbox %s?", name),
-			fmt.Sprintf("restarting %s…", name),
+			fmt.Sprintf("Restart sandbox %s?", ref),
+			fmt.Sprintf("restarting %s…", ref),
 			"restarted",
-			fmt.Sprintf("sandbox %s was restarted", name),
-			func(ctx context.Context) error { return p.Restart(ctx, res.id) },
+			fmt.Sprintf("sandbox %s was restarted", ref),
+			func(ctx context.Context) error { return r.Restart(ctx, res.id) },
 		)
 	case listPostUpgrade:
+		u, ok := p.(sandbox.Upgrader)
+		if !ok {
+			return lifecycle.Unsupported(p, sandbox.FeatureUpgrade)
+		}
 		return runConfirmedSandboxAction(ctx, in, errOut, out,
-			fmt.Sprintf("Upgrade sandbox %s?", name),
-			fmt.Sprintf("upgrading %s…", name),
+			fmt.Sprintf("Upgrade sandbox %s?", ref),
+			fmt.Sprintf("upgrading %s…", ref),
 			"upgraded",
-			fmt.Sprintf("sandbox %s was upgraded", name),
-			func(ctx context.Context) error { return p.Upgrade(ctx, res.id) },
+			fmt.Sprintf("sandbox %s was upgraded", ref),
+			func(ctx context.Context) error { return u.Upgrade(ctx, res.id) },
 		)
 	case listPostDestroy:
+		target := []sandbox.Info{{Provider: p.Name(), ID: res.id}}
 		return runConfirmedSandboxAction(ctx, in, errOut, out,
-			destroyPrompt(false, []sandbox.ID{res.id}),
-			destroySpinnerLabel([]sandbox.ID{res.id}),
+			destroyPrompt(target, false),
+			destroySpinnerLabel(target),
 			"destroyed",
-			destroySuccessMessage([]sandbox.ID{res.id}),
+			destroySuccessMessage(target),
 			func(ctx context.Context) error { return p.Destroy(ctx, res.id) },
 		)
 	case listPostURLAuth:
@@ -309,7 +341,7 @@ func handleListPostAction(cmd *cobra.Command, p sandbox.Provider, res listTUIRes
 func runListURLAuth(ctx context.Context, in io.Reader, errOut, out io.Writer, p sandbox.Provider, res listTUIResult) error {
 	setter, ok := p.(sandbox.PublicURL)
 	if !ok {
-		return lifecycle.Unsupported(p, "url auth")
+		return lifecycle.Unsupported(p, sandbox.FeatureURLAuth)
 	}
 	reader := in
 	if !inputIsTTY(in) {
@@ -323,7 +355,7 @@ func runListURLAuth(ctx context.Context, in io.Reader, errOut, out io.Writer, p 
 	if err != nil {
 		return err
 	}
-	confirmed, err := confirmAction(reader, errOut, fmt.Sprintf("Set sandbox %s URL auth to %s?", res.id, auth))
+	confirmed, err := confirmAction(reader, errOut, fmt.Sprintf("Set sandbox %s URL auth to %s?", sandboxLabel(p.Name(), res.id), auth))
 	if err != nil {
 		return err
 	}
@@ -341,6 +373,6 @@ func runListURLAuth(ctx context.Context, in io.Reader, errOut, out io.Writer, p 
 	if err != nil {
 		return err
 	}
-	msg := fmt.Sprintf("sandbox %s URL auth is %s\n%s", res.id, auth, detail.URL)
+	msg := fmt.Sprintf("sandbox %s URL auth is %s\n%s", sandboxLabel(p.Name(), res.id), auth, detail.URL)
 	return WriteSuccess(out, "url", msg)
 }

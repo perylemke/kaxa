@@ -1,4 +1,4 @@
-package sprites
+package toolchain
 
 import (
 	"fmt"
@@ -37,20 +37,20 @@ const (
 	clojureSHA   = "fe9194858e75d5af13c2e2aff92d710674d5bc5105f2b42f90a7d94d82ec023c"
 )
 
-type spriteArch struct {
+type archInfo struct {
 	goArch string
 	node   string
 	triple string
 }
 
-func archFromUname(raw string) (spriteArch, error) {
+func archFromUname(raw string) (archInfo, error) {
 	switch strings.TrimSpace(raw) {
 	case "x86_64", archAMD64:
-		return spriteArch{goArch: archAMD64, node: "x64", triple: "x86_64-unknown-linux-gnu"}, nil
+		return archInfo{goArch: archAMD64, node: "x64", triple: "x86_64-unknown-linux-gnu"}, nil
 	case "aarch64", archARM64:
-		return spriteArch{goArch: archARM64, node: archARM64, triple: "aarch64-unknown-linux-gnu"}, nil
+		return archInfo{goArch: archARM64, node: archARM64, triple: "aarch64-unknown-linux-gnu"}, nil
 	default:
-		return spriteArch{}, fmt.Errorf("unsupported sprite arch %q", strings.TrimSpace(raw))
+		return archInfo{}, fmt.Errorf("unsupported arch %q", strings.TrimSpace(raw))
 	}
 }
 
@@ -60,7 +60,7 @@ type toolAsset struct {
 	archive string
 }
 
-func goAsset(arch spriteArch) toolAsset {
+func goAsset(arch archInfo) toolAsset {
 	name := fmt.Sprintf("go%s.linux-%s.tar.gz", goVersion, arch.goArch)
 	sha := goARM64SHA
 	if arch.goArch == archAMD64 {
@@ -73,7 +73,7 @@ func goAsset(arch spriteArch) toolAsset {
 	}
 }
 
-func nodeAsset(arch spriteArch) toolAsset {
+func nodeAsset(arch archInfo) toolAsset {
 	name := fmt.Sprintf("node-%s-linux-%s.tar.gz", nodeVersion, arch.node)
 	sha := nodeARM64SHA
 	if arch.node == "x64" {
@@ -86,7 +86,7 @@ func nodeAsset(arch spriteArch) toolAsset {
 	}
 }
 
-func uvAsset(arch spriteArch) toolAsset {
+func uvAsset(arch archInfo) toolAsset {
 	name := "uv-" + arch.triple + ".tar.gz"
 	sha := uvARM64SHA
 	if arch.goArch == archAMD64 {
@@ -99,20 +99,22 @@ func uvAsset(arch spriteArch) toolAsset {
 	}
 }
 
-func rustupAsset(arch spriteArch) toolAsset {
+func rustupAsset(arch archInfo) toolAsset {
 	sha := rustARM64SHA
 	if arch.goArch == archAMD64 {
 		sha = rustAMD64SHA
 	}
 	return toolAsset{
-		url:     "https://static.rust-lang.org/rustup/archive/" + rustupVersion + "/" + arch.triple + "/rustup-init",
-		sha256:  sha,
-		archive: "/tmp/kaxa-rustup-init",
+		url:    "https://static.rust-lang.org/rustup/archive/" + rustupVersion + "/" + arch.triple + "/rustup-init",
+		sha256: sha,
+		// rustup-init picks its behavior from its own file name: under any other
+		// name it acts as a rustup proxy and refuses to install.
+		archive: "/tmp/rustup-init",
 	}
 }
 
 // rubyAsset is a relocatable build (--enable-load-relative) from jdx/ruby.
-func rubyAsset(arch spriteArch) toolAsset {
+func rubyAsset(arch archInfo) toolAsset {
 	platform, sha := "arm64_linux", rubyARM64SHA
 	if arch.goArch == archAMD64 {
 		platform, sha = "x86_64_linux", rubyAMD64SHA
@@ -125,7 +127,7 @@ func rubyAsset(arch spriteArch) toolAsset {
 	}
 }
 
-func jdkAsset(arch spriteArch) toolAsset {
+func jdkAsset(arch archInfo) toolAsset {
 	cpu, sha := "aarch64", jdkARM64SHA
 	if arch.goArch == archAMD64 {
 		cpu, sha = "x64", jdkAMD64SHA

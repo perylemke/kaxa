@@ -65,7 +65,7 @@ func TestCreateAPIFlagValidation(t *testing.T) {
 		{
 			name: "public without support",
 			args: []string{"--public"},
-			want: "does not support public urls",
+			want: "public urls is not available for",
 		},
 		{
 			name: "tmux port",
@@ -96,7 +96,7 @@ func TestCreateAPIRejectsProviderWithoutPublish(t *testing.T) {
 	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdCreate, testBoxName, testAPIFlag, testAPICmdFlag, testUvicorn})
 
 	err := cmd.Execute()
-	if err == nil || !strings.Contains(err.Error(), "does not support api publish") {
+	if err == nil || !strings.Contains(err.Error(), "api publish is not available for") {
 		t.Fatalf("err = %v", err)
 	}
 	if fp.lastCreate.Name != "" {

@@ -29,7 +29,7 @@ func newCreateCmd(reg *registry.Registry) *cobra.Command {
 		Short:   "Create a sandbox",
 		Long: `Create a sandbox on the selected provider.
 
---sync copies this Git repository into /home/sprite/workspace/<repo> and installs Go, Rust, Python, Node, Ruby (Gemfile), or Clojure (deps.edn) dependencies found at the root. --dir selects that repository; without it, sync uses the current directory. A subdirectory still copies the whole Git repository. A failed copy or install deletes the sandbox.
+--sync copies this Git repository into /home/sprite/workspace/<repo> on Sprites or /home/modal/workspace/<repo> on Modal, and installs Go, Rust, Python, Node, Ruby (Gemfile), or Clojure (deps.edn) dependencies found at the root. --dir selects that repository; without it, sync uses the current directory. A subdirectory still copies the whole Git repository. A failed copy or install deletes the sandbox.
 --running keeps the sandbox up for one hour and opens a tmux session on its URL.
 --api publishes one HTTP service on that URL after the copy. It requires --api-cmd and works only with Sprites. With --sync, the repository must be an HTTP API; a CLI project is rejected before the sandbox is created. The process must listen on 0.0.0.0 and on --api-port (8000 unless you change it). Together with --running, port 8080 stays with tmux and the URL forwards to the API. A failed publish deletes the sandbox. Create waits until the service is running. If it fails or does not become running within 90s, the sandbox is deleted.
 --api-env sets a variable for that service: KEY=VALUE, or KEY to copy the value from your shell so a secret stays out of the command line. Repeat it for more variables. Values cannot contain commas. HOME, USER, PATH, and KAXA_ names are reserved.
@@ -128,13 +128,14 @@ func resolveCreateRequest(cmd *cobra.Command, reg *registry.Registry, args []str
 }
 
 func writeCreated(cmd *cobra.Command, p sandbox.Provider, id sandbox.ID, req createRequest) error {
-	msg := fmt.Sprintf("sandbox %s is ready", id)
+	ref := sandboxLabel(p.Name(), id)
+	msg := fmt.Sprintf("sandbox %s is ready", ref)
 	if req.Running || req.API || req.Public {
 		detail, err := p.Inspect(cmd.Context(), id)
 		if err != nil {
 			return err
 		}
-		msg = createdMessage(id, detail.URL, req)
+		msg = createdMessage(ref, detail.URL, req)
 		if req.Running && !req.API {
 			_ = openBrowserFn(detail.URL)
 		}

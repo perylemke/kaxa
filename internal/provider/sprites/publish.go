@@ -93,7 +93,7 @@ func apiServiceArgv(workDir string, port int, argv, env []string) []string {
 	return append(cmd,
 		"--dir", workDir,
 		"--http-port", strconv.Itoa(port),
-		"--env", strings.Join(append(toolEnv(), env...), ","),
+		"--env", strings.Join(append(spriteLayout.Env(), env...), ","),
 		"--no-stream",
 	)
 }

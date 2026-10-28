@@ -14,6 +14,10 @@ import (
 // ErrNotImplemented indicates a provider method is not yet implemented.
 var ErrNotImplemented = errors.New("not implemented")
 
+// ErrNotConfigured indicates a provider has no credentials. Commands that act
+// on every provider skip a provider that returns it.
+var ErrNotConfigured = errors.New("provider not configured")
+
 // SyncLabel marks a sandbox whose workspace was copied from a local Git repository.
 const SyncLabel = "sync"
 
@@ -82,6 +86,12 @@ type WorkspaceSyncer interface {
 	SyncWorkspace(ctx context.Context, id ID, archive io.Reader) error
 }
 
+// RepoChecker reports whether the directory SyncWorkspace would fill for repo
+// already exists in a sandbox. repo must be a single path segment.
+type RepoChecker interface {
+	RepoExists(ctx context.Context, id ID, repo string) (bool, error)
+}
+
 // ProjectSetup installs toolchains and project dependencies in a synced workspace.
 type ProjectSetup interface {
 	SetupProjects(ctx context.Context, id ID, repoName string, steps []project.Step) error
@@ -121,14 +131,28 @@ type PublicURL interface {
 	SetURLAuth(ctx context.Context, id ID, auth string) error
 }
 
+// Restarter reboots a sandbox in place.
+type Restarter interface {
+	Restart(ctx context.Context, id ID) error
+}
+
+// Upgrader moves a sandbox to the latest provider platform version.
+type Upgrader interface {
+	Upgrade(ctx context.Context, id ID) error
+}
+
+// RunningSupport marks a provider that can keep a sandbox up and serve a
+// terminal on its URL when Spec.Running is set.
+type RunningSupport interface {
+	SupportsRunning()
+}
+
 // Provider is a sandbox backend (Sprites, Modal, etc.).
 type Provider interface {
 	Name() string
 	Create(ctx context.Context, spec Spec) (ID, error)
 	List(ctx context.Context) ([]Info, error)
 	Inspect(ctx context.Context, id ID) (Detail, error)
-	Restart(ctx context.Context, id ID) error
-	Upgrade(ctx context.Context, id ID) error
 	Exec(ctx context.Context, id ID, opts ExecOptions) error
 	Destroy(ctx context.Context, id ID) error
 }

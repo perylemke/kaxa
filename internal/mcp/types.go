@@ -36,6 +36,18 @@ type createOut struct {
 	Auth     string `json:"auth,omitempty"`
 }
 
+type syncIn struct {
+	Provider string `json:"provider,omitempty" jsonschema:"Provider name from list_providers. Defaults to KAXA_DEFAULT_PROVIDER."`
+	Name     string `json:"name" jsonschema:"Name of a sandbox that was created with sync."`
+	Dir      string `json:"dir,omitempty" jsonschema:"Directory inside the Git repository to copy. Defaults to the server working directory. Must be related to the server working directory."`
+}
+
+type syncOut struct {
+	ID       string `json:"id"`
+	Provider string `json:"provider"`
+	WorkDir  string `json:"work_dir,omitempty"`
+}
+
 type execIn struct {
 	Provider string   `json:"provider,omitempty" jsonschema:"Provider name from list_providers. Defaults to KAXA_DEFAULT_PROVIDER."`
 	Name     string   `json:"name" jsonschema:"Sandbox name."`
@@ -50,7 +62,7 @@ type execOut struct {
 }
 
 type listIn struct {
-	Provider string `json:"provider,omitempty" jsonschema:"Provider name from list_providers. Defaults to KAXA_DEFAULT_PROVIDER."`
+	Provider string `json:"provider,omitempty" jsonschema:"Provider name from list_providers. Without it, every configured provider is listed."`
 }
 
 type sandboxInfo struct {
@@ -62,6 +74,7 @@ type sandboxInfo struct {
 
 type listOut struct {
 	Sandboxes []sandboxInfo `json:"sandboxes"`
+	Warnings  []string      `json:"warnings,omitempty"`
 }
 
 type nameIn struct {

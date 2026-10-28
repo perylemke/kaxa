@@ -3,12 +3,12 @@ package sprites
 import (
 	"bytes"
 	"context"
-	"crypto/subtle"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"strings"
+
+	"github.com/perylemke/kaxa/internal/toolchain"
 )
 
 const (
@@ -19,6 +19,7 @@ const (
 	webtmuxArchive     = "/tmp/kaxa-webtmux.tar.gz"
 	spriteEnvCmd       = "sprite-env"
 	servicesCmd        = "services"
+	archNameARM64      = "arm64"
 )
 
 // RunningHoldArgv is the remote command used to register a 1-hour task hold.
@@ -61,7 +62,7 @@ var webtmuxAssets = map[string]webtmuxAsset{
 		name:   "webtmux-linux-arm64",
 		sha256: "b041b1dfb67027cbb17a93febd7389a277d5a7635b8a3539bace707bb34848d2",
 	},
-	archARM64: {
+	archNameARM64: {
 		name:   "webtmux-linux-arm64",
 		sha256: "b041b1dfb67027cbb17a93febd7389a277d5a7635b8a3539bace707bb34848d2",
 	},
@@ -110,7 +111,7 @@ func installWebtmux(ctx context.Context, c sdkClient, name, token string) error 
 		_ = removeWebtmuxArchive(ctx, c, name, token)
 		return fmt.Errorf("checksum webtmux: %w", err)
 	}
-	if !checksumMatches(sumOut, asset.sha256) {
+	if !toolchain.ChecksumMatches(sumOut, asset.sha256) {
 		_ = removeWebtmuxArchive(ctx, c, name, token)
 		return errors.New("checksum webtmux: archive hash does not match")
 	}
@@ -158,20 +159,4 @@ func runRemoteIn(ctx context.Context, c sdkClient, name, token, dir string, env,
 		return "", fmt.Errorf("%s: %s", msg, detail)
 	}
 	return "", fmt.Errorf("%s", msg)
-}
-
-func checksumMatches(output, want string) bool {
-	fields := strings.Fields(output)
-	if len(fields) == 0 {
-		return false
-	}
-	got, err := hex.DecodeString(fields[0])
-	if err != nil {
-		return false
-	}
-	expected, err := hex.DecodeString(want)
-	if err != nil || len(got) != len(expected) {
-		return false
-	}
-	return subtle.ConstantTimeCompare(got, expected) == 1
 }

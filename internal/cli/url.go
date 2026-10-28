@@ -51,7 +51,7 @@ func runURL(cmd *cobra.Command, reg *registry.Registry, name, auth string) error
 	}
 	setter, ok := p.(sandbox.PublicURL)
 	if !ok {
-		return lifecycle.Unsupported(p, "url auth")
+		return lifecycle.Unsupported(p, sandbox.FeatureURLAuth)
 	}
 	id := sandbox.ID(name)
 	if err := setter.SetURLAuth(cmd.Context(), id, auth); err != nil {
@@ -61,6 +61,6 @@ func runURL(cmd *cobra.Command, reg *registry.Registry, name, auth string) error
 	if err != nil {
 		return err
 	}
-	msg := fmt.Sprintf("sandbox %s URL auth is %s\n%s", id, auth, detail.URL)
+	msg := fmt.Sprintf("sandbox %s URL auth is %s\n%s", sandboxLabel(p.Name(), id), auth, detail.URL)
 	return WriteSuccess(cmd.OutOrStdout(), "url", msg)
 }

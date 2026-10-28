@@ -63,7 +63,7 @@ func TestServerListsEveryTool(t *testing.T) {
 	slices.Sort(names)
 	want := []string{
 		"create_sandbox", "destroy", "exec", "inspect", "list_providers",
-		"list_sandboxes", "publish_api", "restart", "set_url_auth", "upgrade",
+		"list_sandboxes", "publish_api", "restart", "set_url_auth", "sync_repository", "upgrade",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("tools = %v, want %v", names, want)
@@ -80,6 +80,28 @@ func TestServerListsEveryTool(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestServerSyncRepositoryIsAdditive(t *testing.T) {
+	t.Parallel()
+
+	session := connect(t, &fakeProvider{name: testSprites})
+	res, err := session.ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("list tools: %v", err)
+	}
+	for _, tool := range res.Tools {
+		if tool.Name != "sync_repository" {
+			continue
+		}
+		// It adds a directory and never replaces one, so a client need not confirm it.
+		a := tool.Annotations
+		if a == nil || a.ReadOnlyHint || a.DestructiveHint == nil || *a.DestructiveHint {
+			t.Fatalf("sync_repository must be additive: %+v", a)
+		}
+		return
+	}
+	t.Fatal("sync_repository is not registered")
 }
 
 func call(t *testing.T, session *sdk.ClientSession, tool string, args map[string]any) *sdk.CallToolResult {
@@ -186,6 +208,20 @@ func TestServerRejectsMissingRequiredField(t *testing.T) {
 	}
 	if len(fp.destroyed) != 0 {
 		t.Fatalf("destroyed = %v", fp.destroyed)
+	}
+}
+
+func TestServerSyncRepositoryRejectsMissingName(t *testing.T) {
+	t.Parallel()
+
+	fp := &fakeProvider{name: testSprites}
+	session := connect(t, fp)
+	res := call(t, session, "sync_repository", map[string]any{})
+	if !res.IsError || !strings.Contains(text(res), "name") {
+		t.Fatalf("sync without a name: isError=%v text=%q", res.IsError, text(res))
+	}
+	if fp.synced {
+		t.Fatal("repository was copied")
 	}
 }
 

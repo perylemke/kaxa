@@ -16,4 +16,18 @@ kaxa ssh my-sprite
 
 The remote exit code is the kaxa exit code, from 0 through 255.
 
-On a sandbox created with `--sync`, the shell starts in `/home/sprite/workspace`. Other sandboxes start in the sprite home.
+On a sandbox created with `--sync`, the shell starts in `/home/sprite/workspace`. Other sandboxes start in the sprite home. On Modal, a sandbox created with `--sync` opens the shell as the `modal` user in `/home/modal/workspace`.
+
+## Modal
+
+Pick the provider with `--provider modal` or `KAXA_DEFAULT_PROVIDER=modal`. The sandbox must be running.
+
+```bash
+kaxa --provider modal console my-box
+```
+
+Differences from Sprites:
+
+- The terminal size is applied when the shell starts. Resizing the window during the session is not applied, because the Modal SDK cannot resize a running terminal. Run `stty rows <n> cols <m>` in the shell, or reopen the console, after resizing.
+- Modal merges standard error into standard output in a terminal session.
+- Without `--sync` the shell runs as root in the root directory of the sandbox image. With `--sync` it runs as `modal` in `/home/modal/workspace`.

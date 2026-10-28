@@ -149,19 +149,48 @@ func (s *service) createRequest(name string, in createIn) (lifecycle.Request, er
 		}
 		return req, nil
 	}
-	dir := in.Dir
-	if dir == "" {
-		dir = s.root
-	}
-	root, repo, err := lifecycle.ResolveRepo(dir, true)
+	root, repo, err := s.repoInScope(in.Dir)
 	if err != nil {
-		return lifecycle.Request{}, err
-	}
-	if err := checkRepoScope(root, s.root); err != nil {
 		return lifecycle.Request{}, err
 	}
 	req.Root, req.Repo = root, repo
 	return req, nil
+}
+
+// repoInScope resolves the Git repository to copy: dir, or the server working
+// directory when dir is empty. It refuses a repository unrelated to that directory.
+func (s *service) repoInScope(dir string) (root, repo string, err error) {
+	if dir == "" {
+		dir = s.root
+	}
+	root, repo, err = lifecycle.ResolveRepo(dir, true)
+	if err != nil {
+		return "", "", err
+	}
+	if err := checkRepoScope(root, s.root); err != nil {
+		return "", "", err
+	}
+	return root, repo, nil
+}
+
+func (s *service) syncRepository(ctx context.Context, in syncIn) (syncOut, error) {
+	p, err := s.provider(in.Provider)
+	if err != nil {
+		return syncOut{}, err
+	}
+	name, err := requireName(in.Name)
+	if err != nil {
+		return syncOut{}, err
+	}
+	root, repo, err := s.repoInScope(in.Dir)
+	if err != nil {
+		return syncOut{}, err
+	}
+	res, err := lifecycle.Sync(ctx, p, lifecycle.SyncRequest{Name: string(name), Root: root, Repo: repo}, s.progress)
+	if err != nil {
+		return syncOut{}, err
+	}
+	return syncOut{ID: string(res.ID), Provider: p.Name(), WorkDir: res.WorkDir}, nil
 }
 
 func applyAPI(req *lifecycle.Request, in createIn) error {
@@ -251,11 +280,11 @@ func (s *service) exec(ctx context.Context, in execIn) (execOut, error) {
 }
 
 func (s *service) listSandboxes(ctx context.Context, in listIn) (listOut, error) {
-	p, err := s.provider(in.Provider)
+	providers, names, err := s.listTargets(in.Provider)
 	if err != nil {
 		return listOut{}, err
 	}
-	infos, err := p.List(ctx)
+	infos, failures, err := lifecycle.CollectSandboxes(ctx, providers, names)
 	if err != nil {
 		return listOut{}, err
 	}
@@ -268,7 +297,23 @@ func (s *service) listSandboxes(ctx context.Context, in listIn) (listOut, error)
 			Labels:   nonNil(info.Labels),
 		})
 	}
+	for _, failure := range failures {
+		out.Warnings = append(out.Warnings, "could not list "+failure.Error())
+	}
 	return out, nil
+}
+
+// listTargets is the named provider, or every configured provider when none is
+// named. The default provider does not narrow the search.
+func (s *service) listTargets(name string) (map[string]sandbox.Provider, []string, error) {
+	if strings.TrimSpace(name) != "" {
+		p, err := s.provider(name)
+		if err != nil {
+			return nil, nil, err
+		}
+		return map[string]sandbox.Provider{p.Name(): p}, []string{p.Name()}, nil
+	}
+	return lifecycle.ListTargets(s.reg, s.cfg)
 }
 
 func (s *service) inspect(ctx context.Context, in nameIn) (inspectOut, error) {
@@ -302,11 +347,23 @@ func (s *service) destroy(ctx context.Context, in nameIn) (actionOut, error) {
 }
 
 func (s *service) restart(ctx context.Context, in nameIn) (actionOut, error) {
-	return s.act(ctx, in, "restarted", sandbox.Provider.Restart)
+	return s.act(ctx, in, "restarted", func(p sandbox.Provider, ctx context.Context, id sandbox.ID) error {
+		r, ok := p.(sandbox.Restarter)
+		if !ok {
+			return lifecycle.Unsupported(p, sandbox.FeatureRestart)
+		}
+		return r.Restart(ctx, id)
+	})
 }
 
 func (s *service) upgrade(ctx context.Context, in nameIn) (actionOut, error) {
-	return s.act(ctx, in, "upgraded", sandbox.Provider.Upgrade)
+	return s.act(ctx, in, "upgraded", func(p sandbox.Provider, ctx context.Context, id sandbox.ID) error {
+		u, ok := p.(sandbox.Upgrader)
+		if !ok {
+			return lifecycle.Unsupported(p, sandbox.FeatureUpgrade)
+		}
+		return u.Upgrade(ctx, id)
+	})
 }
 
 func (s *service) act(ctx context.Context, in nameIn, status string, run func(sandbox.Provider, context.Context, sandbox.ID) error) (actionOut, error) {
@@ -335,7 +392,7 @@ func (s *service) publishAPI(ctx context.Context, in publishIn) (actionOut, erro
 	}
 	publisher, ok := p.(sandbox.APIPublisher)
 	if !ok {
-		return actionOut{}, lifecycle.Unsupported(p, "api publish")
+		return actionOut{}, lifecycle.Unsupported(p, sandbox.FeatureAPIPublish)
 	}
 	port := in.APIPort
 	if port == 0 {
@@ -392,7 +449,7 @@ func (s *service) setURLAuth(ctx context.Context, in urlAuthIn) (urlAuthOut, err
 	}
 	setter, ok := p.(sandbox.PublicURL)
 	if !ok {
-		return urlAuthOut{}, lifecycle.Unsupported(p, "url auth")
+		return urlAuthOut{}, lifecycle.Unsupported(p, sandbox.FeatureURLAuth)
 	}
 	if err := setter.SetURLAuth(ctx, id, in.Auth); err != nil {
 		return urlAuthOut{}, err

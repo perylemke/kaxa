@@ -10,18 +10,20 @@ import (
 	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
-func newDestroyForm(infos []sandbox.Info, selected *[]sandbox.ID) *huh.Form {
-	options := make([]huh.Option[sandbox.ID], 0, len(infos))
-	for _, info := range infos {
-		label := fmt.Sprintf("%s  %s", info.ID, info.Status)
-		options = append(options, huh.NewOption(label, info.ID))
+// newDestroyForm offers every sandbox as "name  status  provider". Options are
+// keyed by index because two providers can hold a sandbox with the same name.
+func newDestroyForm(infos []sandbox.Info, selected *[]int) *huh.Form {
+	options := make([]huh.Option[int], 0, len(infos))
+	for i, info := range infos {
+		label := fmt.Sprintf("%s  %s  %s", info.ID, info.Status, info.Provider)
+		options = append(options, huh.NewOption(label, i))
 	}
 
 	// huh sizes an unset multi-select from the option list, then subtracts the
 	// title. That leaves the option viewport at height 0, so the list is blank.
 	return newThemedForm(
 		huh.NewGroup(
-			huh.NewMultiSelect[sandbox.ID]().
+			huh.NewMultiSelect[int]().
 				Title("Sandboxes").
 				Options(options...).
 				Height(len(infos) + 1).
@@ -30,8 +32,8 @@ func newDestroyForm(infos []sandbox.Info, selected *[]sandbox.ID) *huh.Form {
 	)
 }
 
-func collectDestroyForm(in io.Reader, out io.Writer, infos []sandbox.Info) ([]sandbox.ID, error) {
-	var selected []sandbox.ID
+func collectDestroyForm(in io.Reader, out io.Writer, infos []sandbox.Info) ([]sandbox.Info, error) {
+	var selected []int
 	form := newDestroyForm(infos, &selected)
 	if !inputIsTTY(in) {
 		form = form.WithAccessible(true).WithInput(newOneLineReader(in)).WithOutput(out)
@@ -46,5 +48,9 @@ func collectDestroyForm(in io.Reader, out io.Writer, infos []sandbox.Info) ([]sa
 	if len(selected) == 0 {
 		return nil, errDestroyCancelled
 	}
-	return selected, nil
+	chosen := make([]sandbox.Info, 0, len(selected))
+	for _, i := range selected {
+		chosen = append(chosen, infos[i])
+	}
+	return chosen, nil
 }
