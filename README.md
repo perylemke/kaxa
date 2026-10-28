@@ -32,6 +32,22 @@ brew uninstall --cask kaxa
 
 The cask verifies the SHA-256 of the release archive and clears the macOS quarantine flag on the unsigned binary after install. See [install](docs/install.md).
 
+### Install script (Linux, macOS, Windows)
+
+Each release publishes archives for Linux, macOS, and Windows on `amd64` and `arm64`, plus `checksums.txt`. The install script picks the right archive, checks its SHA-256, and puts `kaxa` in a `bin` folder of your user account. No `sudo` or administrator rights.
+
+```bash
+# Linux and macOS: installs to ~/.local/bin
+curl -fsSL https://github.com/perylemke/kaxa/releases/latest/download/install.sh | sh
+```
+
+```powershell
+# Windows (PowerShell): installs to %USERPROFILE%\bin
+irm https://github.com/perylemke/kaxa/releases/latest/download/install.ps1 | iex
+```
+
+Set `VERSION` (for example `0.0.0-rc.1`) to install a specific release and `INSTALL_DIR` to change the folder: `curl -fsSL .../install.sh | VERSION=0.0.0-rc.1 sh`. To read the script first, download it with `curl -fsSLO` and run it yourself. Manual steps, update, and remove are in [install](docs/install.md).
+
 ### From source
 
 ```bash
@@ -137,7 +153,7 @@ Point `command` at the installed binary. `go install` puts it on `$(go env GOPAT
 
 | Manual | What it covers |
 | --- | --- |
-| [install](docs/install.md) | Homebrew, source build, Gatekeeper |
+| [install](docs/install.md) | Homebrew, curl download, source build, Gatekeeper |
 | [Sprites account](docs/sprites-account.md) | Account and API token |
 | [version](docs/version.md) | `kaxa version` |
 | [create](docs/create.md) | `kaxa create` (`new`) |

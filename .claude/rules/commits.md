@@ -1,0 +1,5 @@
+# Commits
+
+- Use Conventional Commits: one line, English, no period at the end.
+- Types: `feat`, `fix`, `test`, `ci`, `docs`, `chore`, `refactor`, `perf`.
+- Examples: `feat: add sprites provider stub`, `ci: run govulncheck on pull requests`.

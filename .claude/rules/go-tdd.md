@@ -1,0 +1,15 @@
+---
+paths:
+  - "**/*.go"
+---
+
+# TDD
+
+- Write a failing test before production code when adding behavior.
+- Prefer table-driven tests with named subtests (`t.Run`).
+- Call `t.Parallel()` in tests that do not share mutable state.
+- Unit tests live next to the package; no build tag.
+- Integration tests use `//go:build integration` under the package they exercise.
+- E2E and acceptance tests live under `test/e2e` and `test/acceptance` with `//go:build e2e` and `//go:build acceptance`.
+- Use `t.Setenv`, `t.TempDir`, and `t.Helper()` instead of global env or fixed paths.
+- Assert errors with `errors.Is` / `errors.As`; avoid brittle string matching on full error text unless necessary.

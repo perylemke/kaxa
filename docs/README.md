@@ -2,7 +2,7 @@
 
 kaxa is a CLI for sandbox providers. Sprites is fully implemented. Modal supports create (including --sync), list, exec, console, and destroy; features that only exist for Sprites are rejected for Modal with a message that names the providers that have them. Create, destroy, and the list URL auth prompt use the Dracula theme.
 
-Install kaxa with Homebrew or from source: [install](install.md).
+Install kaxa with Homebrew, a curl download, or from source: [install](install.md).
 
 Set up an account and token in [Sprites account and token](sprites-account.md) or [Modal account and token](modal-account.md).
 

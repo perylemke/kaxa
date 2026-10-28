@@ -1,0 +1,11 @@
+---
+paths:
+  - "**/*.go"
+---
+
+# Security
+
+- Never log, print, or include tokens in error messages (`sprites.token`, `modal.token_id`, `modal.token_secret`).
+- Do not execute user input via shell (`sh -c`); when exec is implemented, pass argv slices only.
+- Store secrets in environment variables only; avoid long-lived secrets in command-line flags.
+- Validate provider names before use.
