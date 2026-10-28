@@ -40,6 +40,13 @@ type fakeProvider struct {
 	detail    sandbox.Detail
 	infos     []sandbox.Info
 	listErr   error
+
+	// Snapshot bookkeeping; the methods are in snapshot_test.go.
+	restoreMode  sandbox.RestoreMode
+	snaps        []sandbox.Snapshot
+	snapErr      error
+	restores     []sandbox.RestoreRequest
+	deletedSnaps []sandbox.SnapshotID
 }
 
 func (f *fakeProvider) Name() string           { return f.name }

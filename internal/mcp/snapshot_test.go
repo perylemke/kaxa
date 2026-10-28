@@ -1,0 +1,194 @@
+package mcp
+
+import (
+	"context"
+	"errors"
+	"slices"
+	"testing"
+	"time"
+
+	"github.com/perylemke/kaxa/internal/sandbox"
+)
+
+func (f *fakeProvider) RestoreMode() sandbox.RestoreMode {
+	if f.restoreMode != "" {
+		return f.restoreMode
+	}
+	return sandbox.RestoreInPlace
+}
+
+func (f *fakeProvider) Snapshot(_ context.Context, id sandbox.ID, comment string) (sandbox.Snapshot, error) {
+	snap := sandbox.Snapshot{
+		ID: "v1", Sandbox: id, Provider: f.name, Comment: comment,
+		CreatedAt: time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC),
+	}
+	f.snaps = append(f.snaps, snap)
+	return snap, f.snapErr
+}
+
+func (f *fakeProvider) ListSnapshots(context.Context, sandbox.ID) ([]sandbox.Snapshot, error) {
+	return f.snaps, nil
+}
+
+func (f *fakeProvider) Restore(_ context.Context, req sandbox.RestoreRequest) (sandbox.ID, error) {
+	f.restores = append(f.restores, req)
+	if req.Target != "" {
+		return req.Target, nil
+	}
+	return req.Sandbox, nil
+}
+
+func (f *fakeProvider) DeleteSnapshot(_ context.Context, _ sandbox.ID, snap sandbox.SnapshotID) error {
+	f.deletedSnaps = append(f.deletedSnaps, snap)
+	return nil
+}
+
+func TestSnapshotToolsRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	fp := &fakeProvider{name: testSprites}
+	svc := newTestService(t, t.TempDir(), testSprites, fp)
+	ctx := context.Background()
+
+	created, err := svc.createSnapshot(ctx, createSnapshotIn{Name: testBox, Comment: "before"})
+	if err != nil || created.ID != "v1" || created.Comment != "before" || created.Provider != testSprites || created.CreatedAt != "2026-01-02T03:04:05Z" {
+		t.Fatalf("created = %+v err = %v", created, err)
+	}
+	listed, err := svc.listSnapshots(ctx, nameIn{Name: testBox})
+	if err != nil || len(listed.Snapshots) != 1 || listed.Snapshots[0].ID != "v1" {
+		t.Fatalf("listed = %+v err = %v", listed, err)
+	}
+	restoreAndDelete(t, svc, fp)
+}
+
+func restoreAndDelete(t *testing.T, svc *service, fp *fakeProvider) {
+	t.Helper()
+	ctx := context.Background()
+	restored, err := svc.restoreSnapshot(ctx, restoreSnapshotIn{Name: testBox, Snapshot: "v1"})
+	if err != nil || restored.Status != "restored" || restored.Sandbox != testBox {
+		t.Fatalf("restored = %+v err = %v", restored, err)
+	}
+	deleted, err := svc.deleteSnapshot(ctx, deleteSnapshotIn{Name: testBox, Snapshot: "v1"})
+	if err != nil || deleted.Status != "deleted" || !slices.Equal(fp.deletedSnaps, []sandbox.SnapshotID{"v1"}) {
+		t.Fatalf("deleted = %+v err = %v", deleted, err)
+	}
+}
+
+func TestListSnapshotsEmptyIsNotNull(t *testing.T) {
+	t.Parallel()
+
+	svc := newTestService(t, t.TempDir(), testSprites, &fakeProvider{name: testSprites})
+	out, err := svc.listSnapshots(context.Background(), nameIn{Name: testBox})
+	if err != nil || out.Snapshots == nil {
+		t.Fatalf("out = %+v err = %v", out, err)
+	}
+}
+
+func TestRestoreSnapshotTargetByMode(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		mode    sandbox.RestoreMode
+		target  string
+		wantErr bool
+		wantID  string
+	}{
+		{"in place without target", sandbox.RestoreInPlace, "", false, testBox},
+		{"in place rejects target", sandbox.RestoreInPlace, "copy", true, ""},
+		{"new sandbox with target", sandbox.RestoreNewSandbox, "copy", false, "copy"},
+		{"new sandbox needs target", sandbox.RestoreNewSandbox, "", true, ""},
+		{"new sandbox same target", sandbox.RestoreNewSandbox, testBox, true, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			fp := &fakeProvider{name: testSprites, restoreMode: tt.mode}
+			svc := newTestService(t, t.TempDir(), testSprites, fp)
+
+			out, err := svc.restoreSnapshot(context.Background(), restoreSnapshotIn{Name: testBox, Snapshot: "v1", Target: tt.target})
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("err = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr {
+				if len(fp.restores) != 0 {
+					t.Fatal("restore ran despite the invalid request")
+				}
+				return
+			}
+			if out.Sandbox != tt.wantID {
+				t.Fatalf("sandbox = %q, want %q", out.Sandbox, tt.wantID)
+			}
+		})
+	}
+}
+
+func TestSnapshotToolsValidateInput(t *testing.T) {
+	t.Parallel()
+
+	fp := &fakeProvider{name: testSprites}
+	svc := newTestService(t, t.TempDir(), testSprites, fp)
+	ctx := context.Background()
+
+	if _, err := svc.createSnapshot(ctx, createSnapshotIn{}); err == nil {
+		t.Error("create_snapshot accepted an empty name")
+	}
+	if _, err := svc.listSnapshots(ctx, nameIn{}); err == nil {
+		t.Error("list_snapshots accepted an empty name")
+	}
+	if _, err := svc.restoreSnapshot(ctx, restoreSnapshotIn{Name: testBox, Snapshot: "../x"}); err == nil {
+		t.Error("restore_snapshot accepted a path as snapshot id")
+	}
+	if _, err := svc.deleteSnapshot(ctx, deleteSnapshotIn{Name: testBox, Snapshot: "a/b"}); err == nil {
+		t.Error("delete_snapshot accepted a path as snapshot id")
+	}
+	if len(fp.restores)+len(fp.deletedSnaps) != 0 {
+		t.Error("an operation ran despite invalid input")
+	}
+}
+
+func TestSnapshotToolsNeedCapability(t *testing.T) {
+	t.Parallel()
+
+	svc := newTestService(t, t.TempDir(), testPlain,
+		plainProvider{name: testPlain}, &fakeProvider{name: testSprites})
+	ctx := context.Background()
+
+	_, err := svc.createSnapshot(ctx, createSnapshotIn{Name: testBox})
+	wantErr(t, err, "snapshot is not available for plain")
+	if !errors.Is(err, sandbox.ErrUnsupported) {
+		t.Fatalf("err = %v, want ErrUnsupported", err)
+	}
+	if _, err := svc.listSnapshots(ctx, nameIn{Name: testBox}); !errors.Is(err, sandbox.ErrUnsupported) {
+		t.Errorf("list err = %v", err)
+	}
+	if _, err := svc.restoreSnapshot(ctx, restoreSnapshotIn{Name: testBox, Snapshot: "v1"}); !errors.Is(err, sandbox.ErrUnsupported) {
+		t.Errorf("restore err = %v", err)
+	}
+	if _, err := svc.deleteSnapshot(ctx, deleteSnapshotIn{Name: testBox, Snapshot: "v1"}); !errors.Is(err, sandbox.ErrUnsupported) {
+		t.Errorf("delete err = %v", err)
+	}
+}
+
+func TestListProvidersReportsSnapshotRestoreMode(t *testing.T) {
+	t.Parallel()
+
+	svc := newTestService(t, t.TempDir(), testSprites,
+		&fakeProvider{name: testSprites, restoreMode: sandbox.RestoreNewSandbox}, plainProvider{name: testPlain})
+	out, err := svc.listProviders(context.Background(), listProvidersIn{})
+	if err != nil {
+		t.Fatalf("list providers: %v", err)
+	}
+	for _, p := range out.Providers {
+		switch p.Name {
+		case testSprites:
+			if !p.Capabilities.Snapshot || p.Capabilities.SnapshotRestore != string(sandbox.RestoreNewSandbox) {
+				t.Errorf("sprites capabilities = %+v", p.Capabilities)
+			}
+		case testPlain:
+			if p.Capabilities.Snapshot {
+				t.Errorf("plain capabilities = %+v", p.Capabilities)
+			}
+		}
+	}
+}
