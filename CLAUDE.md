@@ -35,6 +35,7 @@ Run `make test` at minimum, and `make lint` after Go changes, before saying work
 - `internal/sandbox` — provider contracts; `internal/registry` — provider registration.
 - `internal/provider/{sprites,modal}` — one package per provider.
 - `internal/{mcp,lifecycle,reposync,project,toolchain,usererr,version}` — MCP server, sandbox lifecycle, repo sync, project detection, toolchain install, user errors, version info.
+- `install.sh`, `install.ps1` — one-line installers, attached to every release by GoReleaser (`release.extra_files`); keep in sync with `docs/install.md`.
 - `docs/` — one manual per command; keep in sync with `README.md`.
 - `test/e2e`, `test/acceptance` — build-tagged tests.
 

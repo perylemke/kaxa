@@ -44,6 +44,10 @@ Use the PR template and confirm you did not include real API tokens in the descr
 
 Run `make help` for all Makefile targets.
 
+## Install scripts
+
+`install.sh` (POSIX `sh`) and `install.ps1` are attached to every release. When you change one, update the other and `docs/install.md`, and test it against a real release with a temporary `HOME`. Both must verify the archive hash and fail closed.
+
 ## AI agent rules
 
 Rules for AI agents live in `.cursor/rules/*.mdc` (Cursor) and `.claude/rules/*.md` plus `CLAUDE.md` (Claude Code). When you change one, update the other so they stay in sync.

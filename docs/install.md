@@ -34,11 +34,53 @@ xattr -d com.apple.quarantine /path/to/kaxa
 
 ## Download with curl
 
-Download the release archive, check it against `checksums.txt`, and put the `kaxa` binary in a `bin` folder of your user account. No `sudo` is needed. Releases cover Linux, macOS, and Windows on `amd64` and `arm64`.
+Each release publishes archives for Linux, macOS, and Windows on `amd64` and `arm64`, plus `checksums.txt`. The install script picks the archive for your system, checks it against `checksums.txt`, and puts the `kaxa` binary in a `bin` folder of your user account. No `sudo` or administrator rights are needed.
 
-The commands install the latest release. Set `VERSION` (without the `v`, for example `0.0.0-rc.1`) to install another one.
+### Install script
 
-### Linux and macOS
+Linux and macOS install to `~/.local/bin`:
+
+```bash
+curl -fsSL https://github.com/perylemke/kaxa/releases/latest/download/install.sh | sh
+```
+
+Windows (PowerShell) installs `kaxa.exe` to `%USERPROFILE%\bin` and adds that folder to your user `PATH`:
+
+```powershell
+irm https://github.com/perylemke/kaxa/releases/latest/download/install.ps1 | iex
+```
+
+Both scripts are attached to every release, so the script you download matches the release it installs. They read two optional variables:
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `VERSION` | latest release | Release to install, without the `v` (for example `0.0.0-rc.1`) |
+| `INSTALL_DIR` | `~/.local/bin` or `%USERPROFILE%\bin` | Folder that receives the binary |
+
+```bash
+curl -fsSL https://github.com/perylemke/kaxa/releases/latest/download/install.sh | VERSION=0.0.0-rc.1 INSTALL_DIR="$HOME/bin" sh
+```
+
+```powershell
+$env:VERSION = "0.0.0-rc.1"
+irm https://github.com/perylemke/kaxa/releases/latest/download/install.ps1 | iex
+```
+
+The script stops without installing anything when the architecture is not supported, the release or its `checksums.txt` cannot be downloaded, or the archive hash does not match. When the folder is not on your `PATH`, the Linux and macOS script prints the `export` line to add to `~/.zshrc` or `~/.bashrc`. Open a new terminal after the Windows script changes your `PATH`.
+
+Running a script straight from the network trusts that download. To read it first, save it and run it yourself:
+
+```bash
+curl -fsSLO https://github.com/perylemke/kaxa/releases/latest/download/install.sh
+less install.sh
+sh install.sh
+```
+
+The checksum comes from the same release as the archive. It catches a corrupted or truncated download, but it does not protect you from a compromised release. kaxa binaries are not signed.
+
+### Manual install: Linux and macOS
+
+These are the steps the script runs, for when you prefer not to run it. Set `VERSION` (without the `v`) to install a release other than the latest.
 
 ```bash
 (
@@ -79,7 +121,7 @@ export PATH="$HOME/.local/bin:$PATH"
 
 On macOS, `curl` does not set the quarantine flag, so Gatekeeper does not block the binary. If you downloaded the archive with a browser instead, remove the flag as described in [Gatekeeper](#gatekeeper).
 
-### Windows (PowerShell)
+### Manual install: Windows (PowerShell)
 
 ```powershell
 $ErrorActionPreference = "Stop"
@@ -113,7 +155,7 @@ The last step adds `%USERPROFILE%\bin` to your user `PATH`. Open a new terminal 
 kaxa version
 ```
 
-To update, run the same commands again; they overwrite the binary. To remove kaxa:
+To update, run the same install command again; it overwrites the binary. To remove kaxa, delete the file from the folder it was installed to (these are the default folders):
 
 ```bash
 rm ~/.local/bin/kaxa
@@ -122,8 +164,6 @@ rm ~/.local/bin/kaxa
 ```powershell
 Remove-Item "$env:USERPROFILE\bin\kaxa.exe"
 ```
-
-The checksum comes from the same release as the archive. It catches a corrupted or truncated download, but it does not protect you from a compromised release. kaxa binaries are not signed.
 
 ## From source
 

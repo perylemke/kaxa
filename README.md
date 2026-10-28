@@ -32,42 +32,21 @@ brew uninstall --cask kaxa
 
 The cask verifies the SHA-256 of the release archive and clears the macOS quarantine flag on the unsigned binary after install. See [install](docs/install.md).
 
-### Download with curl (Linux, macOS, Windows)
+### Install script (Linux, macOS, Windows)
 
-Each release publishes archives for Linux, macOS, and Windows on `amd64` and `arm64`, plus `checksums.txt`. This installs the latest Linux or macOS binary into `~/.local/bin`, after checking its SHA-256:
+Each release publishes archives for Linux, macOS, and Windows on `amd64` and `arm64`, plus `checksums.txt`. The install script picks the right archive, checks its SHA-256, and puts `kaxa` in a `bin` folder of your user account. No `sudo` or administrator rights.
 
 ```bash
-(
-set -eu
-VERSION="${VERSION:-}"
-if [ -z "$VERSION" ]; then
-  url=$(curl -fsSLI -o /dev/null -w "%{url_effective}" https://github.com/perylemke/kaxa/releases/latest)
-  VERSION="${url##*/v}"
-fi
-OS=$(uname -s | tr "[:upper:]" "[:lower:]")
-case "$(uname -m)" in
-  x86_64|amd64) ARCH=amd64 ;;
-  arm64|aarch64) ARCH=arm64 ;;
-  *) echo "unsupported architecture" >&2; exit 1 ;;
-esac
-FILE="kaxa_${VERSION}_${OS}_${ARCH}.tar.gz"
-BASE="https://github.com/perylemke/kaxa/releases/download/v${VERSION}"
-TMP=$(mktemp -d)
-trap 'rm -rf "$TMP"' EXIT
-curl -fsSL -o "$TMP/$FILE" "$BASE/$FILE"
-curl -fsSL -o "$TMP/checksums.txt" "$BASE/checksums.txt"
-cd "$TMP"
-if command -v sha256sum >/dev/null 2>&1; then SUM="sha256sum -c -"; else SUM="shasum -a 256 -c -"; fi
-grep "  ${FILE}\$" checksums.txt | $SUM
-mkdir -p "$HOME/.local/bin"
-tar -xzf "$FILE" -C "$HOME/.local/bin" kaxa
-chmod +x "$HOME/.local/bin/kaxa"
-)
-export PATH="$HOME/.local/bin:$PATH"   # add to ~/.zshrc or ~/.bashrc
-kaxa version
+# Linux and macOS: installs to ~/.local/bin
+curl -fsSL https://github.com/perylemke/kaxa/releases/latest/download/install.sh | sh
 ```
 
-On Windows, use the PowerShell commands that install `kaxa.exe` into `%USERPROFILE%\bin`. Set `VERSION` (for example `0.0.0-rc.1`) to pick a release. Update, remove, and the Windows steps are in [install](docs/install.md).
+```powershell
+# Windows (PowerShell): installs to %USERPROFILE%\bin
+irm https://github.com/perylemke/kaxa/releases/latest/download/install.ps1 | iex
+```
+
+Set `VERSION` (for example `0.0.0-rc.1`) to install a specific release and `INSTALL_DIR` to change the folder: `curl -fsSL .../install.sh | VERSION=0.0.0-rc.1 sh`. To read the script first, download it with `curl -fsSLO` and run it yourself. Manual steps, update, and remove are in [install](docs/install.md).
 
 ### From source
 
