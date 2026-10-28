@@ -38,7 +38,10 @@ func TestNameAndAvailability(t *testing.T) {
 func TestCapabilities(t *testing.T) {
 	t.Parallel()
 
-	want := sandbox.Capabilities{Sync: true, Setup: true, Layout: true}
+	want := sandbox.Capabilities{
+		Sync: true, Setup: true, Layout: true,
+		Snapshot: true, SnapshotRestore: string(sandbox.RestoreNewSandbox),
+	}
 	if got := sandbox.CapabilitiesOf(modal.New()); got != want {
 		t.Fatalf("capabilities = %+v, want %+v", got, want)
 	}

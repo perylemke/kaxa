@@ -16,11 +16,13 @@ import (
 //
 // Modal has no in-place restart or platform upgrade, so Provider does not
 // implement sandbox.Restarter or sandbox.Upgrader. A sandbox name is also its ID.
+// It implements sandbox.Snapshotter with filesystem images, restored into a new sandbox.
 type Provider struct {
 	mu          sync.Mutex
 	tokenID     string
 	tokenSecret string
 	client      sdkClient
+	index       *snapshotIndex
 }
 
 // New returns a Modal provider. Call ConfigureCredentials before use.

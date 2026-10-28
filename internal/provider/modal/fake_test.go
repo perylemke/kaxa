@@ -3,7 +3,9 @@ package modal_test
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"sync"
 
@@ -16,6 +18,12 @@ type fakeClient struct {
 	creates   int
 	withTools bool
 	failWith  error
+
+	// Snapshot bookkeeping.
+	nextImage     int
+	images        map[string][]string
+	fromImage     []imageCall
+	deletedImages []string
 
 	// Exec bookkeeping: what the provider asked for and what the process does.
 	execName string
@@ -85,6 +93,51 @@ func (f *fakeClient) Terminate(_ context.Context, name string) error {
 }
 
 func (f *fakeClient) Close() {}
+
+// SnapshotFilesystem records an image per call: im-1, im-2, ...
+func (f *fakeClient) SnapshotFilesystem(_ context.Context, name string) (string, error) {
+	if f.failWith != nil {
+		return "", f.failWith
+	}
+	if _, ok := f.boxes[name]; !ok {
+		return "", modal.ErrNotFound
+	}
+	f.nextImage++
+	id := fmt.Sprintf("im-%d", f.nextImage)
+	if f.images == nil {
+		f.images = map[string][]string{}
+	}
+	f.images[id] = slices.Clone(f.boxes[name].Labels)
+	return id, nil
+}
+
+func (f *fakeClient) CreateFromImage(_ context.Context, name string, labels []string, imageID string) (modal.Record, error) {
+	if _, ok := f.images[imageID]; !ok {
+		return modal.Record{}, modal.ErrImageNotFound
+	}
+	if _, ok := f.boxes[name]; ok {
+		return modal.Record{}, modal.ErrAlreadyExists
+	}
+	f.fromImage = append(f.fromImage, imageCall{name: name, labels: labels, image: imageID})
+	rec := &modal.Record{ID: "sb-" + name, Name: name, Labels: labels}
+	f.boxes[name] = rec
+	return *rec, nil
+}
+
+func (f *fakeClient) DeleteImage(_ context.Context, imageID string) error {
+	if _, ok := f.images[imageID]; !ok {
+		return modal.ErrImageNotFound
+	}
+	delete(f.images, imageID)
+	f.deletedImages = append(f.deletedImages, imageID)
+	return nil
+}
+
+type imageCall struct {
+	name   string
+	labels []string
+	image  string
+}
 
 func (f *fakeClient) Exec(_ context.Context, name string, argv []string, params modal.ExecParams) (modal.Process, error) {
 	f.execName, f.execArgv, f.execPTY, f.execDir = name, argv, params.PTY, params.Workdir
