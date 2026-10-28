@@ -1,5 +1,12 @@
 # kaxa
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/kaxa_logo_dark.png">
+    <img src="docs/kaxa_logo.png" alt="kaxa" width="240">
+  </picture>
+</p>
+
 [![CI](https://github.com/perylemke/kaxa/actions/workflows/ci.yml/badge.svg)](https://github.com/perylemke/kaxa/actions/workflows/ci.yml)
 [![Lint](https://github.com/perylemke/kaxa/actions/workflows/lint.yml/badge.svg)](https://github.com/perylemke/kaxa/actions/workflows/lint.yml)
 [![Sec](https://github.com/perylemke/kaxa/actions/workflows/sec.yml/badge.svg)](https://github.com/perylemke/kaxa/actions/workflows/sec.yml)
