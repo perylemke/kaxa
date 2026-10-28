@@ -1,0 +1,13 @@
+---
+paths:
+  - "**/*.go"
+---
+
+# Single responsibility
+
+- `cmd/kaxa/main.go` only builds the provider registry and calls `cli.Execute`; no business logic.
+- Cobra commands live in `internal/cli`; they must not import provider HTTP or SDK packages.
+- Configuration loading and validation live in `internal/config`.
+- Provider contracts live in `internal/sandbox`; registration in `internal/registry`.
+- Each provider implementation is one package under `internal/provider/<name>`.
+- One type, one reason to change: split files when a type mixes CLI wiring, config, and provider I/O.

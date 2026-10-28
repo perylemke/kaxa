@@ -1,0 +1,16 @@
+# OWASP Top 10:2025
+
+Apply these defenses when designing or changing kaxa (CLI, config, providers, file/exec paths).
+
+- **A01 Broken Access Control** — Enforce authorization where the operation runs; reject path traversal in file paths; do not fetch URLs the user did not intend (SSRF).
+- **A02 Security Misconfiguration** — Secure defaults; no `tls.Config{InsecureSkipVerify: true}` without documented exception.
+- **A03 Software Supply Chain Failures** — Avoid unnecessary dependencies; keep `go.sum` consistent; run `make vuln` and address reachable CVEs.
+- **A04 Cryptographic Failures** — Use `crypto/rand` for secrets and tokens; `crypto/subtle.ConstantTimeCompare` for secret comparison; verify TLS certificates in production paths.
+- **A05 Injection** — Never pass user input through a shell (`sh -c`); use `exec.Command` with discrete argv only; parameterized queries if SQL is added.
+- **A06 Insecure Design** — Validate at trust boundaries (flags, config keys, provider names, API responses) before use.
+- **A07 Authentication Failures** — Store tokens in environment variables only; never in flags, logs, errors, or PR/issue text.
+- **A08 Software or Data Integrity Failures** — Do not execute downloaded artifacts without integrity checks when implementing install/update flows.
+- **A09 Security Logging and Alerting Failures** — Log security-relevant failures without tokens, secret query strings, or auth headers.
+- **A10 Mishandling of Exceptional Conditions** — Check errors and fail closed (crypto, I/O, auth); do not ignore errors that leave the system in an unsafe state.
+
+For verified false positives, suppress gosec with rule ID and justification: `//gosec:disable Gxxx -- reason`. See also `go-security.md` for kaxa-specific token and exec rules.
