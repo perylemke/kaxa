@@ -41,3 +41,24 @@ changelog:
       - "^ci"
       - "^chore"
       - "^style"
+
+homebrew_casks:
+  - name: kaxa
+    binary: kaxa
+    homepage: https://github.com/perylemke/kaxa
+    description: Unified CLI for sandbox providers
+    license: Apache-2.0
+    directory: Casks
+    skip_upload: false
+    commit_msg_template: "chore: update kaxa cask to {{ .Tag }}"
+    repository:
+      owner: perylemke
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/kaxa"]
+          end
