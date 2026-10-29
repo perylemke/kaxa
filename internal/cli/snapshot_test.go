@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -93,6 +94,7 @@ func runSnapshot(t *testing.T, p sandbox.Provider, in string, args ...string) (s
 
 func TestSnapshotCreateAndList(t *testing.T) {
 	p := newSnapProvider(testSpritesName, sandbox.RestoreInPlace)
+	p.list = []sandbox.Info{{ID: snapBox}}
 
 	out, err := runSnapshot(t, p, "", snapCmdName, testCmdCreate, snapBox, "--comment", "before")
 	if err != nil {
@@ -111,7 +113,7 @@ func TestSnapshotCreateAndList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
-	for _, want := range []string{"ID", "CREATED", "COMMENT", "v1", "2026-01-02T03:04:05Z", "before"} {
+	for _, want := range []string{"PROVIDER", "SANDBOX", "ID", "CREATED", "COMMENT", "sprites", "box", "v1", "2026-01-02T03:04:05Z", "before"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("list output missing %q:\n%s", want, out)
 		}
@@ -123,7 +125,7 @@ func TestSnapshotListEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
-	if !strings.Contains(out, "no snapshots for box on sprites") {
+	if !strings.Contains(out, "no snapshots for box") {
 		t.Fatalf("output = %q", out)
 	}
 }
@@ -225,7 +227,7 @@ func TestSnapshotArgumentErrors(t *testing.T) {
 	}{
 		{"create without name", []string{snapCmdName, testCmdCreate}},
 		{"create with extra", []string{snapCmdName, testCmdCreate, "a", "b"}},
-		{"list without name", []string{snapCmdName, "list"}},
+		{"list with extra", []string{snapCmdName, testCmdList, "a", "b"}},
 		{"restore without id", []string{snapCmdName, snapRestore, snapBox}},
 		{"delete without id", []string{snapCmdName, snapDelete, snapBox}},
 		{"delete bad id", []string{snapCmdName, snapDelete, snapBox, "../x", "-f"}},
@@ -288,5 +290,116 @@ func TestSnapshotUnsupportedHintNamesAlternatives(t *testing.T) {
 	ue, ok := usererr.As(err)
 	if !ok || ue.Message != "snapshot is not available for plain" || !strings.Contains(ue.Hint, testSpritesName) {
 		t.Fatalf("err = %#v", err)
+	}
+}
+
+// snapModal is a snapshot provider that Modal's credentials configure.
+type snapModal struct{ *snapProvider }
+
+func (snapModal) ConfigureCredentials(id, secret string) error {
+	if id == "" || secret == "" {
+		return usererr.Wrap(sandbox.ErrNotConfigured, "missing", "")
+	}
+	return nil
+}
+
+// runSnapshotAll runs kaxa with a Sprites and a Modal provider, both configured.
+func runSnapshotAll(t *testing.T, sp, md *snapProvider, args ...string) (stdout, stderr string, err error) {
+	t.Helper()
+	reg := registry.New()
+	for _, p := range []sandbox.Provider{sp, snapModal{md}} {
+		if regErr := reg.Register(p); regErr != nil {
+			t.Fatalf("register: %v", regErr)
+		}
+	}
+	t.Setenv("KAXA_SPRITES_TOKEN", listToken)
+	t.Setenv("KAXA_MODAL_TOKEN_ID", "ak-id")
+	t.Setenv("KAXA_MODAL_TOKEN_SECRET", "as-secret")
+	t.Setenv("KAXA_DEFAULT_PROVIDER", "")
+
+	cmd := cli.NewRootCmd(reg)
+	out, errOut := new(bytes.Buffer), new(bytes.Buffer)
+	cmd.SetOut(out)
+	cmd.SetErr(errOut)
+	cmd.SetArgs(append([]string{snapCmdName, "list"}, args...))
+	err = cmd.Execute()
+	return out.String(), errOut.String(), err
+}
+
+func newSnapshotPair() (sp, md *snapProvider) {
+	at := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	sp = newSnapProvider(testSpritesName, sandbox.RestoreInPlace)
+	sp.list = []sandbox.Info{{ID: "web"}}
+	sp.snaps = []sandbox.Snapshot{{ID: "v2", Comment: "first", CreatedAt: at}}
+	md = newSnapProvider(testModalName, sandbox.RestoreNewSandbox)
+	md.list = []sandbox.Info{{ID: "api"}}
+	md.snaps = []sandbox.Snapshot{{ID: "im-1", Comment: "second", CreatedAt: at.Add(time.Hour)}}
+	return sp, md
+}
+
+func TestSnapshotListAllProviders(t *testing.T) {
+	sp, md := newSnapshotPair()
+	out, errOut, err := runSnapshotAll(t, sp, md)
+	if err != nil || errOut != "" {
+		t.Fatalf("err = %v, stderr = %q", err, errOut)
+	}
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	if len(lines) != 3 {
+		t.Fatalf("output has %d lines, want a header and two rows:\n%s", len(lines), out)
+	}
+	for i, want := range [][]string{
+		{"PROVIDER", "SANDBOX", "ID", "CREATED", "COMMENT"},
+		{testModalName, "api", "im-1", "2026-01-02T04:04:05Z", "second"}, // registry order: modal, sprites
+		{testSpritesName, "web", "v2", "2026-01-02T03:04:05Z", "first"},
+	} {
+		if got := strings.Fields(lines[i]); !slices.Equal(got, want) {
+			t.Errorf("line %d = %v, want %v", i, got, want)
+		}
+	}
+}
+
+func TestSnapshotListNamedSandboxSearchesEveryProvider(t *testing.T) {
+	sp, md := newSnapshotPair()
+	out, _, err := runSnapshotAll(t, sp, md, "api")
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if !strings.Contains(out, "im-1") || strings.Contains(out, "v2") {
+		t.Fatalf("output = %q, want only the snapshots of api", out)
+	}
+}
+
+func TestSnapshotListProviderFlagNarrows(t *testing.T) {
+	sp, md := newSnapshotPair()
+	out, _, err := runSnapshotAll(t, sp, md, testProviderFlag, testModalName)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if !strings.Contains(out, "im-1") || strings.Contains(out, "v2") {
+		t.Fatalf("output = %q, want only modal", out)
+	}
+}
+
+func TestSnapshotListWarnsWhenAProviderFails(t *testing.T) {
+	sp, md := newSnapshotPair()
+	sp.opErr = errors.New("boom")
+	out, errOut, err := runSnapshotAll(t, sp, md)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if !strings.Contains(out, "im-1") {
+		t.Fatalf("output = %q, want the provider that works", out)
+	}
+	if !strings.Contains(errOut, "warning: could not list snapshots on sprites") || !strings.Contains(errOut, "boom") {
+		t.Fatalf("stderr = %q", errOut)
+	}
+}
+
+func TestSnapshotListEverythingEmpty(t *testing.T) {
+	sp, md := newSnapshotPair()
+	sp.snaps, md.snaps = nil, nil
+	out, _, err := runSnapshotAll(t, sp, md)
+	if err != nil || strings.TrimSpace(out) != "no snapshots" {
+		t.Fatalf("output = %q, err = %v", out, err)
 	}
 }

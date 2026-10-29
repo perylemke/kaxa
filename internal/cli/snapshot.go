@@ -68,23 +68,37 @@ func newSnapshotCreateCmd(reg *registry.Registry) *cobra.Command {
 
 func newSnapshotListCmd(reg *registry.Registry) *cobra.Command {
 	return &cobra.Command{
-		Use:     "list <name>",
+		Use:     "list [name]",
 		Aliases: []string{"ls"},
-		Short:   "List the snapshots of a sandbox",
-		Example: `  kaxa snapshot list my-sandbox`,
-		Args:    snapshotArgs("snapshot list", "kaxa snapshot list <name>", "a sandbox name", 1),
+		Short:   "List snapshots of all providers, or of one sandbox",
+		Long: `List snapshots with the provider and the sandbox each was taken from.
+
+Without a name, it lists every snapshot of every configured provider. With a
+name, it lists the snapshots of that sandbox in every provider that has it.
+--provider limits the search to one provider.`,
+		Example: `  kaxa snapshot list
+  kaxa snapshot list my-sandbox
+  kaxa snapshot list --provider modal`,
+		Args: atMostOneName("snapshot list"),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			p, s, err := snapshotterFromCmd(cmd, reg)
+			var id sandbox.ID
+			if len(args) == 1 {
+				id = sandbox.ID(args[0])
+			}
+			providers, names, err := snapshotTargets(cmd, reg)
 			if err != nil {
 				return err
 			}
-			id := sandbox.ID(args[0])
-			snaps, err := s.ListSnapshots(cmd.Context(), id)
+			snaps, err := collectSnapshots(cmd.Context(), cmd.ErrOrStderr(), providers, names, id)
 			if err != nil {
 				return err
 			}
 			if len(snaps) == 0 {
-				_, err = fmt.Fprintf(cmd.OutOrStdout(), "no snapshots for %s\n", sandboxLabel(p.Name(), id))
+				msg := "no snapshots"
+				if id != "" {
+					msg += " for " + string(id)
+				}
+				_, err = fmt.Fprintln(cmd.OutOrStdout(), msg)
 				return err
 			}
 			return writeSnapshots(cmd.OutOrStdout(), snaps)
@@ -92,9 +106,37 @@ func newSnapshotListCmd(reg *registry.Registry) *cobra.Command {
 	}
 }
 
+// snapshotTargets is the provider named by --provider, which must support
+// snapshots, or every configured provider.
+func snapshotTargets(cmd *cobra.Command, reg *registry.Registry) (map[string]sandbox.Provider, []string, error) {
+	if cmd.Flags().Changed("provider") {
+		p, _, err := snapshotterFromCmd(cmd, reg)
+		if err != nil {
+			return nil, nil, err
+		}
+		return map[string]sandbox.Provider{p.Name(): p}, []string{p.Name()}, nil
+	}
+	return listTargets(cmd, reg)
+}
+
+// collectSnapshots lists the snapshots of every named provider. A provider that
+// fails is reported on errOut and skipped while another succeeds.
+func collectSnapshots(ctx context.Context, errOut io.Writer, providers map[string]sandbox.Provider, names []string, id sandbox.ID) ([]sandbox.Snapshot, error) {
+	snaps, failures, err := lifecycle.CollectSnapshots(ctx, providers, names, id)
+	if err != nil {
+		return nil, err
+	}
+	for _, failure := range failures {
+		if _, werr := fmt.Fprintf(errOut, "warning: could not list snapshots on %v\n", failure); werr != nil {
+			return nil, werr
+		}
+	}
+	return snaps, nil
+}
+
 func writeSnapshots(w io.Writer, snaps []sandbox.Snapshot) error {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	if _, err := fmt.Fprintln(tw, "ID\tCREATED\tCOMMENT"); err != nil {
+	if _, err := fmt.Fprintln(tw, "PROVIDER\tSANDBOX\tID\tCREATED\tCOMMENT"); err != nil {
 		return err
 	}
 	for _, s := range snaps {
@@ -102,7 +144,7 @@ func writeSnapshots(w io.Writer, snaps []sandbox.Snapshot) error {
 		if !s.CreatedAt.IsZero() {
 			created = s.CreatedAt.UTC().Format(time.RFC3339)
 		}
-		if _, err := fmt.Fprintf(tw, "%s\t%s\t%s\n", s.ID, created, s.Comment); err != nil {
+		if _, err := fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", s.Provider, s.Sandbox, s.ID, created, s.Comment); err != nil {
 			return err
 		}
 	}
