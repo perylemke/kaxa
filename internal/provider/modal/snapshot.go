@@ -78,6 +78,25 @@ func (p *Provider) ListSnapshots(_ context.Context, id sandbox.ID) ([]sandbox.Sn
 	return out, nil
 }
 
+// ListAllSnapshots returns every snapshot kaxa took on this machine, newest
+// first, including those of sandboxes that have been destroyed. Like
+// ListSnapshots it reads the local index and needs no credentials.
+func (p *Provider) ListAllSnapshots(_ context.Context) ([]sandbox.Snapshot, error) {
+	idx, err := p.snapshotIndex()
+	if err != nil {
+		return nil, err
+	}
+	entries, err := idx.all()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]sandbox.Snapshot, 0, len(entries))
+	for _, e := range entries {
+		out = append(out, p.toSnapshot(e))
+	}
+	return out, nil
+}
+
 // Restore creates req.Target from a snapshot. The source sandbox is kept.
 // The new sandbox has the labels of the source, so a synced sandbox keeps
 // its workspace and user.

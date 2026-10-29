@@ -132,6 +132,58 @@ func TestRestoreErrors(t *testing.T) {
 	}
 }
 
+func TestListAllSnapshotsIncludesDestroyedSandboxes(t *testing.T) {
+	t.Parallel()
+
+	p := newSnapshotProvider(t, newFakeClient())
+	addBox(t, p, srcName)
+	addBox(t, p, "other")
+	ctx := context.Background()
+	for _, name := range []sandbox.ID{srcName, "other", srcName} {
+		if _, err := p.Snapshot(ctx, name, string(name)); err != nil {
+			t.Fatalf("snapshot: %v", err)
+		}
+	}
+	if err := p.Destroy(ctx, srcName); err != nil {
+		t.Fatalf("destroy: %v", err)
+	}
+
+	all, err := p.ListAllSnapshots(ctx)
+	if err != nil {
+		t.Fatalf("list all: %v", err)
+	}
+	if len(all) != 3 {
+		t.Fatalf("list all = %+v, want the three snapshots", all)
+	}
+	for _, s := range all {
+		if s.Provider != testProviderName || s.Sandbox == "" || s.ID == "" || s.CreatedAt.IsZero() {
+			t.Fatalf("snapshot = %+v, want provider, sandbox, id and time", s)
+		}
+	}
+}
+
+var _ sandbox.SnapshotCatalog = (*modal.Provider)(nil)
+
+func TestListAllSnapshotsEmpty(t *testing.T) {
+	t.Parallel()
+
+	all, err := newSnapshotProvider(t, newFakeClient()).ListAllSnapshots(context.Background())
+	if err != nil || len(all) != 0 {
+		t.Fatalf("list all = %+v, err = %v", all, err)
+	}
+}
+
+func TestListAllSnapshotsNeedsNoCredentials(t *testing.T) {
+	t.Parallel()
+
+	// The index is local, so listing it works before any API call.
+	p := modal.New()
+	p.SetSnapshotIndexPath(filepath.Join(t.TempDir(), "snapshots.json"))
+	if _, err := p.ListAllSnapshots(context.Background()); err != nil {
+		t.Fatalf("list all: %v", err)
+	}
+}
+
 // The hint must be a command that works: snapshot list needs the sandbox name.
 func TestUnknownSnapshotHintNamesTheSandbox(t *testing.T) {
 	t.Parallel()

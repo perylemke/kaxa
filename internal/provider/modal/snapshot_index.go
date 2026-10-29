@@ -132,8 +132,17 @@ func (x *snapshotIndex) add(e snapshotEntry) error {
 	return x.save(append(entries, e))
 }
 
+// all returns every entry, newest first.
+func (x *snapshotIndex) all() ([]snapshotEntry, error) {
+	return x.matching(func(snapshotEntry) bool { return true })
+}
+
 // forSandbox returns the entries of one sandbox, newest first.
 func (x *snapshotIndex) forSandbox(sandbox string) ([]snapshotEntry, error) {
+	return x.matching(func(e snapshotEntry) bool { return e.Sandbox == sandbox })
+}
+
+func (x *snapshotIndex) matching(keep func(snapshotEntry) bool) ([]snapshotEntry, error) {
 	x.mu.Lock()
 	defer x.mu.Unlock()
 	entries, err := x.load()
@@ -142,7 +151,7 @@ func (x *snapshotIndex) forSandbox(sandbox string) ([]snapshotEntry, error) {
 	}
 	var out []snapshotEntry
 	for _, e := range entries {
-		if e.Sandbox == sandbox {
+		if keep(e) {
 			out = append(out, e)
 		}
 	}
