@@ -216,7 +216,7 @@ On a sandbox created with `sync`, the command starts in the provider workspace d
 
 ### Snapshots
 
-`create_snapshot` takes `name`, an optional `comment`, and an optional `provider`. It returns the snapshot `id`, `sandbox`, `provider`, `comment`, and `created_at`. `list_snapshots` takes `name` and returns `snapshots`, newest first. `delete_snapshot` takes `name` and `snapshot`, and is permanent.
+`create_snapshot` takes `name`, an optional `comment`, and an optional `provider`. It returns the snapshot `id`, `sandbox`, `provider`, `comment`, and `created_at`. `list_snapshots` takes an optional `name` and an optional `provider`, and returns `snapshots` with the `provider` and `sandbox` of each. Without them it lists every snapshot of every configured provider, and a provider that fails is reported in `warnings`. `delete_snapshot` takes `name` and `snapshot`, and is permanent.
 
 `restore_snapshot` takes `name`, `snapshot`, and `target`. Read `snapshot_restore` in `list_providers` first:
 

@@ -110,6 +110,7 @@ kaxa restart my-sprite
 kaxa upgrade my-sprite
 
 kaxa snapshot create my-sprite --comment "before the migration"
+kaxa snapshot list                                       # every snapshot, with provider and sandbox
 kaxa snapshot list my-sprite
 kaxa snapshot restore my-sprite v7                       # Sprites: restores in place
 kaxa snapshot restore my-box im-abc123 --to my-box-copy --provider modal   # Modal: new sandbox
@@ -156,7 +157,7 @@ With no sandboxes, `list` prints `no sandboxes created` and exits. In a terminal
 
 ### snapshot
 
-`snapshot create|list|restore|delete` saves the filesystem of a sandbox and brings it back. Sprites restores the same sandbox in place (after a `[y/N]` question). Modal creates a new sandbox named by `--to` and keeps the source; its snapshots are images that Modal keeps for 30 days, listed from an index on this machine. `destroy` does not delete snapshots. A snapshot holds everything in the sandbox, including secrets written there. A provider without snapshots prints that they are not available and names the providers that have them. See [snapshot](docs/snapshot.md).
+`snapshot create|list|restore|delete` saves the filesystem of a sandbox and brings it back. Sprites restores the same sandbox in place (after a `[y/N]` question). Modal creates a new sandbox named by `--to` and keeps the source; its snapshots are images that Modal keeps for 30 days, listed from an index on this machine. `snapshot list` without a name shows every snapshot of every provider with its sandbox, ID, and creation time; `--provider` or a name narrows it. `destroy` does not delete snapshots. A snapshot holds everything in the sandbox, including secrets written there. A provider without snapshots prints that they are not available and names the providers that have them. See [snapshot](docs/snapshot.md).
 
 ### AI agents
 

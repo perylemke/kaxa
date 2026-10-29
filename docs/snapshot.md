@@ -4,12 +4,12 @@ Save the state of a sandbox and bring it back later.
 
 ```bash
 kaxa snapshot create <name> [--comment text]
-kaxa snapshot list <name>
+kaxa snapshot list [name]
 kaxa snapshot restore <name> <snapshot-id> [--to <new-name>] [--force]
 kaxa snapshot delete <name> <snapshot-id> [--force]
 ```
 
-`list` has the alias `ls` and `delete` has the alias `rm`. Every message names the provider, for example `snapshot v7 of sandbox demo on sprites was created`. Add `--provider` or set `KAXA_DEFAULT_PROVIDER` to pick the provider.
+`list` has the alias `ls` and `delete` has the alias `rm`. Every message names the provider, for example `snapshot v7 of sandbox demo on sprites was created`. Add `--provider` or set `KAXA_DEFAULT_PROVIDER` to pick the provider. `list` is the exception: without `--provider` it searches every configured provider.
 
 A provider without snapshots answers `snapshot is not available for <provider>` and names the providers that have it, as `restart` and `upgrade` do. The check runs before any request leaves your machine.
 
@@ -18,9 +18,17 @@ A provider without snapshots answers `snapshot is not available for <provider>` 
 | Subcommand | What it does |
 | --- | --- |
 | `create <name>` | Saves the filesystem of the sandbox. `--comment` stores a note of at most 256 bytes without control characters |
-| `list <name>` | Prints `ID`, `CREATED` (UTC, RFC 3339), and `COMMENT`, newest first. With none it prints `no snapshots for <name> on <provider>` |
+| `list [name]` | Prints `PROVIDER`, `SANDBOX`, `ID`, `CREATED` (UTC, RFC 3339), and `COMMENT`. Without a name it lists every snapshot of every configured provider; with a name, the snapshots of that sandbox in each provider that has it. `--provider` limits the search to one provider. Rows are grouped by provider, then sandbox, newest first. With none it prints `no snapshots` or `no snapshots for <name>` |
 | `restore <name> <snapshot-id>` | Brings a snapshot back. What that means depends on the provider, see below |
 | `delete <name> <snapshot-id>` | Deletes a snapshot. Asks `[y/N]` unless `--force` or `-f` is set |
+
+```text
+PROVIDER  SANDBOX    ID      CREATED               COMMENT
+modal     my-box     im-abc  2026-01-02T04:04:05Z  nightly
+sprites   my-sprite  v7      2026-01-02T03:04:05Z  before the migration
+```
+
+A provider that fails to answer is reported as `warning: could not list snapshots on <provider>: ...` on stderr, and the others are still listed. The command fails only when every provider fails. A provider without snapshots is skipped. Sprites checkpoints belong to a sprite, so listing without a name asks once per sprite.
 
 A snapshot ID is one segment of letters, digits, dots, underscores, and hyphens. Anything else, such as `../x`, is rejected before a request is made.
 
