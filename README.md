@@ -199,8 +199,12 @@ make build
 go test -race -shuffle=on ./...
 # or: make test
 
-# Integration tests
-go test -race -count=1 -tags=integration ./internal/config/...
+# Integration tests (in-memory fakes, no network, no cost)
+go test -race -count=1 -tags=integration ./internal/config/... ./internal/provider/...
+# or: make test-integration
+
+# Live tests against the real Sprites and Modal APIs (needs KAXA_* credentials; BILLS compute)
+make test-live
 
 # End-to-end tests (builds binary)
 go test -race -count=1 -tags=e2e ./test/e2e/...
