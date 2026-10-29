@@ -23,7 +23,8 @@ const instructions = `Run work in an isolated sandbox instead of on the host.
 2. create_sandbox with sync=true copies the local Git repository and installs its dependencies. The response work_dir is where the code lives inside the sandbox.
 3. Run builds, tests and edits with exec (argv, no shell). exec starts above the repository, so run project commands from work_dir, for example ["bash", "-c", "cd <work_dir> && go test ./..."]. Files you change with local editor tools are not in the sandbox, and files changed in the sandbox are not copied back.
 4. To add another Git repository to a sandbox that was created with sync, call sync_repository. It never replaces a directory.
-5. Call destroy only when the user asks for it.`
+5. To save a sandbox state, call create_snapshot; list_snapshots shows the ids, the sandbox and the provider of each snapshot. restore_snapshot either overwrites the sandbox (snapshot_restore in_place) or creates a new one named by target (new_sandbox).
+6. Call destroy, delete_snapshot, or restore_snapshot on an in_place provider only when the user asks for it.`
 
 // Options configures the server.
 type Options struct {
@@ -57,7 +58,7 @@ func Serve(ctx context.Context, reg *registry.Registry, cfg config.Config, stder
 
 func (s *service) register(srv *sdk.Server) {
 	addTool(s, srv, "list_providers", "List providers",
-		"List the registered sandbox providers, whether each is available, and which optional features it supports (sync, setup, api, public_url, workspace_layout).",
+		"List the registered sandbox providers, whether each is available, and which optional features it supports (sync, setup, api, public_url, workspace_layout, snapshot). A provider with snapshot also reports snapshot_restore: in_place or new_sandbox.",
 		readOnly, s.listProviders)
 	addTool(s, srv, "create_sandbox", "Create a sandbox",
 		"Create a sandbox. With sync it copies a local Git repository into the sandbox and installs its dependencies; a failed copy, install or API publish deletes the sandbox. Can take minutes.",
@@ -83,6 +84,18 @@ func (s *service) register(srv *sdk.Server) {
 	addTool(s, srv, "destroy", "Destroy a sandbox",
 		"Permanently delete a sandbox and its data. There is no undo. Call it only when the user asks.",
 		destructive, s.destroy)
+	addTool(s, srv, "create_snapshot", "Snapshot a sandbox",
+		"Save the filesystem of a sandbox so it can be restored later. Only providers that list snapshot in their capabilities support it. The snapshot holds everything in the sandbox, including secrets written there.",
+		additive, s.createSnapshot)
+	addTool(s, srv, "list_snapshots", "List snapshots",
+		"List snapshots with the provider and sandbox each was taken from. Without name, every snapshot of every configured provider is listed; name limits it to one sandbox and provider limits it to one provider. Providers that fail are reported in warnings. Use the snapshot ids with restore_snapshot and delete_snapshot.",
+		readOnly, s.listSnapshots)
+	addTool(s, srv, "restore_snapshot", "Restore a snapshot",
+		"Restore a snapshot. The provider's snapshot_restore capability decides what happens: in_place overwrites the sandbox and discards its changes since the snapshot, so call it only when the user asks; new_sandbox creates the sandbox named by target and keeps the source.",
+		destructive, s.restoreSnapshot)
+	addTool(s, srv, "delete_snapshot", "Delete a snapshot",
+		"Permanently delete a snapshot of a sandbox. There is no undo. Call it only when the user asks.",
+		destructive, s.deleteSnapshot)
 	addTool(s, srv, "publish_api", "Publish an HTTP service",
 		"Start one HTTP service in an existing sandbox and route the sandbox URL to it. Only providers that list api in their capabilities support it.",
 		additive, s.publishAPI)

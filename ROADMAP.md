@@ -15,4 +15,4 @@ Tracked work for **kaxa**. Each item links to a GitHub issue.
 - [ ] [#17 — Implement the E2B provider](https://github.com/perylemke/kaxa/issues/17)
 - [ ] [#18 — Add the ui command to manage sandboxes in the browser](https://github.com/perylemke/kaxa/issues/18)
 - [ ] [#19 — Distribute the CLI as a Homebrew cask](https://github.com/perylemke/kaxa/issues/19)
-- [ ] [#22 — Add sandbox snapshots (create, list, restore, delete)](https://github.com/perylemke/kaxa/issues/22)
+- [X] [#22 — Add sandbox snapshots (create, list, restore, delete)](https://github.com/perylemke/kaxa/issues/22)

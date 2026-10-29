@@ -68,6 +68,24 @@ type sdkClient interface {
 	Close()
 }
 
+// snapshotClient is the snapshot part of the Modal API. It is separate from
+// sdkClient so a client without snapshots still serves every other command.
+type snapshotClient interface {
+	// SnapshotFilesystem saves the filesystem of the named sandbox as an image
+	// that Modal keeps for its default 30 days, and returns the image ID.
+	SnapshotFilesystem(ctx context.Context, name string) (string, error)
+	// CreateFromImage starts a sandbox from a snapshot image, like Create.
+	CreateFromImage(ctx context.Context, name string, labels []string, imageID string) (Record, error)
+	// DeleteImage deletes a snapshot image. It returns ErrImageNotFound when the image is gone.
+	DeleteImage(ctx context.Context, imageID string) error
+}
+
+// fullClient is a client that also serves snapshots.
+type fullClient interface {
+	sdkClient
+	snapshotClient
+}
+
 type realSDKClient struct {
 	c *sdk.Client
 }
@@ -83,11 +101,15 @@ func newSDKClient(tokenID, tokenSecret string) (*realSDKClient, error) {
 func (r *realSDKClient) Close() { r.c.Close() }
 
 func (r *realSDKClient) Create(ctx context.Context, name string, labels []string, withTools bool) (Record, error) {
+	return r.create(ctx, name, labels, r.image(withTools))
+}
+
+func (r *realSDKClient) create(ctx context.Context, name string, labels []string, image *sdk.Image) (Record, error) {
 	app, err := r.c.Apps.FromName(ctx, appName, &sdk.AppFromNameParams{CreateIfMissing: true})
 	if err != nil {
 		return Record{}, err
 	}
-	sb, err := r.c.Sandboxes.Create(ctx, app, r.image(withTools), &sdk.SandboxCreateParams{
+	sb, err := r.c.Sandboxes.Create(ctx, app, image, &sdk.SandboxCreateParams{
 		Name:        name,
 		Tags:        tagsFor(name, labels),
 		Command:     []string{"sleep", "infinity"},

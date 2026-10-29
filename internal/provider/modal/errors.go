@@ -16,6 +16,8 @@ var (
 	ErrAlreadyExists = errors.New("modal: sandbox already exists")
 	// ErrNotFound is returned by a client when a sandbox does not exist.
 	ErrNotFound = errors.New("modal: sandbox not found")
+	// ErrImageNotFound is returned by a client when a snapshot image is gone or expired.
+	ErrImageNotFound = errors.New("modal: snapshot image not found")
 )
 
 func missingCredentialsErr() error {

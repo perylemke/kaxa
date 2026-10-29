@@ -15,7 +15,9 @@ Cursor users: the same rules live in `.cursor/rules/*.mdc`; Claude Code reads `.
 ```bash
 make build # build ./bin/kaxa
 make test # unit tests (-race -shuffle=on)
-make test-integration # integration tests (-tags=integration)
+make test-integration # integration tests with fakes (-tags=integration), free
+make coverage # coverage of unit and integration tests (coverage.out); coverage-html adds coverage.html
+make test-live # real provider APIs (-tags=live); needs credentials and bills compute, never part of make ci
 make test-e2e # end-to-end tests (-tags=e2e)
 make test-acceptance # acceptance tests (-tags=acceptance)
 make fmt # golangci-lint fmt (gofmt + gofumpt)

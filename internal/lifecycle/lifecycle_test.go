@@ -283,7 +283,7 @@ func TestCheckRejectsMissingCapabilities(t *testing.T) {
 		want string
 	}{
 		{name: "sync", req: lifecycle.Request{Name: boxName, Sync: true}, want: "sync"},
-		{name: "api", req: lifecycle.Request{Name: boxName, API: true}, want: "api publish"},
+		{name: testAPI, req: lifecycle.Request{Name: boxName, API: true}, want: "api publish"},
 		{name: "public", req: lifecycle.Request{Name: boxName, Public: true}, want: "public urls"},
 		{name: "running", req: lifecycle.Request{Name: boxName, Running: true}, want: "running"},
 	}

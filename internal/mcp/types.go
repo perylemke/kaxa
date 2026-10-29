@@ -121,3 +121,48 @@ type urlAuthOut struct {
 	Auth     string `json:"auth"`
 	URL      string `json:"url,omitempty"`
 }
+
+type createSnapshotIn struct {
+	Provider string `json:"provider,omitempty" jsonschema:"Provider name from list_providers. Defaults to KAXA_DEFAULT_PROVIDER."`
+	Name     string `json:"name" jsonschema:"Sandbox name."`
+	Comment  string `json:"comment,omitempty" jsonschema:"Short note stored with the snapshot. At most 256 bytes, no control characters. Do not put secrets in it."`
+}
+
+type snapshotInfo struct {
+	ID        string `json:"id"`
+	Sandbox   string `json:"sandbox"`
+	Provider  string `json:"provider"`
+	Comment   string `json:"comment,omitempty"`
+	CreatedAt string `json:"created_at,omitempty"`
+}
+
+type listSnapshotsIn struct {
+	Provider string `json:"provider,omitempty" jsonschema:"Provider name from list_providers. Without it, every configured provider is searched."`
+	Name     string `json:"name,omitempty" jsonschema:"Name of a sandbox. Without it, the snapshots of every sandbox are listed."`
+}
+
+type listSnapshotsOut struct {
+	Snapshots []snapshotInfo `json:"snapshots"`
+	Warnings  []string       `json:"warnings,omitempty"`
+}
+
+type restoreSnapshotIn struct {
+	Provider string `json:"provider,omitempty" jsonschema:"Provider name from list_providers. Defaults to KAXA_DEFAULT_PROVIDER."`
+	Name     string `json:"name" jsonschema:"Name of the sandbox the snapshot was taken from."`
+	Snapshot string `json:"snapshot" jsonschema:"Snapshot id from list_snapshots."`
+	Target   string `json:"target,omitempty" jsonschema:"Name of the new sandbox. Required when the provider's snapshot_restore capability is new_sandbox, and rejected when it is in_place."`
+}
+
+type snapshotActionOut struct {
+	// Sandbox holds the restored state: the source for in_place, the target for new_sandbox.
+	Sandbox  string `json:"sandbox"`
+	Snapshot string `json:"snapshot"`
+	Provider string `json:"provider"`
+	Status   string `json:"status"`
+}
+
+type deleteSnapshotIn struct {
+	Provider string `json:"provider,omitempty" jsonschema:"Provider name from list_providers. Defaults to KAXA_DEFAULT_PROVIDER."`
+	Name     string `json:"name" jsonschema:"Name of the sandbox the snapshot was taken from."`
+	Snapshot string `json:"snapshot" jsonschema:"Snapshot id from list_snapshots."`
+}

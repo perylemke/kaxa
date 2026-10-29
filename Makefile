@@ -42,8 +42,21 @@ test: ## Unit tests (default go test ./...)
 	$(GO) test -race -shuffle=on ./...
 
 .PHONY: test-integration
-test-integration: ## Integration tests
-	$(GO) test -race -count=1 -tags=integration ./internal/config/... ./internal/provider/modal/...
+test-integration: ## Integration tests (in-memory fakes, no network, no cost)
+	$(GO) test -race -count=1 -tags=integration ./internal/config/... ./internal/provider/...
+
+.PHONY: coverage
+coverage: ## Coverage of unit and integration tests; writes coverage.out and prints the total
+	$(GO) test -race -shuffle=on -count=1 -tags=integration -coverprofile=coverage.out ./...
+	$(GO) tool cover -func=coverage.out | tail -n 1
+
+.PHONY: coverage-html
+coverage-html: coverage ## Same as coverage, plus coverage.html with the uncovered lines marked
+	$(GO) tool cover -html=coverage.out -o coverage.html
+
+.PHONY: test-live
+test-live: ## Tests against the real provider APIs; needs KAXA_* credentials and BILLS compute
+	$(GO) test -race -count=1 -timeout 30m -tags=live -v ./internal/provider/...
 
 .PHONY: test-e2e
 test-e2e: ## End-to-end tests (builds binary)
@@ -89,4 +102,4 @@ ci: tidy vet test test-integration test-e2e test-acceptance lint vuln gosec gore
 
 .PHONY: clean
 clean: ## Remove build artifacts
-	rm -rf bin/ dist/ $(GOSEC_SARIF)
+	rm -rf bin/ dist/ $(GOSEC_SARIF) coverage.out coverage.html

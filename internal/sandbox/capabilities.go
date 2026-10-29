@@ -21,6 +21,7 @@ const (
 	FeaturePublicURLs        Feature = "public urls"
 	FeatureURLAuth           Feature = "url auth"
 	FeatureRunning           Feature = "running"
+	FeatureSnapshot          Feature = "snapshot"
 )
 
 // UnsupportedError reports that a provider does not offer a feature.
@@ -69,6 +70,9 @@ type Capabilities struct {
 	Restart   bool `json:"restart"`
 	Upgrade   bool `json:"upgrade"`
 	Running   bool `json:"running"`
+	Snapshot  bool `json:"snapshot"`
+	// SnapshotRestore is the RestoreMode of a provider that has Snapshot.
+	SnapshotRestore string `json:"snapshot_restore,omitempty"`
 }
 
 // Has reports whether the capabilities cover feature.
@@ -80,6 +84,8 @@ func (c Capabilities) Has(feature Feature) bool {
 		return c.Upgrade
 	case FeatureRunning:
 		return c.Running
+	case FeatureSnapshot:
+		return c.Snapshot
 	case FeatureSync:
 		return c.Sync
 	case FeatureDependencyInstall:
@@ -103,8 +109,13 @@ func CapabilitiesOf(p Provider) Capabilities {
 	_, restart := p.(Restarter)
 	_, upgrade := p.(Upgrader)
 	_, running := p.(RunningSupport)
-	return Capabilities{
+	caps := Capabilities{
 		Sync: sync, Setup: setup, API: api, PublicURL: public, Layout: layout,
 		Restart: restart, Upgrade: upgrade, Running: running,
 	}
+	if s, ok := p.(Snapshotter); ok {
+		caps.Snapshot = true
+		caps.SnapshotRestore = string(s.RestoreMode())
+	}
+	return caps
 }

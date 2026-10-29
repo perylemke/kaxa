@@ -62,19 +62,20 @@ func TestServerListsEveryTool(t *testing.T) {
 	}
 	slices.Sort(names)
 	want := []string{
-		"create_sandbox", "destroy", "exec", "inspect", "list_providers",
-		"list_sandboxes", "publish_api", "restart", "set_url_auth", "sync_repository", "upgrade",
+		"create_sandbox", "create_snapshot", "delete_snapshot", "destroy", "exec", "inspect", "list_providers",
+		"list_sandboxes", "list_snapshots", "publish_api", "restart", "restore_snapshot", "set_url_auth",
+		"sync_repository", "upgrade",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("tools = %v, want %v", names, want)
 	}
 	for _, tool := range res.Tools {
 		switch tool.Name {
-		case "destroy":
+		case "destroy", "restore_snapshot", "delete_snapshot":
 			if tool.Annotations.DestructiveHint == nil || !*tool.Annotations.DestructiveHint {
-				t.Errorf("destroy must be marked destructive")
+				t.Errorf("%s must be marked destructive", tool.Name)
 			}
-		case "list_providers", "list_sandboxes", "inspect":
+		case "list_providers", "list_sandboxes", "inspect", "list_snapshots":
 			if !tool.Annotations.ReadOnlyHint {
 				t.Errorf("%s must be read only", tool.Name)
 			}

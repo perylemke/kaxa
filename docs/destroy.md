@@ -57,3 +57,7 @@ kaxa destroy -f --all                  # everything, no confirmation
 ```
 
 Empty `--all` prints `no sandboxes to destroy`.
+
+## Snapshots
+
+`destroy` does not delete snapshots. A Modal snapshot is an image that outlives its sandbox, so you can restore it into a new sandbox after the source is gone; it stays until you run `kaxa snapshot delete` or Modal expires it after 30 days. A sprite takes its persisted state with it. See [snapshot](snapshot.md).
