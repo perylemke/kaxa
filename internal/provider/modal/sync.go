@@ -1,7 +1,6 @@
 package modal
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -136,8 +135,9 @@ func isSynced(rec Record) bool {
 // turns an ExitError into the exit code of the process with no message, which
 // is right for kaxa exec but would hide why a copy or install failed.
 func (p *Provider) runAsModal(ctx context.Context, id sandbox.ID, dir string, env, argv []string, stdin io.Reader) (string, error) {
-	var stdout, stderr bytes.Buffer
-	opts := sandbox.ExecOptions{Command: asModal(env, argv), Stdin: stdin, Stdout: &stdout, Stderr: &stderr}
+	stdout := sandbox.NewCappedBuffer(sandbox.MaxCapturedOutput)
+	stderr := sandbox.NewCappedBuffer(sandbox.MaxCapturedOutput)
+	opts := sandbox.ExecOptions{Command: asModal(env, argv), Stdin: stdin, Stdout: stdout, Stderr: stderr}
 	err := p.run(ctx, id, dir, opts)
 	if err == nil {
 		return stdout.String(), nil

@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/perylemke/kaxa/internal/sandbox"
 )
@@ -35,6 +36,22 @@ func (e *statusError) Error() string {
 	return fmt.Sprintf("API returned status %d: %s", e.Code, e.Body)
 }
 
+const (
+	// apiTimeout bounds one call to the Sprites HTTP API.
+	apiTimeout = 30 * time.Second
+	// maxErrorBody caps how much of an error response is read and shown.
+	maxErrorBody = 4 << 10
+)
+
+// apiHTTPClient is the client for the Sprites HTTP routes the SDK does not cover.
+var apiHTTPClient = &http.Client{Timeout: apiTimeout}
+
+// errorBody reads at most maxErrorBody bytes of a response, for an error message.
+func errorBody(resp *http.Response) string {
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrorBody))
+	return strings.TrimSpace(strings.ToValidUTF8(string(body), "\uFFFD"))
+}
+
 func postSpriteAction(ctx context.Context, baseURL, token, path string) error {
 	return spriteRequest(ctx, http.MethodPost, baseURL, token, path)
 }
@@ -47,7 +64,7 @@ func spriteRequest(ctx context.Context, method, baseURL, token, path string) (er
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := apiHTTPClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -58,8 +75,7 @@ func spriteRequest(ctx context.Context, method, baseURL, token, path string) (er
 	}()
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= 300 {
-		body, _ := io.ReadAll(resp.Body)
-		return &statusError{Code: resp.StatusCode, Body: strings.TrimSpace(string(body))}
+		return &statusError{Code: resp.StatusCode, Body: errorBody(resp)}
 	}
 	return nil
 }

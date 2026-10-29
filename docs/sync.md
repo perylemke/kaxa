@@ -23,4 +23,6 @@ The repository lands in `/home/sprite/workspace/<repo>` on Sprites and `/home/mo
 - A failed copy or install keeps the sandbox, because it holds other work. `create --sync` deletes a sandbox it just made; `sync` does not. After a failed install the files are already in the sandbox. Fix the cause and run the install there with `kaxa exec`, or remove the directory and sync again.
 - `sync` copies the repository once. It does not update a copy that is already there.
 - A `.git` file, used by linked worktrees, is rejected, and submodule directories are omitted, as in `create --sync`.
+- `sync` refuses an untracked file that looks like a credential: `.env` (but not `.env.example`), `*.pem`, `*.key`, `*.p12`, `id_rsa*` and the other SSH private keys, `.netrc`, `.npmrc`, `.pypirc`, and `credentials*.json`. The error names the file. Add it to `.gitignore` or remove it. A tracked file is copied, because it is already in the history.
+- The copied `.git/config` has no credentials: user and password in `http(s)` URLs, `http.extraHeader`, and `credential` sections are removed, and `.git/credentials` is not copied. Remotes and branches stay, so `git fetch` works over SSH or after you sign in again in the sandbox.
 - An AI agent does the same with the `sync_repository` tool. See [kaxa mcp](agent.md#sync_repository).

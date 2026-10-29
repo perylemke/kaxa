@@ -266,3 +266,19 @@ func writeAPIFixture(t *testing.T, files map[string]string) string {
 	}
 	return root
 }
+
+func TestIsAPIIgnoresSpecialManifest(t *testing.T) {
+	t.Parallel()
+
+	if _, err := os.Stat("/dev/zero"); err != nil {
+		t.Skip("no /dev/zero")
+	}
+	root := t.TempDir()
+	if err := os.Symlink("/dev/zero", filepath.Join(root, "package.json")); err != nil {
+		t.Fatalf("symlink: %v", err)
+	}
+	got, err := project.IsAPI(root)
+	if err != nil || got {
+		t.Fatalf("IsAPI = %v, %v", got, err)
+	}
+}

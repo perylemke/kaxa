@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/perylemke/kaxa/internal/project"
+	"github.com/perylemke/kaxa/internal/usererr"
 )
 
 // ErrNotImplemented indicates a provider method is not yet implemented.
@@ -20,6 +21,18 @@ var ErrNotConfigured = errors.New("provider not configured")
 
 // SyncLabel marks a sandbox whose workspace was copied from a local Git repository.
 const SyncLabel = "sync"
+
+// TerminalLabel marks a sandbox whose URL serves the tmux terminal, which has no login.
+const TerminalLabel = "terminal"
+
+// PublicTerminalError reports that a public URL would hand the unauthenticated
+// terminal of the sandbox to anyone who has the address.
+func PublicTerminalError() error {
+	return usererr.New(
+		"a public URL would expose the unauthenticated tmux terminal",
+		"keep the URL behind the provider account, or publish an API so the service owns the URL",
+	)
+}
 
 // ID identifies a sandbox instance.
 type ID string

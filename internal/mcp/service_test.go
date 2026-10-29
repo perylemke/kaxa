@@ -25,6 +25,9 @@ type fakeProvider struct {
 	name        string
 	unavailable bool
 
+	execDeadline    time.Time
+	execHasDeadline bool
+
 	created   []sandbox.Spec
 	destroyed []sandbox.ID
 	synced    bool
@@ -48,6 +51,12 @@ type fakeProvider struct {
 	restores     []sandbox.RestoreRequest
 	deletedSnaps []sandbox.SnapshotID
 }
+
+const (
+	modeProd       = "MODE=prod"
+	envDatabaseURL = "DATABASE_URL"
+	envHostVar     = "GITHUB_TOKEN"
+)
 
 func (f *fakeProvider) Name() string           { return f.name }
 func (f *fakeProvider) Available() bool        { return !f.unavailable }
@@ -80,7 +89,8 @@ func (f *fakeProvider) Inspect(_ context.Context, id sandbox.ID) (sandbox.Detail
 func (f *fakeProvider) Restart(context.Context, sandbox.ID) error { return nil }
 func (f *fakeProvider) Upgrade(context.Context, sandbox.ID) error { return nil }
 
-func (f *fakeProvider) Exec(_ context.Context, _ sandbox.ID, opts sandbox.ExecOptions) error {
+func (f *fakeProvider) Exec(ctx context.Context, _ sandbox.ID, opts sandbox.ExecOptions) error {
+	f.execDeadline, f.execHasDeadline = ctx.Deadline()
 	if f.execFn != nil {
 		return f.execFn(opts)
 	}
@@ -422,6 +432,40 @@ func TestCheckRepoScope(t *testing.T) {
 	}
 }
 
+func TestCheckRepoScopeRefusesBroadScope(t *testing.T) {
+	t.Parallel()
+
+	home := t.TempDir()
+	project := filepath.Join(home, "project")
+	if err := os.Mkdir(project, 0o700); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	root := filepath.VolumeName(home) + string(filepath.Separator)
+
+	tests := []struct {
+		name  string
+		repo  string
+		scope string
+		ok    bool
+	}{
+		{name: "scope is home", repo: project, scope: home},
+		{name: "scope is filesystem root", repo: project, scope: root},
+		{name: "scope is a project below home", repo: project, scope: project, ok: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := checkRepoScopeIn(tt.repo, tt.scope, home)
+			if tt.ok && err != nil {
+				t.Fatalf("err = %v", err)
+			}
+			if !tt.ok {
+				wantErr(t, err, "too broad")
+			}
+		})
+	}
+}
+
 func TestExecReturnsExitCodeWithoutFailing(t *testing.T) {
 	t.Parallel()
 
@@ -662,8 +706,8 @@ func TestPublishAPIPassesEnv(t *testing.T) {
 	svc := newTestService(t, t.TempDir(), testSprites, fp)
 	ctx := context.Background()
 
-	_, err := svc.publishAPI(ctx, publishIn{Name: testBox, APICmd: []string{"x"}, APIEnv: []string{"MODE=prod"}})
-	if err != nil || !slices.Equal(fp.pubEnv, []string{"MODE=prod"}) {
+	_, err := svc.publishAPI(ctx, publishIn{Name: testBox, APICmd: []string{"x"}, APIEnv: []string{modeProd}})
+	if err != nil || !slices.Equal(fp.pubEnv, []string{modeProd}) {
 		t.Fatalf("err=%v env=%v", err, fp.pubEnv)
 	}
 	_, err = svc.publishAPI(ctx, publishIn{Name: testBox, APICmd: []string{"x"}, APIEnv: []string{"PATH=/tmp"}})
@@ -748,5 +792,120 @@ func TestLimitedBuffer(t *testing.T) {
 	_, _ = broken.Write([]byte("é"))
 	if !strings.HasPrefix(broken.String(), "\uFFFD") {
 		t.Fatalf("broken = %q", broken.String())
+	}
+}
+
+func newEnvService(t *testing.T, allow []string, host map[string]string, fp *fakeProvider) *service {
+	t.Helper()
+	reg := registry.New()
+	if err := reg.Register(fp); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	svc, err := newService(reg, config.Config{Provider: testSprites}, Options{
+		Root:        t.TempDir(),
+		Stderr:      io.Discard,
+		APIEnvAllow: allow,
+		LookupEnv:   func(k string) (string, bool) { v, ok := host[k]; return v, ok },
+	})
+	if err != nil {
+		t.Fatalf("service: %v", err)
+	}
+	return svc
+}
+
+func TestPublishAPICopiesOnlyAllowedHostEnv(t *testing.T) {
+	t.Parallel()
+
+	host := map[string]string{envHostVar: "ghp-secret", envDatabaseURL: "postgres://db"}
+	tests := []struct {
+		name   string
+		allow  []string
+		env    []string
+		want   []string
+		errHas string
+	}{
+		{name: "no allowlist", env: []string{envHostVar}, errHas: EnvAPIEnvAllow},
+		{name: "outside allowlist", allow: []string{envDatabaseURL}, env: []string{envHostVar}, errHas: EnvAPIEnvAllow},
+		{name: "inside allowlist", allow: []string{envDatabaseURL}, env: []string{envDatabaseURL}, want: []string{"DATABASE_URL=postgres://db"}},
+		{name: "literal needs no allowlist", env: []string{modeProd}, want: []string{modeProd}},
+		{name: "allowed but unset", allow: []string{"MISSING"}, env: []string{"MISSING"}, errHas: "not set"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			fp := &fakeProvider{name: testSprites}
+			svc := newEnvService(t, tt.allow, host, fp)
+			_, err := svc.publishAPI(context.Background(), publishIn{Name: testBox, APICmd: []string{"x"}, APIEnv: tt.env})
+			if tt.errHas != "" {
+				wantErr(t, err, tt.errHas)
+				if err != nil && strings.Contains(err.Error(), "ghp-secret") {
+					t.Fatalf("error leaks a value: %v", err)
+				}
+				if fp.pubEnv != nil {
+					t.Fatalf("published with env %v", fp.pubEnv)
+				}
+				return
+			}
+			if err != nil || !slices.Equal(fp.pubEnv, tt.want) {
+				t.Fatalf("err=%v env=%v want %v", err, fp.pubEnv, tt.want)
+			}
+		})
+	}
+}
+
+func TestCreateAPIEnvHonorsAllowlist(t *testing.T) {
+	t.Parallel()
+
+	fp := &fakeProvider{name: testSprites}
+	svc := newEnvService(t, nil, map[string]string{envHostVar: "ghp-secret"}, fp)
+	_, err := svc.create(context.Background(), createIn{Name: testBox, API: true, APICmd: []string{"x"}, APIEnv: []string{envHostVar}})
+	wantErr(t, err, EnvAPIEnvAllow)
+	if len(fp.created) != 0 {
+		t.Fatalf("created %v", fp.created)
+	}
+}
+
+func TestParseAPIEnvAllow(t *testing.T) {
+	t.Parallel()
+
+	got := ParseAPIEnvAllow(" A, B ,,C")
+	if !slices.Equal(got, []string{"A", "B", "C"}) {
+		t.Fatalf("got %v", got)
+	}
+	if len(ParseAPIEnvAllow("")) != 0 {
+		t.Fatal("empty value must allow nothing")
+	}
+}
+
+func TestExecTimeout(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		seconds int
+		want    time.Duration
+	}{
+		{name: "default", want: defaultExecTimeout},
+		{name: "negative", seconds: -5, want: defaultExecTimeout},
+		{name: "custom", seconds: 90, want: 90 * time.Second},
+		{name: "capped", seconds: 1 << 30, want: maxExecTimeout},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			fp := &fakeProvider{name: testSprites}
+			svc := newTestService(t, t.TempDir(), testSprites, fp)
+			start := time.Now()
+			if _, err := svc.exec(context.Background(), execIn{Name: testBox, Command: []string{"true"}, Timeout: tt.seconds}); err != nil {
+				t.Fatalf("exec: %v", err)
+			}
+			if !fp.execHasDeadline {
+				t.Fatal("exec has no deadline")
+			}
+			got := fp.execDeadline.Sub(start)
+			if got > tt.want+time.Minute || got < tt.want-time.Minute {
+				t.Fatalf("deadline in %v, want about %v", got, tt.want)
+			}
+		})
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/subtle"
 	"errors"
+	"slices"
 	"sync"
 
 	spritesdk "github.com/superfly/sprites-go"
@@ -61,7 +62,7 @@ func (p *Provider) Create(ctx context.Context, spec sandbox.Spec) (sandbox.ID, e
 	if err != nil {
 		return "", err
 	}
-	sp, err := c.CreateSprite(ctx, spec.Name, spec.Labels)
+	sp, err := c.CreateSprite(ctx, spec.Name, createLabels(spec))
 	if err != nil {
 		return "", redactErr(err, token)
 	}
@@ -75,6 +76,15 @@ func (p *Provider) Create(ctx context.Context, spec sandbox.Spec) (sandbox.ID, e
 		}
 	}
 	return sandbox.ID(name), nil
+}
+
+// createLabels adds the terminal label when the sandbox URL will serve the tmux
+// terminal. That terminal has no login, so SetURLAuth refuses to make it public.
+func createLabels(spec sandbox.Spec) []string {
+	if !spec.Running || spec.ExposeAPI {
+		return spec.Labels
+	}
+	return append(slices.Clone(spec.Labels), sandbox.TerminalLabel)
 }
 
 // List returns all sprites in the organization.

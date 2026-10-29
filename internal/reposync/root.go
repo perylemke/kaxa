@@ -18,6 +18,8 @@ var (
 	ErrInvalidName = errors.New("invalid repository name")
 	// ErrPathEscape means a path leaves the repository root.
 	ErrPathEscape = errors.New("path escapes repository")
+	// ErrSecretFile means an untracked file looks like a credential and would be copied.
+	ErrSecretFile = errors.New("untracked file looks like a secret")
 )
 
 // FindRoot walks up from start and returns the repository root and its directory name.

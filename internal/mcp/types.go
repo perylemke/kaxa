@@ -52,6 +52,7 @@ type execIn struct {
 	Provider string   `json:"provider,omitempty" jsonschema:"Provider name from list_providers. Defaults to KAXA_DEFAULT_PROVIDER."`
 	Name     string   `json:"name" jsonschema:"Sandbox name."`
 	Command  []string `json:"command" jsonschema:"Argv to run. The first item is the binary. It is never passed through a shell; use bash and -c explicitly if you need one."`
+	Timeout  int      `json:"timeout_seconds,omitempty" jsonschema:"Seconds before the command is stopped. Defaults to 1800 and cannot exceed 7200."`
 }
 
 type execOut struct {

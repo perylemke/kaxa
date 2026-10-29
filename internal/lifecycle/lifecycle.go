@@ -84,6 +84,9 @@ func Check(p sandbox.Provider, req Request) error {
 		if _, ok := p.(sandbox.PublicURL); !ok {
 			return Unsupported(p, sandbox.FeaturePublicURLs)
 		}
+		if req.Running && !req.API {
+			return sandbox.PublicTerminalError()
+		}
 	}
 	return nil
 }

@@ -5,10 +5,26 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 )
 
-// maxOutputBytes caps each captured stream of an exec call.
-const maxOutputBytes = 256 << 10
+const (
+	// maxOutputBytes caps each captured stream of an exec call.
+	maxOutputBytes = 256 << 10
+	// defaultExecTimeout stops an exec call that never returns, so one prompt
+	// cannot hold the server and a sandbox forever.
+	defaultExecTimeout = 30 * time.Minute
+	// maxExecTimeout is the longest an agent may ask for.
+	maxExecTimeout = 2 * time.Hour
+)
+
+// execTimeout turns the timeout_seconds argument into a duration.
+func execTimeout(seconds int) time.Duration {
+	if seconds <= 0 {
+		return defaultExecTimeout
+	}
+	return min(time.Duration(seconds)*time.Second, maxExecTimeout)
+}
 
 // limitedBuffer keeps the first limit bytes written and drops the rest.
 // Write always reports success so the remote command is not interrupted.

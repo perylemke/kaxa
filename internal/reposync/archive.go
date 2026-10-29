@@ -13,13 +13,17 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
 // Archive streams a gzip-compressed tar of the repository at root.
 // The caller must close the reader. name is the top-level directory inside the archive.
-// Tracked files are included even when gitignored. Untracked files honor exclude rules.
-// The .git directory is included. Symlinks are stored as symlinks. Submodule directories are omitted.
+// Tracked files are included even when gitignored. Untracked files honor exclude rules,
+// and an untracked file that looks like a secret (.env, private keys, .netrc) fails the
+// call with ErrSecretFile. The .git directory is included with its config stripped of
+// URL credentials, http.extraHeader and credential sections. Symlinks are stored as
+// symlinks. Submodule directories are omitted.
 func Archive(ctx context.Context, root, name string) (io.ReadCloser, error) {
 	if err := validateRepoName(name); err != nil {
 		return nil, err
@@ -35,18 +39,23 @@ func Archive(ctx context.Context, root, name string) (io.ReadCloser, error) {
 		return nil, ErrGitDirFile
 	}
 
+	files, err := workTreeFiles(ctx, root)
+	if err != nil {
+		return nil, err
+	}
+
 	pr, pw := io.Pipe()
 	go func() {
-		err := writeArchive(ctx, pw, root, name)
+		err := writeArchive(ctx, pw, root, name, files)
 		_ = pw.CloseWithError(err)
 	}()
 	return pr, nil
 }
 
-func writeArchive(ctx context.Context, w io.Writer, root, name string) error {
+func writeArchive(ctx context.Context, w io.Writer, root, name string, files []string) error {
 	gz := gzip.NewWriter(w)
 	tw := tar.NewWriter(gz)
-	if err := addWorkTree(ctx, tw, root, name); err != nil {
+	if err := addWorkTree(ctx, tw, root, name, files); err != nil {
 		return err
 	}
 	if err := addGitDir(tw, root, name); err != nil {
@@ -61,11 +70,7 @@ func writeArchive(ctx context.Context, w io.Writer, root, name string) error {
 	return nil
 }
 
-func addWorkTree(ctx context.Context, tw *tar.Writer, root, name string) error {
-	files, err := workTreeFiles(ctx, root)
-	if err != nil {
-		return err
-	}
+func addWorkTree(ctx context.Context, tw *tar.Writer, root, name string, files []string) error {
 	for _, rel := range files {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -78,10 +83,18 @@ func addWorkTree(ctx context.Context, tw *tar.Writer, root, name string) error {
 }
 
 func workTreeFiles(ctx context.Context, root string) ([]string, error) {
-	listed, err := listWorkTree(ctx, root)
+	tracked, err := listWorkTree(ctx, root, "--cached")
 	if err != nil {
 		return nil, err
 	}
+	untracked, err := listWorkTree(ctx, root, "--others", "--exclude-standard")
+	if err != nil {
+		return nil, err
+	}
+	if err := refuseSecrets(untracked); err != nil {
+		return nil, err
+	}
+	listed := slices.Concat(tracked, untracked)
 	skip := map[string]struct{}{}
 	cleaned := make([]string, 0, len(listed))
 	for _, rel := range listed {
@@ -123,9 +136,21 @@ func underSkippedDir(rel string, skip map[string]struct{}) bool {
 	return false
 }
 
-func listWorkTree(ctx context.Context, root string) ([]string, error) {
+// refuseSecrets fails on the first untracked file that looks like a credential.
+// A tracked file is already in the history, so it is not judged here.
+func refuseSecrets(untracked []string) error {
+	for _, rel := range untracked {
+		if IsSecretFile(filepath.ToSlash(rel)) {
+			return fmt.Errorf("%w: %s (add it to .gitignore or remove it, then try again)", ErrSecretFile, rel)
+		}
+	}
+	return nil
+}
+
+func listWorkTree(ctx context.Context, root string, selectors ...string) ([]string, error) {
+	args := append([]string{"-C", root, "ls-files", "-z"}, selectors...)
 	//gosec:disable G204 -- repository path is a git argv element, not a shell command
-	cmd := exec.CommandContext(ctx, "git", "-C", root, "ls-files", "-z", "--cached", "--others", "--exclude-standard")
+	cmd := exec.CommandContext(ctx, "git", args...)
 	out, err := cmd.Output()
 	if err != nil {
 		if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
@@ -163,8 +188,47 @@ func addGitDir(tw *tar.Writer, root, name string) error {
 		if err != nil {
 			return err
 		}
+		switch filepath.ToSlash(rel) {
+		case ".git/credentials":
+			return nil
+		case ".git/config", ".git/config.worktree":
+			return addSanitizedConfig(tw, root, name, rel)
+		}
 		return addFSEntry(tw, root, name, rel)
 	})
+}
+
+// addSanitizedConfig stores a Git config without its credentials.
+func addSanitizedConfig(tw *tar.Writer, root, name, rel string) error {
+	abs := filepath.Join(root, rel)
+	info, err := os.Lstat(abs)
+	if err != nil {
+		return fmt.Errorf("stat %s: %w", rel, err)
+	}
+	if !info.Mode().IsRegular() {
+		return addFSEntry(tw, root, name, rel)
+	}
+	if err := ensureInside(root, abs, info); err != nil {
+		return err
+	}
+	//gosec:disable G304 -- path is the config file inside the repository root
+	data, err := os.ReadFile(abs)
+	if err != nil {
+		return fmt.Errorf("read %s: %w", rel, err)
+	}
+	clean := sanitizeGitConfig(data)
+	hdr, err := newHeader(name, rel, info, tar.TypeReg)
+	if err != nil {
+		return err
+	}
+	hdr.Size = int64(len(clean))
+	if err := tw.WriteHeader(hdr); err != nil {
+		return fmt.Errorf("archive %s: %w", hdr.Name, err)
+	}
+	if _, err := tw.Write(clean); err != nil {
+		return fmt.Errorf("archive %s: %w", hdr.Name, err)
+	}
+	return nil
 }
 
 func addFSEntry(tw *tar.Writer, root, name, rel string) error {
@@ -185,7 +249,7 @@ func addFSEntry(tw *tar.Writer, root, name, rel string) error {
 	case info.IsDir():
 		return addDir(tw, name, rel, info)
 	case info.Mode().IsRegular():
-		return addRegular(tw, name, rel, abs, info)
+		return addRegular(tw, root, name, rel, info)
 	default:
 		return nil
 	}
@@ -251,13 +315,12 @@ func addDir(tw *tar.Writer, name, rel string, info os.FileInfo) error {
 	return nil
 }
 
-func addRegular(tw *tar.Writer, name, rel, abs string, info os.FileInfo) (err error) {
+func addRegular(tw *tar.Writer, root, name, rel string, info os.FileInfo) (err error) {
 	hdr, err := newHeader(name, rel, info, tar.TypeReg)
 	if err != nil {
 		return err
 	}
-	//gosec:disable G304 -- path is confined to the repository root
-	f, err := os.Open(abs)
+	f, err := openInRoot(root, rel)
 	if err != nil {
 		return fmt.Errorf("open %s: %w", rel, err)
 	}
@@ -273,6 +336,17 @@ func addRegular(tw *tar.Writer, name, rel, abs string, info os.FileInfo) (err er
 		return fmt.Errorf("archive %s: %w", hdr.Name, err)
 	}
 	return nil
+}
+
+// openInRoot opens rel below root. os.Root refuses a path that leaves root, also
+// through a symlink, even when the file was swapped after ensureInside checked it.
+func openInRoot(root, rel string) (*os.File, error) {
+	r, err := os.OpenRoot(root)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = r.Close() }()
+	return r.Open(rel)
 }
 
 func newHeader(prefix, rel string, info os.FileInfo, typeflag byte) (*tar.Header, error) {

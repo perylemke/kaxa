@@ -28,6 +28,10 @@ type service struct {
 	root   string
 	stderr io.Writer
 	log    *slog.Logger
+	// envAllow holds the names a bare KEY of api_env may copy from the server
+	// environment, so an agent cannot read the rest of it.
+	envAllow map[string]struct{}
+	hostEnv  func(string) (string, bool)
 }
 
 func newService(reg *registry.Registry, cfg config.Config, opts Options) (*service, error) {
@@ -43,13 +47,27 @@ func newService(reg *registry.Registry, cfg config.Config, opts Options) (*servi
 	if stderr == nil {
 		stderr = io.Discard
 	}
+	hostEnv := opts.LookupEnv
+	if hostEnv == nil {
+		hostEnv = os.LookupEnv
+	}
 	return &service{
-		reg:    reg,
-		cfg:    cfg,
-		root:   root,
-		stderr: stderr,
-		log:    slog.New(slog.NewTextHandler(stderr, nil)),
+		reg:      reg,
+		cfg:      cfg,
+		root:     root,
+		stderr:   stderr,
+		log:      slog.New(slog.NewTextHandler(stderr, nil)),
+		envAllow: nameSet(opts.APIEnvAllow),
+		hostEnv:  hostEnv,
 	}, nil
+}
+
+func nameSet(names []string) map[string]struct{} {
+	set := make(map[string]struct{}, len(names))
+	for _, name := range names {
+		set[name] = struct{}{}
+	}
+	return set
 }
 
 // progress reports a slow step on stderr. Stdout carries only the protocol.
@@ -140,7 +158,7 @@ func (s *service) create(ctx context.Context, in createIn) (createOut, error) {
 
 func (s *service) createRequest(name string, in createIn) (lifecycle.Request, error) {
 	req := lifecycle.Request{Name: name, Running: in.Running, Sync: in.Sync, Public: in.Public}
-	if err := applyAPI(&req, in); err != nil {
+	if err := s.applyAPI(&req, in); err != nil {
 		return lifecycle.Request{}, err
 	}
 	if !in.Sync {
@@ -193,7 +211,7 @@ func (s *service) syncRepository(ctx context.Context, in syncIn) (syncOut, error
 	return syncOut{ID: string(res.ID), Provider: p.Name(), WorkDir: res.WorkDir}, nil
 }
 
-func applyAPI(req *lifecycle.Request, in createIn) error {
+func (s *service) applyAPI(req *lifecycle.Request, in createIn) error {
 	if !in.API {
 		if len(in.APICmd) > 0 {
 			return usererr.New("api_cmd requires api", "set api to publish the service")
@@ -213,7 +231,7 @@ func applyAPI(req *lifecycle.Request, in createIn) error {
 	if err := lifecycle.ValidateAPI(in.Running, port, in.APICmd); err != nil {
 		return err
 	}
-	env, err := lifecycle.ResolveAPIEnv(in.APIEnv, os.LookupEnv)
+	env, err := s.resolveAPIEnv(in.APIEnv)
 	if err != nil {
 		return err
 	}
@@ -221,9 +239,41 @@ func applyAPI(req *lifecycle.Request, in createIn) error {
 	return nil
 }
 
+// resolveAPIEnv resolves api_env. KEY=VALUE comes from the agent, and a bare KEY
+// copies a host variable only when the operator listed it in KAXA_MCP_API_ENV.
+func (s *service) resolveAPIEnv(entries []string) ([]string, error) {
+	var denied string
+	lookup := func(key string) (string, bool) {
+		if _, ok := s.envAllow[key]; !ok {
+			denied = key
+			return "", false
+		}
+		return s.hostEnv(key)
+	}
+	env, err := lifecycle.ResolveAPIEnv(entries, lookup)
+	if err != nil && denied != "" {
+		return nil, usererr.New(
+			fmt.Sprintf("api env %s cannot be copied from the server environment; the user must list it in %s", denied, EnvAPIEnvAllow),
+			"pass KEY=VALUE instead",
+		)
+	}
+	return env, err
+}
+
 // checkRepoScope keeps an agent from copying an unrelated repository off the
 // host: the repository must contain the server working directory or sit below it.
 func checkRepoScope(repoRoot, scope string) error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = ""
+	}
+	return checkRepoScopeIn(repoRoot, scope, home)
+}
+
+// checkRepoScopeIn is checkRepoScope with the home directory given. A scope that
+// is the filesystem root or home contains every repository the user owns, so it
+// bounds nothing.
+func checkRepoScopeIn(repoRoot, scope, home string) error {
 	repo, err := filepath.EvalSymlinks(repoRoot)
 	if err != nil {
 		return fmt.Errorf("resolve repository: %w", err)
@@ -232,6 +282,12 @@ func checkRepoScope(repoRoot, scope string) error {
 	if err != nil {
 		return fmt.Errorf("resolve working directory: %w", err)
 	}
+	if isBroadScope(base, home) {
+		return usererr.New(
+			fmt.Sprintf("the server working directory %s is too broad to bound which repositories sync may copy", scope),
+			"start kaxa mcp from the project, or set cwd to it in the client config",
+		)
+	}
 	if within(repo, base) || within(base, repo) {
 		return nil
 	}
@@ -239,6 +295,20 @@ func checkRepoScope(repoRoot, scope string) error {
 		fmt.Sprintf("repository %s is outside the server working directory", repoRoot),
 		"start kaxa mcp from the project, or pass a dir inside it",
 	)
+}
+
+func isBroadScope(base, home string) bool {
+	if filepath.Dir(base) == base {
+		return true
+	}
+	if home == "" {
+		return false
+	}
+	resolved, err := filepath.EvalSymlinks(home)
+	if err != nil {
+		resolved = home
+	}
+	return filepath.Clean(resolved) == base
 }
 
 // within reports whether child is parent or lies below it.
@@ -262,6 +332,8 @@ func (s *service) exec(ctx context.Context, in execIn) (execOut, error) {
 	if len(in.Command) == 0 || strings.TrimSpace(in.Command[0]) == "" {
 		return execOut{}, usererr.New("command is required", "pass the argv to run; the first item is the binary")
 	}
+	ctx, cancel := context.WithTimeout(ctx, execTimeout(in.Timeout))
+	defer cancel()
 	stdout, stderr := newLimitedBuffer(maxOutputBytes), newLimitedBuffer(maxOutputBytes)
 	err = p.Exec(ctx, id, sandbox.ExecOptions{Command: in.Command, Stdout: stdout, Stderr: stderr})
 	out := execOut{
@@ -401,7 +473,7 @@ func (s *service) publishAPI(ctx context.Context, in publishIn) (actionOut, erro
 	if err := lifecycle.ValidateAPI(false, port, in.APICmd); err != nil {
 		return actionOut{}, err
 	}
-	env, err := lifecycle.ResolveAPIEnv(in.APIEnv, os.LookupEnv)
+	env, err := s.resolveAPIEnv(in.APIEnv)
 	if err != nil {
 		return actionOut{}, err
 	}

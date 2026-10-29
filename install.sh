@@ -6,9 +6,13 @@
 # Environment:
 #   VERSION      Release to install, without the leading v (default: latest).
 #   INSTALL_DIR  Where to put the binary (default: $HOME/.local/bin).
+#   REQUIRE_SIGNATURE  Set to 1 to stop unless checksums.txt has a valid cosign
+#                      signature. Without it, a signature is checked when cosign
+#                      is installed and the release has one.
 #
 # The archive is checked against the release checksums.txt before anything is
-# installed. Nothing here needs root.
+# installed. checksums.txt itself is checked against its cosign signature, which
+# ties it to this repository's release workflow. Nothing here needs root.
 
 set -eu
 
@@ -84,6 +88,30 @@ verify() {
 	echo "$file: OK"
 }
 
+# verify_signature checks checksums.txt against the cosign bundle of the release.
+# A bad signature always stops the install. A missing cosign or bundle only stops
+# it when REQUIRE_SIGNATURE=1, because releases before signing have no bundle.
+verify_signature() {
+	dir="$1"
+	base="$2"
+	if ! command -v cosign >/dev/null 2>&1; then
+		[ "${REQUIRE_SIGNATURE:-}" != "1" ] || err "REQUIRE_SIGNATURE=1 needs cosign, which is not installed"
+		echo "cosign not found: skipping the signature check of checksums.txt"
+		return 0
+	fi
+	if ! curl -fsSL -o "$dir/checksums.txt.sigstore.json" "$base/checksums.txt.sigstore.json"; then
+		[ "${REQUIRE_SIGNATURE:-}" != "1" ] || err "this release has no signature for checksums.txt"
+		echo "no signature published for this release: skipping the signature check"
+		return 0
+	fi
+	cosign verify-blob \
+		--bundle "$dir/checksums.txt.sigstore.json" \
+		--certificate-identity-regexp "^https://github.com/perylemke/kaxa/\.github/workflows/release\.yml@refs/tags/v" \
+		--certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+		"$dir/checksums.txt" >/dev/null 2>&1 || err "signature of checksums.txt is not valid"
+	echo "checksums.txt: signature OK"
+}
+
 main() {
 	need curl
 	need tar
@@ -102,6 +130,7 @@ main() {
 	echo "Installing kaxa $version ($os/$arch) to $install_dir"
 	curl -fsSL -o "$TMP/$file" "$base/$file" || err "could not download $base/$file"
 	curl -fsSL -o "$TMP/checksums.txt" "$base/checksums.txt" || err "could not download $base/checksums.txt"
+	verify_signature "$TMP" "$base"
 	verify "$TMP" "$file"
 
 	tar -xzf "$TMP/$file" -C "$TMP" kaxa

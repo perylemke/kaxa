@@ -229,12 +229,28 @@ func fileHasSignal(path string) (bool, error) {
 	return containsAnyLeft(data, goServerSignals()), nil
 }
 
+// readOptional reads a manifest from the repository root. Only a regular file is
+// read, up to apiFileReadLimit, so a symlink to /dev/zero or a huge file cannot
+// exhaust memory.
 func readOptional(root, name string) ([]byte, bool, error) {
-	data, err := os.ReadFile(filepath.Join(root, name)) //gosec:disable G304 -- name is a fixed manifest under the repository root
+	path := filepath.Join(root, name)
+	info, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, false, nil
 		}
+		return nil, false, fmt.Errorf("read %s: %w", name, err)
+	}
+	if !info.Mode().IsRegular() {
+		return nil, false, nil
+	}
+	f, err := os.Open(path) //gosec:disable G304 -- name is a fixed manifest under the repository root
+	if err != nil {
+		return nil, false, fmt.Errorf("read %s: %w", name, err)
+	}
+	defer func() { _ = f.Close() }()
+	data, err := io.ReadAll(io.LimitReader(f, apiFileReadLimit))
+	if err != nil {
 		return nil, false, fmt.Errorf("read %s: %w", name, err)
 	}
 	return data, true, nil
