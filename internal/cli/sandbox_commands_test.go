@@ -139,6 +139,7 @@ func TestCreateInteractiveForm(t *testing.T) {
 	cmd.SetIn(strings.NewReader(strings.Join([]string{"demo", "1", "y", "n", "n", "n", ""}, "\n")))
 	cmd.SetArgs([]string{testCmdCreate})
 	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
+	t.Setenv("KAXA_DEFAULT_PROVIDER", "")
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
