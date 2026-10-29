@@ -1,6 +1,6 @@
 # kaxa exec
 
-Run a command in a sandbox. This works for Sprites and Modal.
+Run a command in a sandbox. This works for Sprites, Modal, and E2B.
 
 ```bash
 kaxa exec <name> <command> [args...]
@@ -15,6 +15,16 @@ kaxa exec my-sprite -- ls -la
 The remote exit code is the kaxa exit code, from 0 through 255.
 
 On a sandbox created with `--sync`, the command starts in `/home/sprite/workspace`. Other sandboxes start in the sprite home. On Modal, a sandbox created with `--sync` runs the command as the `modal` user in `/home/modal/workspace`.
+
+## E2B
+
+Pick the provider with `--provider e2b` or `KAXA_DEFAULT_PROVIDER=e2b`. A paused sandbox is resumed first, which takes a second or two.
+
+```bash
+kaxa --provider e2b exec my-box -- ls -la
+```
+
+Standard output, standard error, and standard input are passed through, and the remote exit code is the kaxa exit code. Commands run as `user`, starting in `/home/user/workspace` with `--sync` and in `/home/user` without it. The command is not run through a shell; use `sh -c` for pipes.
 
 ## Modal
 

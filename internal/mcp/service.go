@@ -116,6 +116,10 @@ func (s *service) listProviders(_ context.Context, _ listProvidersIn) (listProvi
 		if err != nil {
 			return listProvidersOut{}, err
 		}
+		// Apply the credentials so a provider that reports availability from
+		// them (E2B) is judged on the current configuration. A provider
+		// without credentials stays unconfigured, which is not an error here.
+		_, _ = lifecycle.ResolveProvider(s.reg, s.cfg, name)
 		out.Providers = append(out.Providers, providerInfo{
 			Name:         name,
 			Available:    sandbox.IsAvailable(p),
@@ -157,7 +161,7 @@ func (s *service) create(ctx context.Context, in createIn) (createOut, error) {
 }
 
 func (s *service) createRequest(name string, in createIn) (lifecycle.Request, error) {
-	req := lifecycle.Request{Name: name, Running: in.Running, Sync: in.Sync, Public: in.Public}
+	req := lifecycle.Request{Name: name, Running: in.Running, Sync: in.Sync, Public: in.Public, Template: in.Template}
 	if err := s.applyAPI(&req, in); err != nil {
 		return lifecycle.Request{}, err
 	}

@@ -1,6 +1,6 @@
 # kaxa url
 
-Set Sprites URL authentication. This command is only supported for the sprites provider. Modal is rejected before any API call.
+Set Sprites URL authentication. This command is only supported for the sprites provider. Modal and E2B are rejected before any API call.
 
 ```bash
 kaxa url <name> <public|sprite>

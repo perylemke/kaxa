@@ -21,6 +21,7 @@ const (
 	FeaturePublicURLs        Feature = "public urls"
 	FeatureURLAuth           Feature = "url auth"
 	FeatureRunning           Feature = "running"
+	FeatureTemplate          Feature = "template"
 	FeatureSnapshot          Feature = "snapshot"
 )
 
@@ -70,6 +71,7 @@ type Capabilities struct {
 	Restart   bool `json:"restart"`
 	Upgrade   bool `json:"upgrade"`
 	Running   bool `json:"running"`
+	Template  bool `json:"template"`
 	Snapshot  bool `json:"snapshot"`
 	// SnapshotRestore is the RestoreMode of a provider that has Snapshot.
 	SnapshotRestore string `json:"snapshot_restore,omitempty"`
@@ -84,6 +86,8 @@ func (c Capabilities) Has(feature Feature) bool {
 		return c.Upgrade
 	case FeatureRunning:
 		return c.Running
+	case FeatureTemplate:
+		return c.Template
 	case FeatureSnapshot:
 		return c.Snapshot
 	case FeatureSync:
@@ -109,9 +113,10 @@ func CapabilitiesOf(p Provider) Capabilities {
 	_, restart := p.(Restarter)
 	_, upgrade := p.(Upgrader)
 	_, running := p.(RunningSupport)
+	_, template := p.(TemplateSupport)
 	caps := Capabilities{
 		Sync: sync, Setup: setup, API: api, PublicURL: public, Layout: layout,
-		Restart: restart, Upgrade: upgrade, Running: running,
+		Restart: restart, Upgrade: upgrade, Running: running, Template: template,
 	}
 	if s, ok := p.(Snapshotter); ok {
 		caps.Snapshot = true

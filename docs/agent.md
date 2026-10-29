@@ -26,11 +26,11 @@ A client started from a terminal inherits your `PATH`, so `command` can be `kaxa
 
 `sync` uses the working directory of the `kaxa mcp` process, not the directory that contains the binary. The repository must contain that working directory or sit below it. A desktop client uses the opened project. Set `cwd` when the client has that field and might start elsewhere.
 
-The tokens stay in the environment of that process. Put `KAXA_DEFAULT_PROVIDER` and the token of each provider you use in the client's `env` block: `KAXA_SPRITES_TOKEN` for Sprites, and `KAXA_MODAL_TOKEN_ID` with `KAXA_MODAL_TOKEN_SECRET` for Modal. Do not commit a file that contains a token, and do not paste a token into a prompt. See [Sprites account and token](sprites-account.md) and [Modal account and token](modal-account.md). `--provider` on the command also sets the default.
+The tokens stay in the environment of that process. Put `KAXA_DEFAULT_PROVIDER` and the token of each provider you use in the client's `env` block: `KAXA_SPRITES_TOKEN` for Sprites, `KAXA_MODAL_TOKEN_ID` with `KAXA_MODAL_TOKEN_SECRET` for Modal, and `KAXA_E2B_API_KEY` for E2B. Do not commit a file that contains a token, and do not paste a token into a prompt. See [Sprites account and token](sprites-account.md) [Modal account and token](modal-account.md), and [E2B account and API key](e2b-account.md). `--provider` on the command also sets the default.
 
 A bare `KEY` in `api_env` copies a variable from the `kaxa mcp` environment, so an agent could ask for any secret that environment holds. kaxa refuses it unless the name is in `KAXA_MCP_API_ENV`, a comma-separated list that you set in the same `env` block, for example `"KAXA_MCP_API_ENV": "DATABASE_URL,REDIS_URL"`. Without it, the agent can only pass `KEY=VALUE`.
 
-After the server is connected, ask the agent to call `list_providers`. Sprites and Modal are available. Modal supports create (with `sync`), list, inspect, exec, snapshots, and destroy; its `capabilities` report `sync`, `setup`, `workspace_layout`, and `snapshot` as true and the rest as false. On Modal, `exec` commands start in the image root unless the sandbox was created with `sync`; then they run as the `modal` user in `/home/modal/workspace`.
+After the server is connected, ask the agent to call `list_providers`. Sprites, Modal, and E2B are available. Modal supports create (with `sync`), list, inspect, exec, snapshots, and destroy; its `capabilities` report `sync`, `setup`, `workspace_layout`, and `snapshot` as true and the rest as false. On Modal, `exec` commands start in the image root unless the sandbox was created with `sync`; then they run as the `modal` user in `/home/modal/workspace`. E2B supports create (with `sync` and `api`), list, inspect, exec, restart, and destroy; its `capabilities` report `sync`, `setup`, `api`, `workspace_layout`, and `restart` as true and the rest as false. On E2B, `exec` commands run as `user`, starting in `/home/user`, or in `/home/user/workspace` when the sandbox was created with `sync`.
 
 ### Cursor
 
@@ -46,7 +46,8 @@ User config is `~/.cursor/mcp.json`. Project config is `.cursor/mcp.json`. Prefe
         "KAXA_DEFAULT_PROVIDER": "sprites",
         "KAXA_SPRITES_TOKEN": "paste-the-dashboard-value",
         "KAXA_MODAL_TOKEN_ID": "ak-paste-the-token-id",
-        "KAXA_MODAL_TOKEN_SECRET": "as-paste-the-token-secret"
+        "KAXA_MODAL_TOKEN_SECRET": "as-paste-the-token-secret",
+        "KAXA_E2B_API_KEY": "e2b_paste-the-key"
       }
     }
   }
@@ -70,7 +71,8 @@ Project config is `.mcp.json` at the repository root. Claude Code asks you to ap
         "KAXA_DEFAULT_PROVIDER": "sprites",
         "KAXA_SPRITES_TOKEN": "paste-the-dashboard-value",
         "KAXA_MODAL_TOKEN_ID": "ak-paste-the-token-id",
-        "KAXA_MODAL_TOKEN_SECRET": "as-paste-the-token-secret"
+        "KAXA_MODAL_TOKEN_SECRET": "as-paste-the-token-secret",
+        "KAXA_E2B_API_KEY": "e2b_paste-the-key"
       }
     }
   }
@@ -85,6 +87,7 @@ claude mcp add --transport stdio \
   --env KAXA_SPRITES_TOKEN=paste-the-dashboard-value \
   --env KAXA_MODAL_TOKEN_ID=ak-paste-the-token-id \
   --env KAXA_MODAL_TOKEN_SECRET=as-paste-the-token-secret \
+  --env KAXA_E2B_API_KEY=e2b_paste-the-key \
   kaxa -- /Users/you/go/bin/kaxa mcp
 ```
 
@@ -96,7 +99,7 @@ On macOS the file is `~/Library/Application Support/Claude/claude_desktop_config
 
 ### Gemini CLI
 
-User config is `~/.gemini/settings.json`. Project config is `.gemini/settings.json`. `env` values expand `$KAXA_SPRITES_TOKEN` and `${KAXA_SPRITES_TOKEN}`, and the Modal variables the same way, from the environment that launches Gemini. Set `cwd` to the project so `sync` can see it.
+User config is `~/.gemini/settings.json`. Project config is `.gemini/settings.json`. `env` values expand `$KAXA_SPRITES_TOKEN` and `${KAXA_SPRITES_TOKEN}`, and the Modal and E2B variables the same way, from the environment that launches Gemini. Set `cwd` to the project so `sync` can see it.
 
 ```json
 {
@@ -109,7 +112,8 @@ User config is `~/.gemini/settings.json`. Project config is `.gemini/settings.js
         "KAXA_DEFAULT_PROVIDER": "sprites",
         "KAXA_SPRITES_TOKEN": "${KAXA_SPRITES_TOKEN}",
         "KAXA_MODAL_TOKEN_ID": "${KAXA_MODAL_TOKEN_ID}",
-        "KAXA_MODAL_TOKEN_SECRET": "${KAXA_MODAL_TOKEN_SECRET}"
+        "KAXA_MODAL_TOKEN_SECRET": "${KAXA_MODAL_TOKEN_SECRET}",
+        "KAXA_E2B_API_KEY": "${KAXA_E2B_API_KEY}"
       }
     }
   }
@@ -138,6 +142,13 @@ Every tool that works on a sandbox takes an optional `provider`. Without it, the
 | `publish_api` | Start one HTTP service in an existing sandbox |
 | `set_url_auth` | Same as [url](url.md): `public` or `sprite` |
 
+### Use E2B
+
+Set `KAXA_E2B_API_KEY` in the client (and `KAXA_E2B_TEMPLATE` for a default template), reload the server, and pass `provider: "e2b"` (or set `KAXA_DEFAULT_PROVIDER=e2b`). The flow is the same as on Modal, with `/home/user/workspace` as the workspace and `user` as the user. Pass `template` to `create_sandbox` to start from a template you built with the E2B CLI or SDK, for example one with more memory than `base`. It must keep the `base` layout (user `user`). Other providers reject it. Two things differ:
+
+- E2B sandboxes are private. `create_sandbox` with `api: true` is what makes the API port public, at `https://<port>-<sandbox id>.e2b.app`, and `publish_api` on an existing sandbox must use the port the sandbox was created with. Anyone with the URL can call the service.
+- A sandbox pauses after one hour without activity and resumes on the next `exec`. `restart` reboots it from its disk, which stops running processes. `set_url_auth`, snapshots, and `running` are not available for E2B. See [E2B account and API key](e2b-account.md).
+
 ### Use Modal
 
 Set `KAXA_MODAL_TOKEN_ID` and `KAXA_MODAL_TOKEN_SECRET` in the client, reload the server, and the flow is the same as on Sprites. Pass `provider: "modal"`, or set `KAXA_DEFAULT_PROVIDER=modal`:
@@ -163,6 +174,7 @@ Call this first. A provider is `available: false` when it cannot serve requests 
 | `restart` | `restart` |
 | `upgrade` | `upgrade` |
 | `running` | `create_sandbox` with `running` |
+| `template` | `create_sandbox` with `template` (E2B) |
 | `workspace_layout` | `work_dir` in the result, and the default directory of `publish_api` |
 | `snapshot` | `create_snapshot`, `list_snapshots`, `restore_snapshot`, and `delete_snapshot` |
 | `snapshot_restore` | Not a flag: `in_place` or `new_sandbox`, set when `snapshot` is true. It decides how `restore_snapshot` behaves |

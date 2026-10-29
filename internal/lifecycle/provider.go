@@ -12,10 +12,16 @@ import (
 const (
 	spritesProvider = "sprites"
 	modalProvider   = "modal"
+	e2bProvider     = "e2b"
 )
 
 type tokenConfigurer interface {
 	Configure(token string) error
+}
+
+// templateDefaulter is a provider that starts sandboxes from a default template.
+type templateDefaulter interface {
+	SetDefaultTemplate(name string) error
 }
 
 type credentialsConfigurer interface {
@@ -54,7 +60,25 @@ func ResolveProvider(reg *registry.Registry, cfg config.Config, name string) (sa
 		if err := c.ConfigureCredentials(cfg.Modal.TokenID, cfg.Modal.TokenSecret); err != nil {
 			return nil, err
 		}
+	case e2bProvider:
+		if err := configureE2B(p, cfg.E2B); err != nil {
+			return nil, err
+		}
 	}
 
 	return p, nil
+}
+
+func configureE2B(p sandbox.Provider, cfg config.E2BConfig) error {
+	c, ok := p.(tokenConfigurer)
+	if !ok {
+		return fmt.Errorf("e2b provider %T does not support Configure", p)
+	}
+	if err := c.Configure(cfg.APIKey); err != nil {
+		return err
+	}
+	if d, ok := p.(templateDefaulter); ok {
+		return d.SetDefaultTemplate(cfg.Template)
+	}
+	return nil
 }

@@ -12,7 +12,7 @@ kaxa rm [name]
 | Flag | Meaning |
 | --- | --- |
 | `--all` | Destroy every sandbox. Takes no name. Covers every configured provider unless `--provider` is set |
-| `--provider` | Limit the scope to one provider (`sprites`, `modal`). Without `--all` it also picks the provider for a name |
+| `--provider` | Limit the scope to one provider (`sprites`, `modal`, `e2b`). Without `--all` it also picks the provider for a name |
 | `--force`, `-f` | Skip every confirmation |
 
 ## How a target is chosen
@@ -60,4 +60,4 @@ Empty `--all` prints `no sandboxes to destroy`.
 
 ## Snapshots
 
-`destroy` does not delete snapshots. A Modal snapshot is an image that outlives its sandbox, so you can restore it into a new sandbox after the source is gone; it stays until you run `kaxa snapshot delete` or Modal expires it after 30 days. A sprite takes its persisted state with it. See [snapshot](snapshot.md).
+`destroy` does not delete snapshots. A Modal snapshot is an image that outlives its sandbox, so you can restore it into a new sandbox after the source is gone; it stays until you run `kaxa snapshot delete` or Modal expires it after 30 days. A sprite takes its persisted state with it. An E2B sandbox is killed, and its paused disk goes with it. See [snapshot](snapshot.md).

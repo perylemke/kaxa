@@ -15,6 +15,8 @@ const (
 	envSpritesToken     = "KAXA_SPRITES_TOKEN"      // #nosec G101 -- env var name, not a credential value
 	envModalTokenID     = "KAXA_MODAL_TOKEN_ID"     // #nosec G101 -- env var name, not a credential value
 	envModalTokenSecret = "KAXA_MODAL_TOKEN_SECRET" // #nosec G101 -- env var name, not a credential value
+	envE2BAPIKey        = "KAXA_E2B_API_KEY"        // #nosec G101 -- env var name, not a credential value
+	envE2BTemplate      = "KAXA_E2B_TEMPLATE"
 )
 
 // Config holds resolved CLI settings (secrets are never logged via String).
@@ -22,6 +24,14 @@ type Config struct {
 	Provider string
 	Sprites  SpritesConfig
 	Modal    ModalConfig
+	E2B      E2BConfig
+}
+
+// E2BConfig holds the E2B API key and the template new sandboxes start from.
+type E2BConfig struct {
+	APIKey string
+	// Template is the default template. Empty means E2B's base template.
+	Template string
 }
 
 // SpritesConfig holds Fly.io Sprites credentials.
@@ -51,6 +61,7 @@ func Load(opts LoadOptions, reg *registry.Registry) (Config, error) {
 			TokenID:     os.Getenv(envModalTokenID),
 			TokenSecret: os.Getenv(envModalTokenSecret),
 		},
+		E2B: E2BConfig{APIKey: os.Getenv(envE2BAPIKey), Template: os.Getenv(envE2BTemplate)},
 	}
 
 	if opts.Provider != "" {

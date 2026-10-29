@@ -26,6 +26,7 @@ type createIn struct {
 	APIPort  int      `json:"api_port,omitempty" jsonschema:"Port the HTTP service listens on. Defaults to 8000. Port 8080 is reserved when running is true."`
 	APIEnv   []string `json:"api_env,omitempty" jsonschema:"Environment of the HTTP service. Each item is KEY=VALUE, or KEY to copy the value from the server environment so secrets stay out of the conversation. Values cannot contain commas. HOME, USER, PATH and KAXA_ names are reserved. Requires api."`
 	Public   bool     `json:"public,omitempty" jsonschema:"Make the sandbox URL reachable without a provider account."`
+	Template string   `json:"template,omitempty" jsonschema:"Template to start the sandbox from. Only for providers whose capabilities report template (E2B). Defaults to KAXA_E2B_TEMPLATE, then base. A custom template must have the same user and home as base."`
 }
 
 type createOut struct {

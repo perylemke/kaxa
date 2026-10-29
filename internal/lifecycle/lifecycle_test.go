@@ -18,6 +18,7 @@ import (
 const (
 	boxName = "box"
 	uvicorn = "uvicorn"
+	bigTpl  = "big"
 )
 
 type recorder struct {
@@ -288,6 +289,7 @@ func TestCheckRejectsMissingCapabilities(t *testing.T) {
 		{name: testAPI, req: lifecycle.Request{Name: boxName, API: true}, want: "api publish"},
 		{name: "public", req: lifecycle.Request{Name: boxName, Public: true}, want: "public urls"},
 		{name: "running", req: lifecycle.Request{Name: boxName, Running: true}, want: "running"},
+		{name: "template", req: lifecycle.Request{Name: boxName, Template: bigTpl}, want: "template"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -321,6 +323,49 @@ func TestCheckRejectsCLIProjectForAPI(t *testing.T) {
 	}
 	if rec.created.Name != "" || rec.published {
 		t.Fatalf("created %q published %v", rec.created.Name, rec.published)
+	}
+}
+
+func TestCreatePassesAPIPortToSpec(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		req      lifecycle.Request
+		wantAPI  bool
+		wantPort int
+	}{
+		{name: "api", req: lifecycle.Request{Name: boxName, API: true, APIPort: 9000, APICmd: []string{uvicorn}}, wantAPI: true, wantPort: 9000},
+		{name: "no api ignores port", req: lifecycle.Request{Name: boxName, APIPort: 9000}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			p, rec := newFull()
+			if _, err := lifecycle.Create(context.Background(), p, tt.req, nil); err != nil {
+				t.Fatalf("create: %v", err)
+			}
+			if rec.created.ExposeAPI != tt.wantAPI || rec.created.APIPort != tt.wantPort {
+				t.Fatalf("spec = %+v", rec.created)
+			}
+		})
+	}
+}
+
+type templateProvider struct{ *fullProvider }
+
+func (templateProvider) SupportsTemplate() {}
+
+func TestCreatePassesTemplateToSpec(t *testing.T) {
+	t.Parallel()
+
+	full, rec := newFull()
+	p := templateProvider{full}
+	if _, err := lifecycle.Create(context.Background(), p, lifecycle.Request{Name: boxName, Template: bigTpl}, nil); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if rec.created.Template != bigTpl {
+		t.Fatalf("spec = %+v, want template big", rec.created)
 	}
 }
 

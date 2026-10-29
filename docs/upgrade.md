@@ -15,4 +15,4 @@ kaxa upgrade my-sprite
 kaxa upgrade
 ```
 
-Upgrade is not available for Modal: Modal has no per-sandbox platform upgrade. kaxa says so and lists the providers that support it, such as Sprites.
+Upgrade is not available for Modal or E2B: neither has a per-sandbox platform upgrade. kaxa says so and lists the providers that support it, such as Sprites.

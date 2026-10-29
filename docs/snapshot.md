@@ -52,7 +52,7 @@ kaxa snapshot restore my-sprite v7 --provider sprites
 kaxa snapshot delete my-sprite v7 --provider sprites
 ```
 
-A Sprites checkpoint does not include `/tmp`, which is in memory. Keep what you want to save under `/home/sprite`, `/opt`, or `/var`. Modal snapshots hold the whole filesystem.
+A Sprites checkpoint does not include `/tmp`, which is in memory. Keep what you want to save under `/home/sprite`, `/opt`, or `/var`. Modal snapshots hold the whole filesystem. E2B has no snapshots in kaxa yet: `snapshot` prints that they are not available and names the providers that have them.
 
 Deleting a checkpoint uses `DELETE /v1/sprites/{name}/checkpoints/{id}`. That route is not in the public Sprites API reference, so a failure names the status code. `create` finds the new checkpoint by listing before and after, because the create stream does not return its ID.
 

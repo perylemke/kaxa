@@ -308,6 +308,35 @@ func TestCreateRejectsProviderWithoutCapability(t *testing.T) {
 	wantErr(t, err, "public urls is not available for plain")
 }
 
+type templateFake struct{ *fakeProvider }
+
+func (templateFake) SupportsTemplate() {}
+
+func TestCreatePassesTemplate(t *testing.T) {
+	t.Parallel()
+
+	fp := &fakeProvider{name: testSprites}
+	svc := newTestService(t, t.TempDir(), testSprites, templateFake{fp})
+	if _, err := svc.create(context.Background(), createIn{Name: testBox, Template: "big"}); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if fp.created[0].Template != "big" {
+		t.Fatalf("spec = %+v", fp.created[0])
+	}
+}
+
+func TestCreateRejectsTemplateWithoutCapability(t *testing.T) {
+	t.Parallel()
+
+	fp := &fakeProvider{name: testSprites}
+	svc := newTestService(t, t.TempDir(), testSprites, fp)
+	_, err := svc.create(context.Background(), createIn{Name: testBox, Template: "big"})
+	wantErr(t, err, "template is not available for "+testSprites)
+	if len(fp.created) != 0 {
+		t.Fatalf("created %v", fp.created)
+	}
+}
+
 func TestCreateSyncReturnsWorkDir(t *testing.T) {
 	t.Parallel()
 

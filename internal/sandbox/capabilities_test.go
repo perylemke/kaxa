@@ -32,6 +32,7 @@ type fullProvider struct {
 }
 
 func (fullProvider) SupportsRunning()                          {}
+func (fullProvider) SupportsTemplate()                         {}
 func (fullProvider) Restart(context.Context, sandbox.ID) error { return nil }
 func (fullProvider) Upgrade(context.Context, sandbox.ID) error { return nil }
 
@@ -61,7 +62,7 @@ func TestCapabilitiesOfFullProvider(t *testing.T) {
 	t.Parallel()
 
 	got := sandbox.CapabilitiesOf(fullProvider{})
-	want := sandbox.Capabilities{Sync: true, Setup: true, API: true, PublicURL: true, Layout: true, Restart: true, Upgrade: true, Running: true}
+	want := sandbox.Capabilities{Sync: true, Setup: true, API: true, PublicURL: true, Layout: true, Restart: true, Upgrade: true, Running: true, Template: true}
 	if got != want {
 		t.Fatalf("capabilities = %+v, want %+v", got, want)
 	}
@@ -92,7 +93,7 @@ func TestIsAvailable(t *testing.T) {
 func TestCapabilitiesHas(t *testing.T) {
 	t.Parallel()
 
-	caps := sandbox.Capabilities{Restart: true, PublicURL: true}
+	caps := sandbox.Capabilities{Restart: true, PublicURL: true, Template: true}
 	tests := []struct {
 		feature sandbox.Feature
 		want    bool
@@ -100,6 +101,7 @@ func TestCapabilitiesHas(t *testing.T) {
 		{sandbox.FeatureRestart, true},
 		{sandbox.FeatureURLAuth, true},
 		{sandbox.FeaturePublicURLs, true},
+		{sandbox.FeatureTemplate, true},
 		{sandbox.FeatureUpgrade, false},
 		{sandbox.FeatureRunning, false},
 		{sandbox.FeatureSync, false},
