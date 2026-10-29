@@ -8,7 +8,7 @@ Cursor users: the same rules live in `.cursor/rules/*.mdc`; Claude Code reads `.
 - Go 1.27+ (see `go.mod`), Cobra CLI, `CGO_ENABLED=0` builds.
 - Providers: Sprites and Modal, registered in `internal/registry`.
 - `kaxa mcp` serves sandboxes to AI agents over the Model Context Protocol.
-- Releases: GoReleaser (`.goreleaser.yml`) and the Homebrew cask in `perylemke/homebrew-tap`.
+- Releases: semtag tags (`make release`, `make prerelease`), GoReleaser (`.goreleaser.yml`), and the Homebrew cask in `perylemke/homebrew-tap`. Only final `vX.Y.Z` tags reach Homebrew; `-alpha/-beta/-rc` tags are GitHub pre-releases.
 
 ## Commands
 
@@ -25,6 +25,10 @@ make lint # golangci-lint
 make vuln # govulncheck
 make gosec # gosec SAST
 make ci # everything CI runs
+make next-version SCOPE=minor # print the next final version, tags nothing
+make changelog-release SCOPE=minor # move [Unreleased] into the next version of CHANGELOG.md
+make release SCOPE=minor # tag and push a final version from main (needs semtag)
+make prerelease SCOPE=minor TYPE=rc # tag and push a test version (alpha|beta|rc), not on Homebrew
 ```
 
 Run `make test` at minimum, and `make lint` after Go changes, before saying work is done. Report the real result.
@@ -38,6 +42,7 @@ Run `make test` at minimum, and `make lint` after Go changes, before saying work
 - `internal/provider/{sprites,modal}` — one package per provider.
 - `internal/{mcp,lifecycle,reposync,project,toolchain,usererr,version}` — MCP server, sandbox lifecycle, repo sync, project detection, toolchain install, user errors, version info.
 - `install.sh`, `install.ps1` — one-line installers, attached to every release by GoReleaser (`release.extra_files`); keep in sync with `docs/install.md`.
+- `CHANGELOG.md` — Keep a Changelog; `internal/changelog` and `tools/changelog` edit it at release time; `scripts/release.sh` wraps semtag.
 - `docs/` — one manual per command; keep in sync with `README.md`.
 - `test/e2e`, `test/acceptance` — build-tagged tests.
 
@@ -46,7 +51,7 @@ Run `make test` at minimum, and `make lint` after Go changes, before saying work
 Detailed rules are in `.claude/rules/` (mirrors of `.cursor/rules/`):
 
 - `go-style.md`, `go-tdd.md`, `go-srp.md`, `go-registries.md`, `go-security.md` — load for `**/*.go`.
-- `commits.md`, `owasp.md` — always apply.
+- `commits.md`, `owasp.md`, `releases.md` — always apply.
 
 Highlights:
 
@@ -61,5 +66,7 @@ Highlights:
 - Keep changes minimal and scoped; do not refactor unrelated code.
 - Any command or flag change must update `README.md` and the matching `docs/*.md`.
 - Avoid new dependencies; keep `go.mod` and `go.sum` consistent (`make tidy`).
+- Any user-visible change adds a line under `## [Unreleased]` in `CHANGELOG.md`; never edit released sections by hand.
+- Never tag or push a release unless asked; use `make release` or `make prerelease`, not `git tag`.
 - Never commit `.env` or real tokens.
 - Commits (only when asked): Conventional Commits, one line, English, no trailing period (`feat: add sprites provider stub`).

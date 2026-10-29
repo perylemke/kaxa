@@ -22,6 +22,7 @@ If you have questions about kaxa, open a [GitHub Discussion](https://github.com/
 
 1. **Tests:** Include tests for new behavior. Run `make test` at minimum; before opening a PR, run `make ci` or the checks listed in [.github/pull_request_template.md](.github/pull_request_template.md).
 1. **Format and lint:** Run `make fmt` and `make lint` so Go code stays consistent.
+1. **Changelog:** When a change is visible to users (new command or flag, behavior change, fix, security fix), add a line under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md), in the matching `Added`, `Changed`, `Fixed`, `Removed`, or `Security` subsection.
 1. **Commits:** Use [Conventional Commits](https://www.conventionalcommits.org/)—one line, English, no trailing period (e.g. `feat: add sprites list command`, `fix: validate provider name`).
 
 ### Quick steps to contribute
@@ -41,8 +42,35 @@ Use the PR template and confirm you did not include real API tokens in the descr
 
 - Go 1.27+ (see [go.mod](go.mod))
 - `golangci-lint`, `govulncheck`, and `gosec` v2.30.0 for local CI parity (`make lint`, `make vuln`, `make gosec`)
+- [semtag](https://github.com/nico2sh/semtag) 0.2.0 (`brew install semtag`) and push access to `origin`, only for maintainers who cut releases
 
 Run `make help` for all Makefile targets.
+
+## Releases
+
+Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and are tagged with semtag through `make`. Pushing a tag starts [.github/workflows/release.yml](.github/workflows/release.yml), which publishes the GitHub release with GoReleaser.
+
+| Tag | Command | GitHub release | Homebrew cask |
+| --- | --- | --- | --- |
+| `vX.Y.Z` (final) | `make release SCOPE=minor` | Release, notes from `CHANGELOG.md` | Updated |
+| `vX.Y.Z-rc.N`, `-beta.N`, `-alpha.N` (test) | `make prerelease SCOPE=minor TYPE=rc` | Pre-release, notes from commits | Not updated |
+
+`SCOPE` is `major`, `minor`, or `patch`, and is always required. `TYPE` is `alpha`, `beta`, or `rc` (default `rc`). `make next-version SCOPE=minor` prints the next final version without tagging anything.
+
+### Final version
+
+1. `main` is protected, so prepare the changelog in a pull request. From an up-to-date branch, run `make changelog-release SCOPE=minor`. It moves the `[Unreleased]` entries into `## [X.Y.Z] - date` and updates the links at the end of the file. Review it, commit (`docs: update changelog for vX.Y.Z`), and merge the PR.
+1. Update `main` locally (`git switch main && git pull`) and run `make release SCOPE=minor` with the same `SCOPE`. The command stops unless you are on `main`, the tree is clean, `main` equals `origin/main`, and `CHANGELOG.md` already has the section for the next version.
+1. The workflow checks the tag is on `main`, uses that changelog section as the release notes, and updates the cask in `perylemke/homebrew-tap`.
+
+### Test version
+
+1. Push the commit you want to try (any branch), then run `make prerelease SCOPE=minor TYPE=rc` from it. The next `-rc.N` is counted from the existing tags, and the command stops when the commit is not on `origin`.
+1. The workflow publishes a GitHub pre-release and skips Homebrew. Users install it with the script from that release; see [Test versions](docs/install.md#test-versions).
+
+semtag orders pre-release names as text and requires them to increase, so `alpha` comes before `beta`, `beta` before `rc`, and a version allows up to 9 pre-releases per type. After that, cut a new version.
+
+A wrong tag can be undone with `git push origin :refs/tags/vX.Y.Z-rc.N`, `git tag -d vX.Y.Z-rc.N`, and deleting the GitHub release. Never reuse a final version.
 
 ## Install scripts
 
