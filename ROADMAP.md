@@ -16,3 +16,8 @@ Tracked work for **kaxa**. Each item links to a GitHub issue.
 - [ ] [#18 — Add the ui command to manage sandboxes in the browser](https://github.com/perylemke/kaxa/issues/18)
 - [ ] [#19 — Distribute the CLI as a Homebrew cask](https://github.com/perylemke/kaxa/issues/19)
 - [X] [#22 — Add sandbox snapshots (create, list, restore, delete)](https://github.com/perylemke/kaxa/issues/22)
+- [ ] [#31 — Implement the Vercel Sandboxes provider](https://github.com/perylemke/kaxa/issues/31)
+- [ ] [#32 — Implement the Blaxel provider](https://github.com/perylemke/kaxa/issues/32)
+- [ ] [#33 — Implement the Cloudflare Sandboxes provider](https://github.com/perylemke/kaxa/issues/33)
+- [ ] [#34 — Implement the Upstash Box provider](https://github.com/perylemke/kaxa/issues/34)
+- [ ] [#35 — Implement the LangSmith Sandboxes provider](https://github.com/perylemke/kaxa/issues/35)
