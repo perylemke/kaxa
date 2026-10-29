@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"strings"
 
 	"github.com/perylemke/kaxa/internal/lifecycle"
 	"github.com/perylemke/kaxa/internal/sandbox"
@@ -41,18 +42,28 @@ func (s *service) createSnapshot(ctx context.Context, in createSnapshotIn) (snap
 	return toSnapshotInfo(snap), nil
 }
 
-func (s *service) listSnapshots(ctx context.Context, in nameIn) (listSnapshotsOut, error) {
-	_, sn, id, err := s.snapshotter(in.Provider, in.Name)
+func (s *service) listSnapshots(ctx context.Context, in listSnapshotsIn) (listSnapshotsOut, error) {
+	providers, names, err := s.listTargets(in.Provider)
 	if err != nil {
 		return listSnapshotsOut{}, err
 	}
-	snaps, err := sn.ListSnapshots(ctx, id)
+	if strings.TrimSpace(in.Provider) != "" {
+		// A provider named on purpose must support snapshots; one found by
+		// searching every provider is skipped when it does not.
+		if _, err := lifecycle.SnapshotterOf(providers[names[0]]); err != nil {
+			return listSnapshotsOut{}, err
+		}
+	}
+	snaps, failures, err := lifecycle.CollectSnapshots(ctx, providers, names, sandbox.ID(strings.TrimSpace(in.Name)))
 	if err != nil {
 		return listSnapshotsOut{}, err
 	}
 	out := listSnapshotsOut{Snapshots: make([]snapshotInfo, 0, len(snaps))}
 	for _, snap := range snaps {
 		out.Snapshots = append(out.Snapshots, toSnapshotInfo(snap))
+	}
+	for _, failure := range failures {
+		out.Warnings = append(out.Warnings, "could not list snapshots on "+failure.Error())
 	}
 	return out, nil
 }

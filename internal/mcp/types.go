@@ -136,8 +136,14 @@ type snapshotInfo struct {
 	CreatedAt string `json:"created_at,omitempty"`
 }
 
+type listSnapshotsIn struct {
+	Provider string `json:"provider,omitempty" jsonschema:"Provider name from list_providers. Without it, every configured provider is searched."`
+	Name     string `json:"name,omitempty" jsonschema:"Name of a sandbox. Without it, the snapshots of every sandbox are listed."`
+}
+
 type listSnapshotsOut struct {
 	Snapshots []snapshotInfo `json:"snapshots"`
+	Warnings  []string       `json:"warnings,omitempty"`
 }
 
 type restoreSnapshotIn struct {

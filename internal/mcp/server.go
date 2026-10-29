@@ -23,7 +23,7 @@ const instructions = `Run work in an isolated sandbox instead of on the host.
 2. create_sandbox with sync=true copies the local Git repository and installs its dependencies. The response work_dir is where the code lives inside the sandbox.
 3. Run builds, tests and edits with exec (argv, no shell). exec starts above the repository, so run project commands from work_dir, for example ["bash", "-c", "cd <work_dir> && go test ./..."]. Files you change with local editor tools are not in the sandbox, and files changed in the sandbox are not copied back.
 4. To add another Git repository to a sandbox that was created with sync, call sync_repository. It never replaces a directory.
-5. To save a sandbox state, call create_snapshot; list_snapshots shows the ids. restore_snapshot either overwrites the sandbox (snapshot_restore in_place) or creates a new one named by target (new_sandbox).
+5. To save a sandbox state, call create_snapshot; list_snapshots shows the ids, the sandbox and the provider of each snapshot. restore_snapshot either overwrites the sandbox (snapshot_restore in_place) or creates a new one named by target (new_sandbox).
 6. Call destroy, delete_snapshot, or restore_snapshot on an in_place provider only when the user asks for it.`
 
 // Options configures the server.
@@ -88,7 +88,7 @@ func (s *service) register(srv *sdk.Server) {
 		"Save the filesystem of a sandbox so it can be restored later. Only providers that list snapshot in their capabilities support it. The snapshot holds everything in the sandbox, including secrets written there.",
 		additive, s.createSnapshot)
 	addTool(s, srv, "list_snapshots", "List snapshots",
-		"List the snapshots of a sandbox, newest first. Use the snapshot ids with restore_snapshot and delete_snapshot.",
+		"List snapshots with the provider and sandbox each was taken from. Without name, every snapshot of every configured provider is listed; name limits it to one sandbox and provider limits it to one provider. Providers that fail are reported in warnings. Use the snapshot ids with restore_snapshot and delete_snapshot.",
 		readOnly, s.listSnapshots)
 	addTool(s, srv, "restore_snapshot", "Restore a snapshot",
 		"Restore a snapshot. The provider's snapshot_restore capability decides what happens: in_place overwrites the sandbox and discards its changes since the snapshot, so call it only when the user asks; new_sandbox creates the sandbox named by target and keeps the source.",

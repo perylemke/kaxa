@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -46,7 +47,7 @@ func (f *fakeProvider) DeleteSnapshot(_ context.Context, _ sandbox.ID, snap sand
 func TestSnapshotToolsRoundTrip(t *testing.T) {
 	t.Parallel()
 
-	fp := &fakeProvider{name: testSprites}
+	fp := &fakeProvider{name: testSprites, infos: []sandbox.Info{{ID: testBox}}}
 	svc := newTestService(t, t.TempDir(), testSprites, fp)
 	ctx := context.Background()
 
@@ -54,7 +55,7 @@ func TestSnapshotToolsRoundTrip(t *testing.T) {
 	if err != nil || created.ID != "v1" || created.Comment != "before" || created.Provider != testSprites || created.CreatedAt != "2026-01-02T03:04:05Z" {
 		t.Fatalf("created = %+v err = %v", created, err)
 	}
-	listed, err := svc.listSnapshots(ctx, nameIn{Name: testBox})
+	listed, err := svc.listSnapshots(ctx, listSnapshotsIn{Name: testBox})
 	if err != nil || len(listed.Snapshots) != 1 || listed.Snapshots[0].ID != "v1" {
 		t.Fatalf("listed = %+v err = %v", listed, err)
 	}
@@ -77,8 +78,8 @@ func restoreAndDelete(t *testing.T, svc *service, fp *fakeProvider) {
 func TestListSnapshotsEmptyIsNotNull(t *testing.T) {
 	t.Parallel()
 
-	svc := newTestService(t, t.TempDir(), testSprites, &fakeProvider{name: testSprites})
-	out, err := svc.listSnapshots(context.Background(), nameIn{Name: testBox})
+	svc := newTestService(t, t.TempDir(), testSprites, &fakeProvider{name: testSprites, infos: []sandbox.Info{{ID: testBox}}})
+	out, err := svc.listSnapshots(context.Background(), listSnapshotsIn{Name: testBox})
 	if err != nil || out.Snapshots == nil {
 		t.Fatalf("out = %+v err = %v", out, err)
 	}
@@ -133,9 +134,6 @@ func TestSnapshotToolsValidateInput(t *testing.T) {
 	if _, err := svc.createSnapshot(ctx, createSnapshotIn{}); err == nil {
 		t.Error("create_snapshot accepted an empty name")
 	}
-	if _, err := svc.listSnapshots(ctx, nameIn{}); err == nil {
-		t.Error("list_snapshots accepted an empty name")
-	}
 	if _, err := svc.restoreSnapshot(ctx, restoreSnapshotIn{Name: testBox, Snapshot: "../x"}); err == nil {
 		t.Error("restore_snapshot accepted a path as snapshot id")
 	}
@@ -159,7 +157,7 @@ func TestSnapshotToolsNeedCapability(t *testing.T) {
 	if !errors.Is(err, sandbox.ErrUnsupported) {
 		t.Fatalf("err = %v, want ErrUnsupported", err)
 	}
-	if _, err := svc.listSnapshots(ctx, nameIn{Name: testBox}); !errors.Is(err, sandbox.ErrUnsupported) {
+	if _, err := svc.listSnapshots(ctx, listSnapshotsIn{Provider: testPlain, Name: testBox}); !errors.Is(err, sandbox.ErrUnsupported) {
 		t.Errorf("list err = %v", err)
 	}
 	if _, err := svc.restoreSnapshot(ctx, restoreSnapshotIn{Name: testBox, Snapshot: "v1"}); !errors.Is(err, sandbox.ErrUnsupported) {
@@ -191,4 +189,84 @@ func TestListProvidersReportsSnapshotRestoreMode(t *testing.T) {
 			}
 		}
 	}
+}
+
+func snapshotFakes() (sprites, modal *fakeProvider) {
+	at := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	sprites = &fakeProvider{
+		name: testSprites, infos: []sandbox.Info{{ID: "web"}},
+		snaps: []sandbox.Snapshot{{ID: "v2", Comment: "first", CreatedAt: at}},
+	}
+	modal = &fakeProvider{
+		name: testModal, infos: []sandbox.Info{{ID: "api"}},
+		snaps: []sandbox.Snapshot{{ID: "im-1", Comment: "second", CreatedAt: at.Add(time.Hour)}},
+	}
+	return sprites, modal
+}
+
+func TestListSnapshotsAcrossProviders(t *testing.T) {
+	t.Parallel()
+
+	sprites, modal := snapshotFakes()
+	svc := newTestService(t, t.TempDir(), testSprites, sprites, modal)
+	ctx := context.Background()
+
+	all, err := svc.listSnapshots(ctx, listSnapshotsIn{})
+	if err != nil || len(all.Snapshots) != 2 || len(all.Warnings) != 0 {
+		t.Fatalf("all = %+v err = %v", all, err)
+	}
+	// The registry lists providers by name, so modal comes first.
+	want := []snapshotInfo{
+		{ID: "im-1", Sandbox: "api", Provider: testModal, Comment: "second", CreatedAt: "2026-01-02T04:04:05Z"},
+		{ID: "v2", Sandbox: "web", Provider: testSprites, Comment: "first", CreatedAt: "2026-01-02T03:04:05Z"},
+	}
+	if !slices.Equal(all.Snapshots, want) {
+		t.Fatalf("snapshots = %+v, want %+v", all.Snapshots, want)
+	}
+
+	named, err := svc.listSnapshots(ctx, listSnapshotsIn{Name: "web"})
+	if err != nil || len(named.Snapshots) != 1 || named.Snapshots[0].ID != "v2" {
+		t.Fatalf("named = %+v err = %v", named, err)
+	}
+	only, err := svc.listSnapshots(ctx, listSnapshotsIn{Provider: testModal})
+	if err != nil || len(only.Snapshots) != 1 || only.Snapshots[0].ID != "im-1" {
+		t.Fatalf("only = %+v err = %v", only, err)
+	}
+}
+
+func TestListSnapshotsOneProviderFailing(t *testing.T) {
+	t.Parallel()
+
+	sprites, modal := snapshotFakes()
+	modal.listErr = errors.New("modal is down")
+	svc := newTestService(t, t.TempDir(), testSprites, sprites, modal)
+
+	out, err := svc.listSnapshots(context.Background(), listSnapshotsIn{})
+	if err != nil || len(out.Snapshots) != 1 || out.Snapshots[0].ID != "v2" {
+		t.Fatalf("out = %+v err = %v", out, err)
+	}
+	if len(out.Warnings) != 1 || !strings.Contains(out.Warnings[0], "could not list snapshots on modal") {
+		t.Fatalf("warnings = %v", out.Warnings)
+	}
+}
+
+func TestListSnapshotsAllFailing(t *testing.T) {
+	t.Parallel()
+
+	sprites, modal := snapshotFakes()
+	sprites.listErr, modal.listErr = errors.New("sprites is down"), errors.New("modal is down")
+	svc := newTestService(t, t.TempDir(), testSprites, sprites, modal)
+
+	_, err := svc.listSnapshots(context.Background(), listSnapshotsIn{})
+	if err == nil || !strings.Contains(err.Error(), "sprites is down") || !strings.Contains(err.Error(), "modal is down") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestListSnapshotsUnknownProvider(t *testing.T) {
+	t.Parallel()
+
+	svc := newTestService(t, t.TempDir(), testSprites, &fakeProvider{name: testSprites})
+	_, err := svc.listSnapshots(context.Background(), listSnapshotsIn{Provider: "nope"})
+	wantErr(t, err, `unknown provider "nope"`)
 }
