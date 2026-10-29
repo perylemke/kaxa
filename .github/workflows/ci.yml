@@ -37,7 +37,7 @@ jobs:
           cache: true
 
       - name: Integration tests
-        run: go test -race -count=1 -tags=integration ./internal/config/...
+        run: go test -race -count=1 -tags=integration ./internal/config/... ./internal/provider/...
 
   e2e:
     name: E2E tests
