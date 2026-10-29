@@ -19,6 +19,7 @@ const (
 	boxName = "box"
 	uvicorn = "uvicorn"
 	bigTpl  = "big"
+	e2bName = "e2b"
 )
 
 type recorder struct {

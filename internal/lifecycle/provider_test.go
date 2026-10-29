@@ -62,11 +62,11 @@ func TestResolveProviderConfiguresSprites(t *testing.T) {
 func TestResolveProviderConfiguresE2B(t *testing.T) {
 	t.Parallel()
 
-	p := &namedProvider{name: "e2b"}
+	p := &namedProvider{name: e2bName}
 	reg := registryWith(t, p)
 	cfg := config.Config{E2B: config.E2BConfig{APIKey: "key", Template: bigTpl}}
 
-	got, err := lifecycle.ResolveProvider(reg, cfg, "e2b")
+	got, err := lifecycle.ResolveProvider(reg, cfg, e2bName)
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
@@ -79,10 +79,10 @@ func TestResolveProviderRejectsBadE2BTemplate(t *testing.T) {
 	t.Parallel()
 
 	want := errors.New("bad template")
-	reg := registryWith(t, &namedProvider{name: "e2b", templateErr: want})
+	reg := registryWith(t, &namedProvider{name: e2bName, templateErr: want})
 	cfg := config.Config{E2B: config.E2BConfig{APIKey: "key", Template: "x y"}}
 
-	if _, err := lifecycle.ResolveProvider(reg, cfg, "e2b"); !errors.Is(err, want) {
+	if _, err := lifecycle.ResolveProvider(reg, cfg, e2bName); !errors.Is(err, want) {
 		t.Fatalf("err = %v, want %v", err, want)
 	}
 }

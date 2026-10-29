@@ -122,14 +122,14 @@ func TestAlternativesAppliesCredentials(t *testing.T) {
 
 	newReg := func() *registry.Registry {
 		reg := registry.New()
-		if err := reg.Register(&keyedProvider{restartingProvider: restartingProvider{altProvider{name: "e2b"}}}); err != nil {
+		if err := reg.Register(&keyedProvider{restartingProvider: restartingProvider{altProvider{name: e2bName}}}); err != nil {
 			t.Fatalf("register: %v", err)
 		}
 		return reg
 	}
 
 	got := lifecycle.Alternatives(newReg(), config.Config{E2B: config.E2BConfig{APIKey: "k"}}, sandbox.FeatureRestart)
-	if !slices.Equal(got, []string{"e2b"}) {
+	if !slices.Equal(got, []string{e2bName}) {
 		t.Fatalf("with a key: alternatives = %v, want [e2b]", got)
 	}
 	if got := lifecycle.Alternatives(newReg(), config.Config{}, sandbox.FeatureRestart); len(got) != 0 {
