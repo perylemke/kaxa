@@ -1,5 +1,8 @@
 name: Release
 
+# Final tags (vX.Y.Z) publish the GitHub release and the Homebrew cask, with the
+# notes taken from CHANGELOG.md. Pre-release tags (vX.Y.Z-alpha.N, -beta.N, -rc.N)
+# publish a GitHub pre-release only: GoReleaser marks it as such and skips the cask.
 on:
   push:
     tags:
@@ -17,12 +20,52 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Check the tag
+        id: tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          if echo "$TAG" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'; then
+            echo "final=true" >> "$GITHUB_OUTPUT"
+          elif echo "$TAG" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-(alpha|beta|rc)\.[1-9][0-9]*$'; then
+            echo "final=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::tag $TAG is not vX.Y.Z or vX.Y.Z-(alpha|beta|rc).N"
+            exit 1
+          fi
+
+      - name: Check the final tag is on main
+        if: steps.tag.outputs.final == 'true'
+        run: |
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || {
+            echo "::error::final tags must point to a commit on main"
+            exit 1
+          }
+
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
           cache: true
 
-      - uses: goreleaser/goreleaser-action@v6
+      - name: Release notes from CHANGELOG.md
+        if: steps.tag.outputs.final == 'true'
+        env:
+          TAG: ${{ github.ref_name }}
+        run: go run ./tools/changelog notes "$TAG" > "$RUNNER_TEMP/notes.md"
+
+      - name: GoReleaser (final)
+        if: steps.tag.outputs.final == 'true'
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --clean --release-notes=${{ runner.temp }}/notes.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+      - name: GoReleaser (pre-release)
+        if: steps.tag.outputs.final != 'true'
+        uses: goreleaser/goreleaser-action@v6
         with:
           version: "~> v2"
           args: release --clean
