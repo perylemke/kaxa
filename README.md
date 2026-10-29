@@ -13,7 +13,12 @@
 
 Unified CLI for sandbox providers. **kaxa** aggregates isolated execution environments behind one command-line interface, starting with [Fly.io Sprites](https://docs.fly.io/sprites) and [Modal Sandboxes](https://modal.com/docs/guide/sdk-javascript-go).
 
-Sprites lifecycle commands (`create`, `list`, `exec`, `console`, `restart`, `upgrade`, `snapshot`, `destroy`) are implemented when using `--provider sprites`. Modal implements `create`, `list`, `exec`, `console`, `snapshot`, and `destroy`; set it up with [Modal account and token](docs/modal-account.md). Features that only exist for Sprites (`restart`, `upgrade`, `url`, `--running`, `--public`) print that they are not available for Modal and name the providers that have them. `--sync` works on Modal too, with the workspace in `/home/modal/workspace`.
+Provider support:
+
+- **Sprites** (`--provider sprites`): `create`, `list`, `exec`, `console`, `restart`, `upgrade`, `snapshot`, `destroy`.
+- **Modal** (`--provider modal`): `create`, `list`, `exec`, `console`, `snapshot`, `destroy`. Set it up with [Modal account and token](docs/modal-account.md).
+
+Features that only exist for Sprites (`restart`, `upgrade`, `url`, `--running`, `--public`) print that they are not available for Modal and name the providers that have them. `--sync` works on Modal too, with the workspace in `/home/modal/workspace`.
 
 ## Requirements
 
