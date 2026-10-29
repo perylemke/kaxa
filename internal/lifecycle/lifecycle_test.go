@@ -35,6 +35,8 @@ type recorder struct {
 
 type basicProvider struct{ rec *recorder }
 
+const errReserved = "reserved"
+
 func (b basicProvider) Name() string { return "fake" }
 func (b basicProvider) Create(_ context.Context, spec sandbox.Spec) (sandbox.ID, error) {
 	b.rec.created = spec
@@ -400,6 +402,7 @@ func TestValidateAPI(t *testing.T) {
 	}{
 		{name: "ok", port: 8000, argv: []string{uvicorn, "app:app"}},
 		{name: "no command", port: 8000, want: "api command is required"},
+		{name: "option as binary", port: 8000, argv: []string{"--http-port", "1"}, want: "not an option"},
 		{name: "blank argument", port: 8000, argv: []string{uvicorn, " "}, want: "empty argument"},
 		{name: "low port", port: 0, argv: []string{uvicorn}, want: "invalid api port"},
 		{name: "high port", port: 70000, argv: []string{uvicorn}, want: "invalid api port"},
@@ -458,9 +461,12 @@ func TestResolveAPIEnv(t *testing.T) {
 		{name: "comma inherited", entries: []string{"WITH_COMMA"}, errHas: "comma"},
 		{name: "newline", entries: []string{"X=a\nb"}, errHas: "control character"},
 		{name: "duplicate", entries: []string{"X=1", "X=2"}, errHas: "more than once"},
-		{name: "reserved path", entries: []string{"PATH=/bin"}, errHas: "reserved"},
-		{name: "reserved home", entries: []string{"HOME=/"}, errHas: "reserved"},
-		{name: "kaxa token", entries: []string{"KAXA_SPRITES_TOKEN"}, errHas: "reserved"},
+		{name: "reserved path", entries: []string{"PATH=/bin"}, errHas: errReserved},
+		{name: "reserved home", entries: []string{"HOME=/"}, errHas: errReserved},
+		{name: "kaxa token", entries: []string{"KAXA_SPRITES_TOKEN"}, errHas: errReserved},
+		{name: "modal token", entries: []string{"MODAL_TOKEN_SECRET"}, errHas: errReserved},
+		{name: "fly token", entries: []string{"FLY_API_TOKEN=x"}, errHas: errReserved},
+		{name: "sprites token", entries: []string{"SPRITES_TOKEN"}, errHas: errReserved},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -497,5 +503,43 @@ func TestCreatePassesAPIEnvToPublisher(t *testing.T) {
 	}
 	if !slices.Equal(rec.env, []string{modeProd}) {
 		t.Fatalf("env = %v", rec.env)
+	}
+}
+
+type runningProvider struct{ *fullProvider }
+
+func (runningProvider) SupportsRunning() {}
+
+func TestCheckRejectsPublicTerminal(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		req     lifecycle.Request
+		wantErr bool
+	}{
+		{name: "running public without api", req: lifecycle.Request{Name: boxName, Running: true, Public: true}, wantErr: true},
+		{name: "running public with api", req: lifecycle.Request{Name: boxName, Running: true, Public: true, API: true, APIPort: 8000, APICmd: []string{uvicorn}}},
+		{name: "running private", req: lifecycle.Request{Name: boxName, Running: true}},
+		{name: "public without running", req: lifecycle.Request{Name: boxName, Public: true}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			full, rec := newFull()
+			_, err := lifecycle.Create(context.Background(), runningProvider{full}, tt.req, nil)
+			if tt.wantErr {
+				if err == nil || !strings.Contains(err.Error(), "terminal") {
+					t.Fatalf("err = %v", err)
+				}
+				if rec.created.Name != "" {
+					t.Fatalf("created %q before rejecting", rec.created.Name)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("create: %v", err)
+			}
+		})
 	}
 }

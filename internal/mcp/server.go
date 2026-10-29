@@ -8,6 +8,8 @@ package mcp
 import (
 	"context"
 	"io"
+	"os"
+	"strings"
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -32,6 +34,26 @@ type Options struct {
 	Stderr io.Writer
 	// Root bounds which Git repositories sync may copy. Empty means the working directory.
 	Root string
+	// APIEnvAllow lists the server environment variables an agent may copy into
+	// a service with a bare KEY in api_env. Empty means none.
+	APIEnvAllow []string
+	// LookupEnv reads the server environment. Nil means os.LookupEnv.
+	LookupEnv func(string) (string, bool)
+}
+
+// EnvAPIEnvAllow names the variable that holds the comma-separated allowlist of
+// server environment variables an agent may copy into a service.
+const EnvAPIEnvAllow = "KAXA_MCP_API_ENV"
+
+// ParseAPIEnvAllow splits the value of KAXA_MCP_API_ENV into variable names.
+func ParseAPIEnvAllow(raw string) []string {
+	var out []string
+	for name := range strings.SplitSeq(raw, ",") {
+		if name = strings.TrimSpace(name); name != "" {
+			out = append(out, name)
+		}
+	}
+	return out
 }
 
 // New builds an MCP server with the sandbox tools registered.
@@ -49,7 +71,7 @@ func New(reg *registry.Registry, cfg config.Config, opts Options) (*sdk.Server, 
 
 // Serve runs the server on stdin and stdout until the client disconnects or ctx ends.
 func Serve(ctx context.Context, reg *registry.Registry, cfg config.Config, stderr io.Writer) error {
-	srv, err := New(reg, cfg, Options{Stderr: stderr})
+	srv, err := New(reg, cfg, Options{Stderr: stderr, APIEnvAllow: ParseAPIEnvAllow(os.Getenv(EnvAPIEnvAllow))})
 	if err != nil {
 		return err
 	}

@@ -164,9 +164,9 @@ func TestCreateRunningRegistersHoldAndHTTPService(t *testing.T) {
 		run: func(_ context.Context, _ string, argv []string, _ io.Reader, stdout, _ io.Writer) error {
 			runCalls = append(runCalls, append([]string(nil), argv...))
 			switch argv[0] {
-			case "uname":
+			case cmdUname:
 				_, _ = io.WriteString(stdout, "x86_64\n")
-			case "sha256sum":
+			case cmdSha256sum:
 				_, _ = io.WriteString(stdout, "bb69984aab06d9463ed5da46a81b71d2d1582ba75c9c07c65f49fecbb52f7b7b  /tmp/kaxa-webtmux.tar.gz\n")
 			}
 			return nil
@@ -216,9 +216,9 @@ func TestCreateRunningRejectsBadWebtmuxChecksum(t *testing.T) {
 				startedService = true
 			}
 			switch argv[0] {
-			case "uname":
+			case cmdUname:
 				_, _ = io.WriteString(stdout, "x86_64\n")
-			case "sha256sum":
+			case cmdSha256sum:
 				_, _ = io.WriteString(stdout, "0000000000000000000000000000000000000000000000000000000000000000  /tmp/kaxa-webtmux.tar.gz\n")
 			}
 			return nil

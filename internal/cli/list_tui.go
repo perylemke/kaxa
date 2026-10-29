@@ -233,24 +233,24 @@ func (m listInteractiveModel) detailView() string {
 	var b strings.Builder
 	b.WriteString("Sandbox detail\n\n")
 	if m.detailErr != nil {
-		fmt.Fprintf(&b, "Could not load detail: %v\n\n", m.detailErr)
+		fmt.Fprintf(&b, "Could not load detail: %s\n\n", plainText(m.detailErr.Error()))
 		b.WriteString("esc back • q quit\n")
 		return b.String()
 	}
 	d := m.detail
-	fmt.Fprintf(&b, "Name          %s\n", d.ID)
-	fmt.Fprintf(&b, "Status        %s\n", d.Status)
+	fmt.Fprintf(&b, "Name          %s\n", plainText(string(d.ID)))
+	fmt.Fprintf(&b, "Status        %s\n", plainText(d.Status))
 	if d.SpriteUUID != "" {
 		fmt.Fprintf(&b, "ID            sprite-%s\n", d.SpriteUUID)
 	}
 	if d.Organization != "" {
-		fmt.Fprintf(&b, "Organization  %s\n", d.Organization)
+		fmt.Fprintf(&b, "Organization  %s\n", plainText(d.Organization))
 	}
 	if d.URL != "" {
-		fmt.Fprintf(&b, "URL           %s\n", d.URL)
+		fmt.Fprintf(&b, "URL           %s\n", plainText(d.URL))
 	}
 	if d.Auth != "" {
-		fmt.Fprintf(&b, "Auth          %s\n", d.Auth)
+		fmt.Fprintf(&b, "Auth          %s\n", plainText(d.Auth))
 	}
 	fmt.Fprintf(&b, "Created       %s\n", formatRelativeTime(d.CreatedAt))
 	fmt.Fprintf(&b, "Updated       %s\n", formatRelativeTime(d.UpdatedAt))

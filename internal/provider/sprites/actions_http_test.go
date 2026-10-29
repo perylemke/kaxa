@@ -97,3 +97,26 @@ func writeSpriteDetail(w http.ResponseWriter) {
 		"updated_at": time.Now().Add(-10 * time.Minute).Format(time.RFC3339),
 	})
 }
+
+func TestRestartErrorBodyIsCapped(t *testing.T) {
+	t.Parallel()
+
+	const token = "cap-test-token" // #nosec G101 -- test fixture
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(strings.Repeat("A", 1<<20)))
+	}))
+	t.Cleanup(srv.Close)
+
+	p := sprites.New()
+	if err := p.ConfigureWithOptions(token, srv.URL, spritesdk.WithDisableControl()); err != nil {
+		t.Fatalf("configure: %v", err)
+	}
+	err := p.Restart(context.Background(), spriteName)
+	if err == nil {
+		t.Fatal("restart succeeded")
+	}
+	if len(err.Error()) > 8<<10 {
+		t.Fatalf("error is %d bytes", len(err.Error()))
+	}
+}

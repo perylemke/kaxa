@@ -27,9 +27,9 @@ func newListTable(infos []sandbox.Info, focused bool, height int) table.Model {
 	rows := make([]table.Row, 0, len(infos))
 	for _, info := range infos {
 		rows = append(rows, table.Row{
-			string(info.ID),
-			info.Status,
-			info.Provider,
+			plainText(string(info.ID)),
+			plainText(info.Status),
+			plainText(info.Provider),
 			joinListLabels(info.Labels),
 		})
 	}
@@ -74,7 +74,7 @@ func writeListPlain(w io.Writer, infos []sandbox.Info) error {
 	}
 	for _, info := range infos {
 		labels := joinListLabels(info.Labels)
-		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", info.ID, info.Status, info.Provider, labels); err != nil {
+		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", plainText(string(info.ID)), plainText(info.Status), plainText(info.Provider), labels); err != nil {
 			return err
 		}
 	}
@@ -82,7 +82,7 @@ func writeListPlain(w io.Writer, infos []sandbox.Info) error {
 }
 
 func joinListLabels(labels []string) string {
-	return strings.Join(labels, ",")
+	return plainText(strings.Join(labels, ","))
 }
 
 func listOutputIsTTY(w io.Writer) bool {

@@ -144,7 +144,7 @@ func writeSnapshots(w io.Writer, snaps []sandbox.Snapshot) error {
 		if !s.CreatedAt.IsZero() {
 			created = s.CreatedAt.UTC().Format(time.RFC3339)
 		}
-		if _, err := fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", s.Provider, s.Sandbox, s.ID, created, s.Comment); err != nil {
+		if _, err := fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", plainText(s.Provider), plainText(string(s.Sandbox)), plainText(string(s.ID)), created, plainText(s.Comment)); err != nil {
 			return err
 		}
 	}

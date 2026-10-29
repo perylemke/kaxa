@@ -28,6 +28,8 @@ A client started from a terminal inherits your `PATH`, so `command` can be `kaxa
 
 The tokens stay in the environment of that process. Put `KAXA_DEFAULT_PROVIDER` and the token of each provider you use in the client's `env` block: `KAXA_SPRITES_TOKEN` for Sprites, and `KAXA_MODAL_TOKEN_ID` with `KAXA_MODAL_TOKEN_SECRET` for Modal. Do not commit a file that contains a token, and do not paste a token into a prompt. See [Sprites account and token](sprites-account.md) and [Modal account and token](modal-account.md). `--provider` on the command also sets the default.
 
+A bare `KEY` in `api_env` copies a variable from the `kaxa mcp` environment, so an agent could ask for any secret that environment holds. kaxa refuses it unless the name is in `KAXA_MCP_API_ENV`, a comma-separated list that you set in the same `env` block, for example `"KAXA_MCP_API_ENV": "DATABASE_URL,REDIS_URL"`. Without it, the agent can only pass `KEY=VALUE`.
+
 After the server is connected, ask the agent to call `list_providers`. Sprites and Modal are available. Modal supports create (with `sync`), list, inspect, exec, snapshots, and destroy; its `capabilities` report `sync`, `setup`, `workspace_layout`, and `snapshot` as true and the rest as false. On Modal, `exec` commands start in the image root unless the sandbox was created with `sync`; then they run as the `modal` user in `/home/modal/workspace`.
 
 ### Cursor
@@ -179,8 +181,8 @@ A request that needs a missing capability fails before anything is created, with
 | `api` | Publish one HTTP service. Requires `api_cmd` |
 | `api_cmd` | Argv of the service as a list. The first item is the binary |
 | `api_port` | Port the service listens on. Default `8000`. `8080` is reserved with `running` |
-| `api_env` | Service environment as a list. Each item is `KEY=VALUE`, or `KEY` to copy the value from the server environment. No commas in values. `HOME`, `USER`, `PATH`, and `KAXA_` names are reserved. Requires `api` |
-| `public` | Make the URL reachable without a provider account |
+| `api_env` | Service environment as a list. Each item is `KEY=VALUE`, or `KEY` to copy the value from the server environment, but only for names the user listed in `KAXA_MCP_API_ENV`. No commas in values. `HOME`, `USER`, `PATH`, and names that start with `KAXA_`, `MODAL_TOKEN_`, `FLY_`, or `SPRITES_` are reserved. Requires `api` |
+| `public` | Make the URL reachable without a provider account. Refused with `running` unless `api` is set, because the tmux terminal has no login |
 
 The result has `id`, `provider`, `work_dir`, `url` and `auth`. `work_dir` is where the repository lives inside the sandbox and is set only with `sync`. Use it instead of assuming a path.
 
@@ -212,6 +214,8 @@ A command that exits non-zero is a result: the tool succeeds and `exit_code` is 
 
 Each of `stdout` and `stderr` keeps the first 256 KiB. When more is produced, the rest is dropped, a marker line ends the text, and `truncated` is true. The command is not interrupted. There is no stdin, so a command that reads input sees end of file.
 
+`timeout_seconds` stops a command that runs too long. It defaults to 1800 (30 minutes) and cannot exceed 7200 (2 hours). A command stopped by the timeout is a tool error.
+
 On a sandbox created with `sync`, the command starts in the provider workspace directory, which contains the repository. For Sprites that is `/home/sprite/workspace` and for Modal `/home/modal/workspace`, and `work_dir` is a subdirectory of it. Run project commands from `work_dir`, for example `["bash", "-c", "cd <work_dir> && go test ./..."]`.
 
 ### Snapshots
@@ -231,7 +235,7 @@ The result has `sandbox` (the one that holds the restored state), `snapshot`, `p
 
 - Edits made with the agent's local file tools are not in the sandbox. Edits made in the sandbox are not copied back. Move code with `git` inside `exec`, or create a new sandbox with `sync`. There is no pull tool yet.
 - `sync_repository` adds a repository but never refreshes one. To send new local changes, create a new sandbox or move the code with `git` inside `exec`.
-- `sync` and `sync_repository` copy only a repository that contains the server working directory or sits below it. This keeps a prompt from sending an unrelated repository to a remote provider. Start `kaxa mcp` from the project, or pass a `dir` inside it. A symlink that leaves the working directory is rejected.
+- `sync` and `sync_repository` copy only a repository that contains the server working directory or sits below it. This keeps a prompt from sending an unrelated repository to a remote provider. Start `kaxa mcp` from the project, or pass a `dir` inside it. A symlink that leaves the working directory is rejected. The server refuses to start sync when its working directory is the filesystem root or your home directory, because that would allow every repository under it; set `cwd` to the project.
 - Network policy and connectors are not exposed. Use the provider's own tools for them. Memory snapshots are not supported.
 - `destroy` is permanent, and its tool is marked destructive so a client can ask first. On Modal it does not delete snapshots, which outlive the sandbox; on Sprites the checkpoints are destroyed with the sprite.
 

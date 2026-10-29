@@ -5,8 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -69,6 +69,11 @@ func (p *Provider) SetURLAuth(ctx context.Context, id sandbox.ID, auth string) e
 	if err != nil {
 		return err
 	}
+	if auth == sandbox.URLAuthPublic {
+		if err := refuseTerminalURL(ctx, c, string(id), token); err != nil {
+			return err
+		}
+	}
 	client, ok := c.(*realSDKClient)
 	if !ok {
 		return usererr.New("url auth requires the sprites API", "pass --provider sprites")
@@ -81,6 +86,19 @@ func (p *Provider) SetURLAuth(ctx context.Context, id sandbox.ID, auth string) e
 	}
 	if err := putSpriteJSON(ctx, client.baseURL, token, "/v1/sprites/"+string(id), body); err != nil {
 		return redactErr(err, token)
+	}
+	return nil
+}
+
+// refuseTerminalURL fails when the sprite URL serves the unauthenticated tmux
+// terminal. A sprite created before the terminal label existed is not covered.
+func refuseTerminalURL(ctx context.Context, c sdkClient, name, token string) error {
+	sp, err := c.GetSprite(ctx, name)
+	if err != nil {
+		return redactErr(err, token)
+	}
+	if slices.Contains(spriteLabels(sp), sandbox.TerminalLabel) {
+		return sandbox.PublicTerminalError()
 	}
 	return nil
 }
@@ -181,6 +199,9 @@ func validateAPIArgv(argv []string) error {
 	if len(argv) == 0 {
 		return usererr.New("api command is required", "pass --api-cmd with comma-separated argv")
 	}
+	if strings.HasPrefix(argv[0], "-") {
+		return usererr.New("api command must start with a binary", "put the binary first in --api-cmd")
+	}
 	for _, arg := range argv {
 		if arg == "" || strings.Contains(arg, ",") {
 			return usererr.New("api command has an empty argument", "separate argv with commas and omit empty items")
@@ -210,7 +231,7 @@ func putSpriteJSON(ctx context.Context, baseURL, token, path string, body []byte
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := apiHTTPClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -220,8 +241,7 @@ func putSpriteJSON(ctx context.Context, baseURL, token, path string, body []byte
 		}
 	}()
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= 300 {
-		respBody, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("API returned status %d: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
+		return fmt.Errorf("API returned status %d: %s", resp.StatusCode, errorBody(resp))
 	}
 	return nil
 }

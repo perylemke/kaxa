@@ -24,7 +24,7 @@ Only final versions (`vX.Y.Z`) update the cask. Test versions (`vX.Y.Z-alpha.N`,
 
 ### Gatekeeper
 
-The kaxa binary is not signed or notarized, so macOS Gatekeeper can block a binary downloaded from the internet. After install, the cask removes the `com.apple.quarantine` attribute from the binary with `xattr`. Nothing else is changed.
+The kaxa binary is not signed or notarized, so macOS Gatekeeper can block a binary downloaded from the internet. After install, the cask removes the `com.apple.quarantine` attribute from the binary with `xattr`. Nothing else is changed. This lowers the protection macOS gives to downloads, so it stays only until the binary is signed and notarized; Homebrew's SHA-256 check and the signature above are the integrity checks meanwhile.
 
 If you download an archive from the [releases page](https://github.com/perylemke/kaxa/releases) yourself, verify it against `checksums.txt`, then remove the flag by hand:
 
@@ -76,7 +76,27 @@ less install.sh
 sh install.sh
 ```
 
-The checksum comes from the same release as the archive. It catches a corrupted or truncated download, but it does not protect you from a compromised release. kaxa binaries are not signed.
+The checksum comes from the same release as the archive. It catches a corrupted or truncated download, but by itself it does not protect you from a compromised release, because whoever can replace the archive can replace `checksums.txt` too. That is why `checksums.txt` is signed; see [Verify the signature](#verify-the-signature).
+
+### Verify the signature
+
+Each release carries `checksums.txt.sigstore.json`, a [cosign](https://docs.sigstore.dev/cosign/installation/) keyless signature of `checksums.txt` made by `release.yml` of this repository through GitHub OIDC. The archives also have an SPDX SBOM and a GitHub build provenance attestation. The install scripts check the signature when `cosign` is on your `PATH`. Set `REQUIRE_SIGNATURE=1` to stop when cosign is missing or the release has no signature; releases made before signing was added have none.
+
+```bash
+curl -fsSL https://github.com/perylemke/kaxa/releases/latest/download/install.sh | REQUIRE_SIGNATURE=1 sh
+```
+
+To check by hand, download `checksums.txt` and `checksums.txt.sigstore.json` from the release, then:
+
+```bash
+cosign verify-blob \
+  --bundle checksums.txt.sigstore.json \
+  --certificate-identity-regexp '^https://github.com/perylemke/kaxa/\.github/workflows/release\.yml@refs/tags/v' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  checksums.txt
+```
+
+For an archive, `gh attestation verify kaxa_<version>_<os>_<arch>.tar.gz --repo perylemke/kaxa` checks the provenance.
 
 ### Test versions
 

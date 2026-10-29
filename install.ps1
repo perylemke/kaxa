@@ -5,9 +5,12 @@
 # Environment:
 #   VERSION      Release to install, without the leading v (default: latest).
 #   INSTALL_DIR  Where to put kaxa.exe (default: %USERPROFILE%\bin).
+#   REQUIRE_SIGNATURE  Set to 1 to stop unless checksums.txt has a valid cosign
+#                      signature. Without it, a signature is checked when cosign
+#                      is installed and the release has one.
 #
 # The archive is checked against the release checksums.txt before anything is
-# installed. Nothing here needs administrator rights. The work happens in a
+# installed. checksums.txt itself is checked against its cosign signature. Nothing here needs administrator rights. The work happens in a
 # function that is called on the last line, so a cut download runs nothing.
 
 $ErrorActionPreference = "Stop"
@@ -63,6 +66,32 @@ function Test-Checksum([string]$Dir, [string]$File) {
     Write-Host "${File}: OK"
 }
 
+# A bad signature always stops the install. A missing cosign or bundle only stops
+# it when REQUIRE_SIGNATURE=1, because releases before signing have no bundle.
+function Test-Signature([string]$Dir, [string]$Base) {
+    $required = $env:REQUIRE_SIGNATURE -eq "1"
+    if (-not (Get-Command cosign -ErrorAction SilentlyContinue)) {
+        if ($required) { Fail "REQUIRE_SIGNATURE=1 needs cosign, which is not installed" }
+        Write-Host "cosign not found: skipping the signature check of checksums.txt"
+        return
+    }
+    $bundle = Join-Path $Dir "checksums.txt.sigstore.json"
+    try {
+        Invoke-WebRequest -Uri "$Base/checksums.txt.sigstore.json" -OutFile $bundle -UseBasicParsing
+    }
+    catch {
+        if ($required) { Fail "this release has no signature for checksums.txt" }
+        Write-Host "no signature published for this release: skipping the signature check"
+        return
+    }
+    & cosign verify-blob --bundle $bundle `
+        --certificate-identity-regexp "^https://github.com/perylemke/kaxa/\.github/workflows/release\.yml@refs/tags/v" `
+        --certificate-oidc-issuer "https://token.actions.githubusercontent.com" `
+        (Join-Path $Dir "checksums.txt") *> $null
+    if ($LASTEXITCODE -ne 0) { Fail "signature of checksums.txt is not valid" }
+    Write-Host "checksums.txt: signature OK"
+}
+
 function Add-ToUserPath([string]$Dir) {
     $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
     $entries = @($userPath -split ";" | Where-Object { $_ } | ForEach-Object { $_.TrimEnd("\") })
@@ -91,6 +120,7 @@ function Install-Kaxa {
         Write-Host "Installing kaxa $version (windows/$arch) to $installDir"
         Invoke-WebRequest -Uri "$base/$file" -OutFile (Join-Path $tmp $file) -UseBasicParsing
         Invoke-WebRequest -Uri "$base/checksums.txt" -OutFile (Join-Path $tmp "checksums.txt") -UseBasicParsing
+        Test-Signature $tmp $base
         Test-Checksum $tmp $file
 
         $extract = Join-Path $tmp "extract"

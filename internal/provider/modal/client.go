@@ -12,8 +12,10 @@ import (
 )
 
 const (
-	appName        = "kaxa"
-	imageTag       = "debian:bookworm-slim"
+	appName = "kaxa"
+	// imageTag is pinned by digest so a moved tag cannot change what runs in the
+	// sandbox. To update it, resolve the new digest of debian:bookworm-slim.
+	imageTag       = "debian:bookworm-slim@sha256:99c0b25c46d0214d5a2091092e7908907dcaecd6a962cde0ac700acee222b6f3"
 	nameTag        = "kaxa.name"
 	labelTagValue  = "true"
 	sandboxTimeout = 24 * time.Hour // Modal's maximum sandbox lifetime.

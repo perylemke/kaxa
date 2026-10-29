@@ -17,6 +17,12 @@ import (
 	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
+// Commands the fake remote runner recognizes.
+const (
+	cmdUname     = "uname"
+	cmdSha256sum = "sha256sum"
+)
+
 func TestPublishAPIBuildsServiceCommand(t *testing.T) {
 	t.Parallel()
 
@@ -112,9 +118,9 @@ func TestCreateRunningWithAPILeavesURLForAPI(t *testing.T) {
 		run: func(_ context.Context, _ string, argv []string, _ io.Reader, stdout, _ io.Writer) error {
 			runCalls = append(runCalls, append([]string(nil), argv...))
 			switch argv[0] {
-			case "uname":
+			case cmdUname:
 				_, _ = io.WriteString(stdout, "x86_64\n")
-			case "sha256sum":
+			case cmdSha256sum:
 				_, _ = io.WriteString(stdout, "bb69984aab06d9463ed5da46a81b71d2d1582ba75c9c07c65f49fecbb52f7b7b  /tmp/kaxa-webtmux.tar.gz\n")
 			}
 			return nil
@@ -145,6 +151,10 @@ func TestSetURLAuthPutsAuth(t *testing.T) {
 	const token = "public-test-token" // #nosec G101 -- test fixture
 	var body map[string]map[string]string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/v1/sprites/"+spriteName {
+			writeSpriteDetail(w)
+			return
+		}
 		if r.Method != http.MethodPut || r.URL.Path != "/v1/sprites/"+spriteName {
 			http.NotFound(w, r)
 			return
@@ -182,6 +192,88 @@ func TestSetURLAuthRejectsUnknown(t *testing.T) {
 	p := sprites.NewWithClient(&fakeSDKClient{}, "token")
 	err := p.SetURLAuth(context.Background(), spriteName, "open")
 	if err == nil || !strings.Contains(err.Error(), "invalid url auth") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestSetURLAuthRefusesPublicTerminal(t *testing.T) {
+	t.Parallel()
+
+	client := &fakeSDKClient{
+		get: func(context.Context, string) (*spritesdk.Sprite, error) {
+			return &spritesdk.Sprite{Labels: []string{"kaxa", sandbox.TerminalLabel}}, nil
+		},
+	}
+	p := sprites.NewWithClient(client, "token")
+	err := p.SetURLAuth(context.Background(), spriteName, sandbox.URLAuthPublic)
+	if err == nil || !strings.Contains(err.Error(), "unauthenticated tmux terminal") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestSetURLAuthSpriteAllowedForTerminal(t *testing.T) {
+	t.Parallel()
+
+	client := &fakeSDKClient{
+		get: func(context.Context, string) (*spritesdk.Sprite, error) {
+			return &spritesdk.Sprite{Labels: []string{sandbox.TerminalLabel}}, nil
+		},
+	}
+	p := sprites.NewWithClient(client, "token")
+	err := p.SetURLAuth(context.Background(), spriteName, sandbox.URLAuthSprite)
+	if err != nil && strings.Contains(err.Error(), "unauthenticated") {
+		t.Fatalf("sprite auth refused: %v", err)
+	}
+}
+
+func TestCreateRunningWithoutAPILabelsTerminal(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		spec sandbox.Spec
+		want bool
+	}{
+		{name: "running", spec: sandbox.Spec{Name: spriteName, Running: true}, want: true},
+		{name: "running with api", spec: sandbox.Spec{Name: spriteName, Running: true, ExposeAPI: true}},
+		{name: "plain", spec: sandbox.Spec{Name: spriteName}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var labels []string
+			client := &fakeSDKClient{
+				create: func(_ context.Context, _ string, l []string) (*spritesdk.Sprite, error) {
+					labels = append([]string(nil), l...)
+					return &spritesdk.Sprite{}, nil
+				},
+				run: func(_ context.Context, _ string, argv []string, _ io.Reader, stdout, _ io.Writer) error {
+					switch argv[0] {
+					case cmdUname:
+						_, _ = io.WriteString(stdout, "x86_64\n")
+					case cmdSha256sum:
+						_, _ = io.WriteString(stdout, "bb69984aab06d9463ed5da46a81b71d2d1582ba75c9c07c65f49fecbb52f7b7b  /tmp/kaxa-webtmux.tar.gz\n")
+					}
+					return nil
+				},
+			}
+			p := sprites.NewWithClient(client, "token")
+			if _, err := p.Create(context.Background(), tt.spec); err != nil {
+				t.Fatalf("create: %v", err)
+			}
+			if got := slices.Contains(labels, sandbox.TerminalLabel); got != tt.want {
+				t.Fatalf("labels = %v, terminal label = %v, want %v", labels, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestPublishAPIRejectsOptionAsBinary(t *testing.T) {
+	t.Parallel()
+
+	p := sprites.NewWithClient(&fakeSDKClient{}, "token")
+	err := p.PublishAPI(context.Background(), "box", "/home/sprite", 8000, []string{"--http-port", "1"}, nil)
+	if err == nil || !strings.Contains(err.Error(), "must start with a binary") {
 		t.Fatalf("err = %v", err)
 	}
 }

@@ -24,13 +24,15 @@ Modal sandboxes use a Debian image, live for up to 24 hours, and stop after one 
 | `--api-cmd` | Comma-separated argv. The first item is the binary |
 | `--api-port` | Port the process listens on. Default `8000`. `8080` is reserved when `--running` is also set |
 | `--api-env` | Environment variable for the service: `KEY=VALUE`, or `KEY` to copy the value from your shell. Repeat for more. Requires `--api` |
-| `--public` | Make the Sprites URL reachable without an account |
+| `--public` | Make the Sprites URL reachable without an account. Refused with `--running` unless `--api` is set |
 
 `--api-cmd`, `--api-env`, and a changed `--api-port` require `--api`. `--dir` requires `--sync`.
 
 ## Sync
 
 `--sync` copies the Git repository that contains the start directory, including `.git` and excluding ignored files. A subdirectory still copies the whole repository. The root selects Go, Rust, Python, Node, Ruby, and Clojure; missing tools are installed, then project dependencies. A `Gemfile` runs `bundle install` (`--frozen` with a `Gemfile.lock`), and installs Ruby when `bundle` is missing. A `deps.edn` runs `clojure -P`, and installs the Clojure CLI, plus a JDK when `java` is missing. `project.clj` alone is not detected. A failed copy or install deletes the sandbox.
+
+The copy leaves out credentials: untracked files such as `.env` or `id_rsa` stop the sync with an error, and `.git/config` is stripped of URL credentials and `http.extraHeader`. See [sync](sync.md#limits).
 
 `--dir` must exist and be a directory. A relative path is resolved from the current directory. A missing path, a file, or a directory outside a Git repository fails before create.
 
@@ -83,7 +85,7 @@ Values cannot contain commas or control characters, because the provider joins v
 
 ## Public URL
 
-`--public` sets the Sprites URL auth to `public` after the service is running. A failed auth change leaves the sandbox in place. Change it later with [kaxa url](url.md).
+`--public` sets the Sprites URL auth to `public` after the service is running. `--running` without `--api` serves a tmux terminal on the URL that has no login, so `--public` is refused for it. A failed auth change leaves the sandbox in place. Change it later with [kaxa url](url.md).
 
 ## What gets deleted
 

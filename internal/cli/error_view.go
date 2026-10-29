@@ -37,10 +37,10 @@ func WriteError(w io.Writer, err error) error {
 
 	var body strings.Builder
 	body.WriteString("  ")
-	body.WriteString(message)
+	body.WriteString(plainText(message))
 	if hint != "" {
 		body.WriteString("\n\n  ")
-		body.WriteString(hintStyle.Render("hint  " + hint))
+		body.WriteString(hintStyle.Render("hint  " + plainText(hint)))
 	}
 
 	border := lipgloss.RoundedBorder()
@@ -75,7 +75,7 @@ func WriteSuccess(w io.Writer, title, message string) error {
 	border.BottomLeft = "╰"
 	border.BottomRight = "╯"
 
-	inner := titleStyle.Render(title) + "\n\n  " + message
+	inner := titleStyle.Render(title) + "\n\n  " + plainText(message)
 	box := lipgloss.NewStyle().
 		Border(border, true).
 		BorderForeground(lipgloss.Color("2")).

@@ -35,6 +35,25 @@ checksum:
     - glob: install.sh
     - glob: install.ps1
 
+# checksums.txt covers the archives and both install scripts. Signing it with
+# cosign (keyless, tied to release.yml through GitHub OIDC) lets a user check that
+# the file came from this repository's workflow, not only that it matches the
+# archive next to it. The bundle is attached to the release.
+signs:
+  - cmd: cosign
+    artifacts: checksum
+    signature: "${artifact}.sigstore.json"
+    args:
+      - sign-blob
+      - --yes
+      - --bundle=${signature}
+      - ${artifact}
+    output: true
+
+# One SPDX document per archive, made by syft.
+sboms:
+  - artifacts: archive
+
 release:
   prerelease: auto
   extra_files:
@@ -66,6 +85,9 @@ homebrew_casks:
       name: homebrew-tap
       branch: main
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    # kaxa is not signed or notarized by Apple yet, so Gatekeeper would block the
+    # binary. The quarantine flag is cleared until it is; the archive checksum and
+    # signature (see docs/install.md) are the integrity check meanwhile.
     hooks:
       post:
         install_steps: |

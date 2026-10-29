@@ -6,7 +6,7 @@ Set Sprites URL authentication. This command is only supported for the sprites p
 kaxa url <name> <public|sprite>
 ```
 
-`public` lets anyone with the address open the URL. `sprite` requires a Sprites account. No other value is accepted.
+`public` lets anyone with the address open the URL. `sprite` requires a Sprites account. No other value is accepted. `public` is refused for a sandbox created with `--running` and no API, because its URL serves a tmux terminal that has no login. Sandboxes created before this check existed carry no marker, so keep their URL on `sprite`.
 
 On success, kaxa prints the URL and the access mode. A failed update leaves the sandbox in place.
 

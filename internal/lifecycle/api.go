@@ -19,6 +19,12 @@ func ValidateAPI(running bool, port int, argv []string) error {
 			"pass the argv to run; the first item is the binary",
 		)
 	}
+	if strings.HasPrefix(argv[0], "-") {
+		return usererr.New(
+			"api command must start with a binary, not an option",
+			"put the binary first, for example uvicorn,app.main:app",
+		)
+	}
 	for _, arg := range argv {
 		if strings.TrimSpace(arg) == "" {
 			return usererr.New(
@@ -47,6 +53,9 @@ const (
 	maxAPIEnvValue   = 8192
 	reservedEnvKaxa  = "KAXA_"
 )
+
+// reservedAPIEnvPrefixes are provider credential families that never reach a service.
+var reservedAPIEnvPrefixes = []string{reservedEnvKaxa, "MODAL_TOKEN_", "FLY_", "SPRITES_"}
 
 // reservedAPIEnv lists variables the provider sets for the service itself.
 var reservedAPIEnv = map[string]struct{}{"HOME": {}, "USER": {}, "PATH": {}}
@@ -94,7 +103,7 @@ func splitAPIEnv(entry string, lookup func(string) (string, bool)) (string, stri
 			"use KEY=VALUE or KEY, with letters, digits, and underscores, not starting with a digit",
 		)
 	}
-	if _, reserved := reservedAPIEnv[key]; reserved || strings.HasPrefix(key, reservedEnvKaxa) {
+	if _, reserved := reservedAPIEnv[key]; reserved || hasReservedPrefix(key) {
 		return "", "", usererr.New(
 			fmt.Sprintf("api env %s is reserved", key),
 			"choose another variable name",
@@ -111,6 +120,15 @@ func splitAPIEnv(entry string, lookup func(string) (string, bool)) (string, stri
 		)
 	}
 	return key, got, nil
+}
+
+func hasReservedPrefix(key string) bool {
+	for _, prefix := range reservedAPIEnvPrefixes {
+		if strings.HasPrefix(key, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func checkAPIEnvValue(key, value string) error {

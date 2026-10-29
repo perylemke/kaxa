@@ -1,13 +1,13 @@
 package sprites
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"strings"
 
+	"github.com/perylemke/kaxa/internal/sandbox"
 	"github.com/perylemke/kaxa/internal/toolchain"
 )
 
@@ -149,8 +149,9 @@ func runRemoteStdin(ctx context.Context, c sdkClient, name, token string, argv [
 }
 
 func runRemoteIn(ctx context.Context, c sdkClient, name, token, dir string, env, argv []string, stdin io.Reader) (string, error) {
-	var stdout, stderr bytes.Buffer
-	err := c.RunIn(ctx, name, dir, env, argv, stdin, &stdout, &stderr)
+	stdout := sandbox.NewCappedBuffer(sandbox.MaxCapturedOutput)
+	stderr := sandbox.NewCappedBuffer(sandbox.MaxCapturedOutput)
+	err := c.RunIn(ctx, name, dir, env, argv, stdin, stdout, stderr)
 	if err == nil {
 		return stdout.String(), nil
 	}
