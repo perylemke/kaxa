@@ -42,8 +42,12 @@ test: ## Unit tests (default go test ./...)
 	$(GO) test -race -shuffle=on ./...
 
 .PHONY: test-integration
-test-integration: ## Integration tests
-	$(GO) test -race -count=1 -tags=integration ./internal/config/... ./internal/provider/modal/...
+test-integration: ## Integration tests (in-memory fakes, no network, no cost)
+	$(GO) test -race -count=1 -tags=integration ./internal/config/... ./internal/provider/...
+
+.PHONY: test-live
+test-live: ## Tests against the real provider APIs; needs KAXA_* credentials and BILLS compute
+	$(GO) test -race -count=1 -timeout 30m -tags=live -v ./internal/provider/...
 
 .PHONY: test-e2e
 test-e2e: ## End-to-end tests (builds binary)

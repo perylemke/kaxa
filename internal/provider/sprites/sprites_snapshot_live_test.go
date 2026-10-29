@@ -1,4 +1,4 @@
-//go:build integration
+//go:build live
 
 package sprites_test
 
