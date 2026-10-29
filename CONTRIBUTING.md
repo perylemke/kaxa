@@ -70,6 +70,8 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and a
 
 semtag orders pre-release names as text and requires them to increase, so `alpha` comes before `beta`, `beta` before `rc`, and a version allows up to 9 pre-releases per type. After that, cut a new version.
 
+Creating a `v*` tag is restricted by the GitHub ruleset "Release tags" (Settings → Rules) to repository admins, so only maintainers can start a release. Deleting that ruleset removes the restriction.
+
 A wrong tag can be undone with `git push origin :refs/tags/vX.Y.Z-rc.N`, `git tag -d vX.Y.Z-rc.N`, and deleting the GitHub release. Never reuse a final version.
 
 ## Install scripts
