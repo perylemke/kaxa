@@ -9,6 +9,12 @@ BIN ?= bin/kaxa
 CMD := ./cmd/kaxa
 GOSEC ?= gosec
 GOSEC_SARIF ?= gosec.sarif
+SEMTAG ?= semtag
+SCOPE ?=
+TYPE ?= rc
+
+# scripts/release.sh reads these from the environment.
+export SEMTAG GO
 
 VERSION ?= dev
 COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
@@ -96,6 +102,24 @@ gosec: ## gosec SAST; SARIF in gosec.sarif; fails on findings
 .PHONY: goreleaser-check
 goreleaser-check: ## Validate .goreleaser.yml
 	goreleaser check
+
+.PHONY: next-version
+next-version: ## Print the next final version for SCOPE=major|minor|patch (tags nothing)
+	@./scripts/release.sh next "$(SCOPE)"
+
+.PHONY: changelog-release
+changelog-release: ## Move [Unreleased] into the next version of CHANGELOG.md (SCOPE=major|minor|patch)
+	@version=$$(./scripts/release.sh next "$(SCOPE)") && \
+		echo "Updating CHANGELOG.md for $$version" && \
+		$(GO) run ./tools/changelog release "$$version"
+
+.PHONY: release
+release: ## Tag and push a final version from main (SCOPE=major|minor|patch); publishes the Homebrew cask
+	@./scripts/release.sh final "$(SCOPE)"
+
+.PHONY: prerelease
+prerelease: ## Tag and push a test version (SCOPE=major|minor|patch TYPE=alpha|beta|rc); not on Homebrew
+	@./scripts/release.sh pre "$(SCOPE)" "$(TYPE)"
 
 .PHONY: ci
 ci: tidy vet test test-integration test-e2e test-acceptance lint vuln gosec goreleaser-check ## Run CI-equivalent checks locally
