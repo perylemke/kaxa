@@ -203,6 +203,11 @@ go test -race -shuffle=on ./...
 go test -race -count=1 -tags=integration ./internal/config/... ./internal/provider/...
 # or: make test-integration
 
+# Coverage of unit and integration tests (prints the total, writes coverage.out)
+make coverage
+# plus coverage.html, with the uncovered lines marked
+make coverage-html
+
 # Live tests against the real Sprites and Modal APIs (needs KAXA_* credentials; BILLS compute)
 make test-live
 
