@@ -166,7 +166,7 @@ func addTool[In, Out any](s *service, srv *sdk.Server, name, title, description 
 		if err != nil {
 			var zero Out
 			s.log.Warn("tool failed", "tool", name, "error", err)
-			return nil, zero, withHint(lifecycle.WithAlternatives(s.reg, err))
+			return nil, zero, withHint(lifecycle.WithAlternatives(s.reg, s.cfg, err))
 		}
 		return nil, out, nil
 	})

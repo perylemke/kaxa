@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/perylemke/kaxa/internal/cli"
+	"github.com/perylemke/kaxa/internal/config"
 	"github.com/perylemke/kaxa/internal/lifecycle"
 	"github.com/perylemke/kaxa/internal/registry"
 	"github.com/perylemke/kaxa/internal/sandbox"
@@ -286,7 +287,7 @@ func TestSnapshotUnsupportedHintNamesAlternatives(t *testing.T) {
 	cmd.SetArgs([]string{testProviderFlag, plainName, snapCmdName, "list", snapBox})
 
 	// cli.Execute applies WithAlternatives to the command error before printing it.
-	err := lifecycle.WithAlternatives(reg, cmd.Execute())
+	err := lifecycle.WithAlternatives(reg, config.Config{Sprites: config.SpritesConfig{Token: "tok"}}, cmd.Execute())
 	ue, ok := usererr.As(err)
 	if !ok || ue.Message != "snapshot is not available for plain" || !strings.Contains(ue.Hint, testSpritesName) {
 		t.Fatalf("err = %#v", err)

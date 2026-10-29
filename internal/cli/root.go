@@ -21,7 +21,10 @@ func Execute(reg *registry.Registry) int {
 		if exitErr, ok := errors.AsType[*sandbox.ExitError](err); ok {
 			return remoteExitCode(exitErr.Code)
 		}
-		_ = WriteError(os.Stderr, lifecycle.WithAlternatives(reg, err))
+		// A load error leaves cfg empty: no provider has credentials, so the
+		// hint names none, and the command error is what the user needs.
+		cfg, _ := config.Load(config.LoadOptions{}, reg)
+		_ = WriteError(os.Stderr, lifecycle.WithAlternatives(reg, cfg, err))
 		return 1
 	}
 	return 0
