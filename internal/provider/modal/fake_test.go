@@ -24,6 +24,8 @@ type fakeClient struct {
 	images        map[string][]string
 	fromImage     []imageCall
 	deletedImages []string
+	// deleteImageErr makes DeleteImage fail.
+	deleteImageErr error
 
 	// Exec bookkeeping: what the provider asked for and what the process does.
 	execName string
@@ -125,6 +127,9 @@ func (f *fakeClient) CreateFromImage(_ context.Context, name string, labels []st
 }
 
 func (f *fakeClient) DeleteImage(_ context.Context, imageID string) error {
+	if f.deleteImageErr != nil {
+		return f.deleteImageErr
+	}
 	if _, ok := f.images[imageID]; !ok {
 		return modal.ErrImageNotFound
 	}

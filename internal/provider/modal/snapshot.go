@@ -52,8 +52,7 @@ func (p *Provider) Snapshot(ctx context.Context, id sandbox.ID, comment string) 
 	}
 	if err := idx.add(entry); err != nil {
 		// An image kaxa cannot list could never be deleted, so do not leave it behind.
-		_ = c.DeleteImage(ctx, imageID)
-		return sandbox.Snapshot{}, err
+		return sandbox.Snapshot{}, unrecordedImageErr(err, c.DeleteImage(ctx, imageID), imageID, secrets)
 	}
 	return p.toSnapshot(entry), nil
 }
@@ -174,7 +173,7 @@ func (p *Provider) entry(id sandbox.ID, snap sandbox.SnapshotID) (snapshotEntry,
 	if !ok {
 		return snapshotEntry{}, usererr.New(
 			fmt.Sprintf("snapshot %q not found for sandbox %q", snap, id),
-			"run kaxa snapshot list --provider modal to see the snapshots; Modal keeps them for 30 days and kaxa lists only those taken on this machine",
+			fmt.Sprintf("run kaxa snapshot list %s --provider modal to see the snapshots; Modal keeps them for 30 days and kaxa lists only those taken on this machine", id),
 		)
 	}
 	return e, nil
@@ -185,6 +184,19 @@ func (p *Provider) forget(imageID string) {
 	if idx, err := p.snapshotIndex(); err == nil {
 		_ = idx.remove(imageID)
 	}
+}
+
+// unrecordedImageErr reports a snapshot image that could not be written to the
+// index. When the image could not be deleted either, it stays on Modal with a
+// copy of the filesystem, so the error names it.
+func unrecordedImageErr(indexErr, deleteErr error, imageID string, secrets []string) error {
+	if deleteErr == nil || errors.Is(deleteErr, ErrImageNotFound) {
+		return indexErr
+	}
+	msg := fmt.Sprintf("snapshot image %s was created but kaxa could not record it (%v) or delete it (%v)",
+		imageID, indexErr, redact(deleteErr, secrets...))
+	return usererr.Wrap(errors.Join(indexErr, deleteErr), msg,
+		"delete that image in Modal; it holds a copy of the sandbox filesystem for 30 days")
 }
 
 func imageGoneErr(err error, snap sandbox.SnapshotID) error {

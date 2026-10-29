@@ -3,6 +3,7 @@ package modal_test
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/perylemke/kaxa/internal/provider/modal"
 	"github.com/perylemke/kaxa/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/usererr"
 )
 
 const (
@@ -130,6 +132,22 @@ func TestRestoreErrors(t *testing.T) {
 	}
 }
 
+// The hint must be a command that works: snapshot list needs the sandbox name.
+func TestUnknownSnapshotHintNamesTheSandbox(t *testing.T) {
+	t.Parallel()
+
+	p := newSnapshotProvider(t, newFakeClient())
+	addBox(t, p, srcName)
+	_, err := p.Restore(context.Background(), sandbox.RestoreRequest{Sandbox: srcName, Snapshot: "im-99", Target: newTarget})
+	ue, ok := usererr.As(err)
+	if !ok {
+		t.Fatalf("err = %v, want a user error", err)
+	}
+	if want := "kaxa snapshot list " + srcName + " --provider modal"; !strings.Contains(ue.Hint, want) {
+		t.Fatalf("hint = %q, want %q", ue.Hint, want)
+	}
+}
+
 func TestRestoreRefusesSnapshotOfAnotherSandbox(t *testing.T) {
 	t.Parallel()
 
@@ -151,6 +169,55 @@ func TestRestoreRefusesSnapshotOfAnotherSandbox(t *testing.T) {
 	}
 	if len(fake.deletedImages) != 0 {
 		t.Fatalf("deleted images = %v", fake.deletedImages)
+	}
+}
+
+// brokenIndexProvider returns a provider whose snapshot index cannot be
+// written: its directory would have to live under a regular file.
+func brokenIndexProvider(t *testing.T, fake *fakeClient) *modal.Provider {
+	t.Helper()
+	p := newProvider(t, fake)
+	file := filepath.Join(t.TempDir(), "not-a-dir")
+	if err := os.WriteFile(file, nil, 0o600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	p.SetSnapshotIndexPath(filepath.Join(file, "kaxa", "snapshots.json"))
+	return p
+}
+
+func TestSnapshotIndexFailureDeletesTheImage(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeClient()
+	p := brokenIndexProvider(t, fake)
+	addBox(t, p, srcName)
+	if _, err := p.Snapshot(context.Background(), srcName, ""); err == nil {
+		t.Fatal("snapshot succeeded without a writable index")
+	}
+	if !slices.Equal(fake.deletedImages, []string{firstImage}) {
+		t.Fatalf("deleted images = %v, want the unrecorded image removed", fake.deletedImages)
+	}
+}
+
+// An image kaxa could neither record nor delete keeps a copy of the filesystem
+// for 30 days, so the error has to name it.
+func TestSnapshotIndexFailureNamesAnImageItCannotDelete(t *testing.T) {
+	t.Parallel()
+
+	errDelete := errors.New("modal is down")
+	fake := newFakeClient()
+	fake.deleteImageErr = errDelete
+	p := brokenIndexProvider(t, fake)
+	addBox(t, p, srcName)
+	_, err := p.Snapshot(context.Background(), srcName, "")
+	if err == nil {
+		t.Fatal("snapshot succeeded without a writable index")
+	}
+	if !strings.Contains(err.Error(), firstImage) || !strings.Contains(err.Error(), errDelete.Error()) {
+		t.Fatalf("err = %q, want the image id and the delete error", err)
+	}
+	if !errors.Is(err, errDelete) {
+		t.Fatalf("err = %v, want it to wrap the delete error", err)
 	}
 }
 
