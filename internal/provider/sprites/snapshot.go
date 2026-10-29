@@ -38,11 +38,16 @@ func (p *Provider) Snapshot(ctx context.Context, id sandbox.ID, comment string) 
 	if err != nil {
 		return sandbox.Snapshot{}, redactErr(err, token)
 	}
-	cp := newest(added(before, after))
-	if cp == nil {
-		return sandbox.Snapshot{}, errors.New("sprites: checkpoint was created but is not listed")
+	fresh := added(before, after)
+	if len(fresh) != 1 {
+		// Two or none: the new checkpoint cannot be told apart from another
+		// create, and a wrong ID would roll the sprite back to the wrong state.
+		return sandbox.Snapshot{}, usererr.New(
+			fmt.Sprintf("could not tell which checkpoint of %q is the new one (%d appeared)", id, len(fresh)),
+			fmt.Sprintf("run kaxa snapshot list %s --provider sprites to find it", id),
+		)
 	}
-	return p.toSnapshot(id, cp), nil
+	return p.toSnapshot(id, fresh[0]), nil
 }
 
 // ListSnapshots returns the checkpoints of a sprite, newest first.
@@ -164,14 +169,4 @@ func added(before, after []*spritesdk.Checkpoint) []*spritesdk.Checkpoint {
 		}
 	}
 	return out
-}
-
-func newest(cps []*spritesdk.Checkpoint) *spritesdk.Checkpoint {
-	var best *spritesdk.Checkpoint
-	for _, cp := range cps {
-		if best == nil || cp.CreateTime.After(best.CreateTime) {
-			best = cp
-		}
-	}
-	return best
 }

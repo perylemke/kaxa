@@ -16,6 +16,7 @@ import (
 
 	"github.com/perylemke/kaxa/internal/provider/sprites"
 	"github.com/perylemke/kaxa/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/usererr"
 )
 
 const snapshotToken = "snapshot-test-token" // #nosec G101 -- test fixture
@@ -27,6 +28,9 @@ type checkpointServer struct {
 	restored    string
 	deleted     []string
 	streamError string
+	// createExtra is how many checkpoints one create adds besides its own, to
+	// mimic a second create landing in the same window. -1 adds none at all.
+	createExtra int
 	deleteCode  int
 	deleteBody  string
 	badAuth     bool
@@ -63,11 +67,17 @@ func (s *checkpointServer) create(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
 	if s.streamError == "" {
-		s.checkpoints = append(s.checkpoints, map[string]any{
-			"id":          fmt.Sprintf("v%d", len(s.checkpoints)+1),
-			"create_time": time.Date(2026, 1, 1, 0, len(s.checkpoints), 0, 0, time.UTC).Format(time.RFC3339),
-			"comment":     body.Comment,
-		})
+		n := 1 + max(s.createExtra, 0)
+		if s.createExtra < 0 {
+			n = 0
+		}
+		for range n {
+			s.checkpoints = append(s.checkpoints, map[string]any{
+				"id":          fmt.Sprintf("v%d", len(s.checkpoints)+1),
+				"create_time": time.Date(2026, 1, 1, 0, len(s.checkpoints), 0, 0, time.UTC).Format(time.RFC3339),
+				"comment":     body.Comment,
+			})
+		}
 	}
 	s.stream(w)
 }
@@ -279,6 +289,34 @@ func TestSnapshotHidesCurrent(t *testing.T) {
 	}
 	if srv.restored != "" || len(srv.deleted) != 0 {
 		t.Errorf("a request reached the API: restored=%q deleted=%v", srv.restored, srv.deleted)
+	}
+}
+
+// The new checkpoint is found by diffing two lists, so it is only trusted when
+// exactly one checkpoint appeared. Anything else could be another create.
+func TestSnapshotRefusesAnAmbiguousCheckpoint(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		extra int
+	}{
+		{"another checkpoint appeared", 1},
+		{"no checkpoint appeared", -1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			p := newSnapshotProvider(t, &checkpointServer{createExtra: tt.extra})
+			_, err := p.Snapshot(context.Background(), spriteName, "x")
+			ue, ok := usererr.As(err)
+			if !ok {
+				t.Fatalf("err = %v, want a user error", err)
+			}
+			if want := "kaxa snapshot list " + spriteName; !strings.Contains(ue.Hint, want) {
+				t.Fatalf("hint = %q, want %q", ue.Hint, want)
+			}
+		})
 	}
 }
 
