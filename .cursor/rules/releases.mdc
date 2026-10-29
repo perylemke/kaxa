@@ -1,0 +1,15 @@
+---
+description: Semantic versioning, semtag releases, and CHANGELOG.md
+alwaysApply: true
+---
+
+# Releases
+
+- Versions follow Semantic Versioning and are tagged with semtag through `make`, never with a hand-made `git tag`.
+- Final `vX.Y.Z`: `make changelog-release SCOPE=...` (reviewed and merged by PR), then `make release SCOPE=...` from `main`. Publishes the GitHub release and the Homebrew cask.
+- Test `vX.Y.Z-(alpha|beta|rc).N`: `make prerelease SCOPE=... TYPE=...`. GitHub pre-release only; never the Homebrew cask. Users install it remotely with `install.sh` and `VERSION`.
+- `SCOPE` (`major`, `minor`, `patch`) is always explicit; never use semtag `auto`.
+- Add a line under `## [Unreleased]` in `CHANGELOG.md` for every user-visible change (Keep a Changelog sections). Do not edit released sections by hand.
+- Keep `.goreleaser.yml` (`release.prerelease: auto`, `homebrew_casks.skip_upload: auto`), `.github/workflows/release.yml`, `scripts/release.sh`, `docs/install.md`, and `CONTRIBUTING.md` in sync.
+- Creating `v*` tags is restricted to repository admins by the GitHub ruleset "Release tags"; do not try to work around it.
+- Never tag or push a release unless the user asks for it.

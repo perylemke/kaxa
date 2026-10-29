@@ -36,6 +36,7 @@ checksum:
     - glob: install.ps1
 
 release:
+  prerelease: auto
   extra_files:
     - glob: install.sh
     - glob: install.ps1
@@ -58,7 +59,7 @@ homebrew_casks:
     description: Unified CLI for sandbox providers
     license: Apache-2.0
     directory: Casks
-    skip_upload: false
+    skip_upload: auto
     commit_msg_template: "chore: update kaxa cask to {{ .Tag }}"
     repository:
       owner: perylemke

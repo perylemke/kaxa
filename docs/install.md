@@ -20,7 +20,7 @@ The cask downloads the darwin archive of the release (arm64 or amd64) and checks
 
 Homebrew links the binary at `$(brew --prefix)/bin/kaxa`, for example `/opt/homebrew/bin/kaxa` on Apple Silicon and `/usr/local/bin/kaxa` on Intel. Use that absolute path as `command` in a desktop MCP client; see [mcp](agent.md).
 
-Pre-release tags (for example `v0.0.0-rc.1`) also update the cask, so `brew upgrade` can install a release candidate.
+Only final versions (`vX.Y.Z`) update the cask. Test versions (`vX.Y.Z-alpha.N`, `-beta.N`, `-rc.N`) never reach Homebrew, so `brew install` and `brew upgrade` always give you a final release. To try a test version, install it remotely as described in [Test versions](#test-versions).
 
 ### Gatekeeper
 
@@ -77,6 +77,21 @@ sh install.sh
 ```
 
 The checksum comes from the same release as the archive. It catches a corrupted or truncated download, but it does not protect you from a compromised release. kaxa binaries are not signed.
+
+### Test versions
+
+Test versions are tagged `vX.Y.Z-alpha.N`, `vX.Y.Z-beta.N`, or `vX.Y.Z-rc.N` and are published as GitHub pre-releases. They are not on Homebrew, and the `latest` links above never point to them. Download the script from the test release itself and set `VERSION` to the same tag without the `v`:
+
+```bash
+curl -fsSL https://github.com/perylemke/kaxa/releases/download/v0.1.0-rc.1/install.sh | VERSION=0.1.0-rc.1 sh
+```
+
+```powershell
+$env:VERSION = "0.1.0-rc.1"
+irm https://github.com/perylemke/kaxa/releases/download/v0.1.0-rc.1/install.ps1 | iex
+```
+
+The list of test versions is on the [releases page](https://github.com/perylemke/kaxa/releases) (entries marked Pre-release). If a Homebrew install is in place, the script puts a second binary in `~/.local/bin`; remove it, or run `brew reinstall --cask kaxa`, to go back to the final version.
 
 ### Manual install: Linux and macOS
 

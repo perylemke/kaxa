@@ -35,7 +35,7 @@ brew upgrade --cask kaxa
 brew uninstall --cask kaxa
 ```
 
-The cask verifies the SHA-256 of the release archive and clears the macOS quarantine flag on the unsigned binary after install. See [install](docs/install.md).
+The cask verifies the SHA-256 of the release archive and clears the macOS quarantine flag on the unsigned binary after install. Homebrew only receives final versions (`vX.Y.Z`); test versions (`-alpha.N`, `-beta.N`, `-rc.N`) are installed remotely, see [Test versions](docs/install.md#test-versions). See [install](docs/install.md). Release notes are in [CHANGELOG.md](CHANGELOG.md).
 
 ### Install script (Linux, macOS, Windows)
 
@@ -51,7 +51,7 @@ curl -fsSL https://github.com/perylemke/kaxa/releases/latest/download/install.sh
 irm https://github.com/perylemke/kaxa/releases/latest/download/install.ps1 | iex
 ```
 
-Set `VERSION` (for example `0.0.0-rc.1`) to install a specific release and `INSTALL_DIR` to change the folder: `curl -fsSL .../install.sh | VERSION=0.0.0-rc.1 sh`. To read the script first, download it with `curl -fsSLO` and run it yourself. Manual steps, update, and remove are in [install](docs/install.md).
+Set `VERSION` (for example `0.1.0`) to install a specific release and `INSTALL_DIR` to change the folder: `curl -fsSL .../install.sh | VERSION=0.1.0 sh`. The `latest` link always points to the newest final version, never to a test version. To read the script first, download it with `curl -fsSLO` and run it yourself. Manual steps, update, and remove are in [install](docs/install.md).
 
 ### From source
 

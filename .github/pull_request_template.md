@@ -13,6 +13,7 @@
 - [ ] Lint: `golangci-lint run ./...`
 - [ ] Vulnerabilities: `govulncheck ./...`
 - [ ] SAST: `make gosec`
+- [ ] CHANGELOG.md updated under `[Unreleased]` (skip only for changes users never see)
 
 ## Security
 
