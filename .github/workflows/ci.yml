@@ -25,6 +25,33 @@ jobs:
       - name: Unit tests
         run: go test -race -shuffle=on ./...
 
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Coverage
+        run: |
+          make coverage
+          {
+            echo '### Test coverage'
+            echo
+            echo '```'
+            go tool cover -func=coverage.out | tail -n 1
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.out
+
   integration:
     name: Integration tests
     runs-on: ubuntu-latest
