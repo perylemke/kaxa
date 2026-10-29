@@ -233,7 +233,7 @@ The result has `sandbox` (the one that holds the restored state), `snapshot`, `p
 - `sync_repository` adds a repository but never refreshes one. To send new local changes, create a new sandbox or move the code with `git` inside `exec`.
 - `sync` and `sync_repository` copy only a repository that contains the server working directory or sits below it. This keeps a prompt from sending an unrelated repository to a remote provider. Start `kaxa mcp` from the project, or pass a `dir` inside it. A symlink that leaves the working directory is rejected.
 - Network policy and connectors are not exposed. Use the provider's own tools for them. Memory snapshots are not supported.
-- `destroy` is permanent, and its tool is marked destructive so a client can ask first. It does not delete snapshots.
+- `destroy` is permanent, and its tool is marked destructive so a client can ask first. On Modal it does not delete snapshots, which outlive the sandbox; on Sprites the checkpoints are destroyed with the sprite.
 
 ## Errors
 
