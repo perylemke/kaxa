@@ -54,6 +54,13 @@ type Snapshotter interface {
 	DeleteSnapshot(ctx context.Context, id ID, snap SnapshotID) error
 }
 
+// SnapshotCatalog is an optional capability of a Snapshotter that can list
+// every snapshot it knows at once, including those of sandboxes that no longer
+// exist. Without it, snapshots are listed sandbox by sandbox.
+type SnapshotCatalog interface {
+	ListAllSnapshots(ctx context.Context) ([]Snapshot, error)
+}
+
 // ValidSnapshotID reports whether id is a single path segment of ASCII
 // letters, digits, dots, underscores, and hyphens. It keeps an ID safe to put
 // in a URL path.

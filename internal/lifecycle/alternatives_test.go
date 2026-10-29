@@ -40,7 +40,7 @@ func altRegistry(t *testing.T) *registry.Registry {
 	for _, p := range []sandbox.Provider{
 		&restartingProvider{altProvider{name: "alpha"}},
 		&restartingProvider{altProvider{name: "stub", unavailable: true}},
-		&altProvider{name: "plain"},
+		&altProvider{name: testPlain},
 	} {
 		if err := reg.Register(p); err != nil {
 			t.Fatalf("register: %v", err)
@@ -65,7 +65,7 @@ func TestWithAlternatives(t *testing.T) {
 	t.Parallel()
 
 	reg := altRegistry(t)
-	plain := &altProvider{name: "plain"}
+	plain := &altProvider{name: testPlain}
 
 	tests := []struct {
 		name     string

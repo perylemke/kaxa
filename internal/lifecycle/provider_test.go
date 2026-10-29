@@ -39,11 +39,11 @@ func registryWith(t *testing.T, ps ...sandbox.Provider) *registry.Registry {
 func TestResolveProviderConfiguresSprites(t *testing.T) {
 	t.Parallel()
 
-	p := &namedProvider{name: "sprites"}
+	p := &namedProvider{name: listSprites}
 	reg := registryWith(t, p)
 	cfg := config.Config{Sprites: config.SpritesConfig{Token: "tok"}}
 
-	got, err := lifecycle.ResolveProvider(reg, cfg, "sprites")
+	got, err := lifecycle.ResolveProvider(reg, cfg, listSprites)
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
@@ -69,7 +69,7 @@ func TestResolveProviderLeavesOthersAlone(t *testing.T) {
 func TestResolveProviderErrors(t *testing.T) {
 	t.Parallel()
 
-	reg := registryWith(t, &namedProvider{name: "sprites"})
+	reg := registryWith(t, &namedProvider{name: listSprites})
 
 	_, err := lifecycle.ResolveProvider(reg, config.Config{}, "")
 	if ue, ok := usererr.As(err); !ok || !strings.Contains(ue.Message, "missing sandbox provider") {
@@ -86,7 +86,7 @@ type credProvider struct {
 	err        error
 }
 
-func (c *credProvider) Name() string { return "modal" }
+func (c *credProvider) Name() string { return listModal }
 
 func (c *credProvider) ConfigureCredentials(id, secret string) error {
 	c.id, c.secret = id, secret
@@ -100,7 +100,7 @@ func TestResolveProviderConfiguresModal(t *testing.T) {
 	reg := registryWith(t, p)
 	cfg := config.Config{Modal: config.ModalConfig{TokenID: "ak-1", TokenSecret: "as-2"}}
 
-	got, err := lifecycle.ResolveProvider(reg, cfg, "modal")
+	got, err := lifecycle.ResolveProvider(reg, cfg, listModal)
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
@@ -115,7 +115,7 @@ func TestResolveProviderModalConfigureError(t *testing.T) {
 	want := errors.New("missing credentials")
 	reg := registryWith(t, &credProvider{err: want})
 
-	if _, err := lifecycle.ResolveProvider(reg, config.Config{}, "modal"); !errors.Is(err, want) {
+	if _, err := lifecycle.ResolveProvider(reg, config.Config{}, listModal); !errors.Is(err, want) {
 		t.Fatalf("err = %v, want %v", err, want)
 	}
 }
@@ -123,9 +123,9 @@ func TestResolveProviderModalConfigureError(t *testing.T) {
 func TestResolveProviderModalWithoutConfigurer(t *testing.T) {
 	t.Parallel()
 
-	reg := registryWith(t, &namedProvider{name: "modal"})
+	reg := registryWith(t, &namedProvider{name: listModal})
 
-	if _, err := lifecycle.ResolveProvider(reg, config.Config{}, "modal"); err == nil {
+	if _, err := lifecycle.ResolveProvider(reg, config.Config{}, listModal); err == nil {
 		t.Fatal("modal provider without ConfigureCredentials accepted")
 	}
 }
