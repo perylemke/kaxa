@@ -13,8 +13,9 @@ import (
 
 func newURLCmd(reg *registry.Registry) *cobra.Command {
 	return &cobra.Command{
-		Use:   "url <name> <public|sprite>",
-		Short: "Set Sprites URL authentication",
+		Use:         "url <name> <public|sprite>",
+		Short:       "Set Sprites URL authentication",
+		Annotations: featureCommand(sandbox.FeatureURLAuth),
 		Long: `Set a Sprites sandbox URL to public or sprite.
 
 public lets anyone with the address open the URL. sprite requires a Sprites account. This command is only supported for the sprites provider.`,

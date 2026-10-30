@@ -2,6 +2,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"os"
 	"strings"
@@ -42,7 +43,7 @@ kaxa aggregates sandbox providers behind one CLI.
 
 Supported providers: ` + strings.Join(reg.Names(), ", ") + `.
 
-Configure Sprites or Modal credentials via KAXA_* environment variables (see README).`),
+Configure the credentials of each provider via KAXA_* environment variables (see README).`),
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
@@ -63,8 +64,9 @@ Configure Sprites or Modal credentials via KAXA_* environment variables (see REA
 		},
 	}
 
-	root.PersistentFlags().StringVar(&provider, "provider", "", "sandbox provider (sprites, modal)")
+	root.PersistentFlags().StringVar(&provider, "provider", "", "sandbox provider ("+strings.Join(reg.Names(), ", ")+")")
 	root.SetUsageTemplate(usageTemplate)
+	root.SetContext(withRegistry(context.Background(), reg))
 
 	root.AddCommand(newVersionCmd())
 	root.AddCommand(newCreateCmd(reg))

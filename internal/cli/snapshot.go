@@ -17,8 +17,9 @@ import (
 
 func newSnapshotCmd(reg *registry.Registry) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "snapshot",
-		Short: "Save and restore the state of a sandbox",
+		Use:         "snapshot",
+		Short:       "Save and restore the state of a sandbox",
+		Annotations: featureCommand(sandbox.FeatureSnapshot),
 		Long: `Save the filesystem of a sandbox and bring it back later.
 
 Whether a restore overwrites the sandbox or creates a new one depends on the
@@ -183,6 +184,7 @@ keeps the source.`,
 	}
 	cmd.Flags().StringVar(&to, "to", "", "name of the new sandbox (providers that restore into a new sandbox)")
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "restore in place without confirmation")
+	markProviderFlags(cmd, "to")
 	return cmd
 }
 

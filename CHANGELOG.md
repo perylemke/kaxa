@@ -27,6 +27,7 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 ### Changed
 
 - Configuration is read from environment variables only; Viper was removed.
+- `kaxa --help` lists the commands every provider has under `Commands:`, then one section per provider (Sprites, Modal, E2B) with the commands it supports. Command help splits `Flags:` from `Provider flags:`, and `--provider` names the registered providers.
 - The project was renamed from `sbox` to `kaxa`.
 - `--api-env` and `api_env` reject names starting with `MODAL_TOKEN_`, `FLY_`, or `SPRITES_` as well as `KAXA_`.
 - GitHub Actions are pinned to commit SHAs, the release job runs in the `release` environment with a read-only default token, and the Homebrew token reaches only the step that needs it.
