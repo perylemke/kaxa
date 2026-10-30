@@ -162,6 +162,7 @@ func TestDestroyPromptSingularForOneSandbox(t *testing.T) {
 	t.Setenv("KAXA_SPRITES_TOKEN", listToken)
 	t.Setenv("KAXA_MODAL_TOKEN_ID", "ak-1")
 	t.Setenv("KAXA_MODAL_TOKEN_SECRET", "as-2")
+	t.Setenv("KAXA_DEFAULT_PROVIDER", "")
 
 	cmd := cli.NewRootCmd(reg)
 	errOut := new(bytes.Buffer)

@@ -14,11 +14,18 @@ import (
 
 type namedProvider struct {
 	basicProvider
-	name  string
-	token string
+	name        string
+	token       string
+	template    string
+	templateErr error
 }
 
 func (n *namedProvider) Name() string { return n.name }
+
+func (n *namedProvider) SetDefaultTemplate(name string) error {
+	n.template = name
+	return n.templateErr
+}
 
 func (n *namedProvider) Configure(token string) error {
 	n.token = token
@@ -49,6 +56,34 @@ func TestResolveProviderConfiguresSprites(t *testing.T) {
 	}
 	if got != sandbox.Provider(p) || p.token != "tok" {
 		t.Fatalf("provider = %v token = %q", got, p.token)
+	}
+}
+
+func TestResolveProviderConfiguresE2B(t *testing.T) {
+	t.Parallel()
+
+	p := &namedProvider{name: e2bName}
+	reg := registryWith(t, p)
+	cfg := config.Config{E2B: config.E2BConfig{APIKey: "key", Template: bigTpl}}
+
+	got, err := lifecycle.ResolveProvider(reg, cfg, e2bName)
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if got != sandbox.Provider(p) || p.token != "key" || p.template != "big" {
+		t.Fatalf("provider = %v key = %q template = %q", got, p.token, p.template)
+	}
+}
+
+func TestResolveProviderRejectsBadE2BTemplate(t *testing.T) {
+	t.Parallel()
+
+	want := errors.New("bad template")
+	reg := registryWith(t, &namedProvider{name: e2bName, templateErr: want})
+	cfg := config.Config{E2B: config.E2BConfig{APIKey: "key", Template: "x y"}}
+
+	if _, err := lifecycle.ResolveProvider(reg, cfg, e2bName); !errors.Is(err, want) {
+		t.Fatalf("err = %v, want %v", err, want)
 	}
 }
 

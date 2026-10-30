@@ -9,22 +9,25 @@ kaxa new [name]
 
 Without a name, a form asks for the name, provider, and the same yes/no choices as the flags. When API is yes, the form asks for the command and the port. The form uses the Dracula theme. It does not ask for `--dir`; pass that flag if you need it.
 
-Sprites and Modal implement create. `--running`, API publish, and public URLs exist only for Sprites; Modal rejects them with a message that names the providers that have them. `--sync` works on both; see [Sync](#sync).
+Sprites, Modal, and E2B implement create. `--running` and public URLs exist only for Sprites; Modal and E2B reject them with a message that names the providers that have them. API publish works on Sprites and E2B. `--sync` works on all three; see [Sync](#sync).
 
 Modal sandboxes use a Debian image, live for up to 24 hours, and stop after one idle hour. Names are DNS labels. See [Modal account and token](modal-account.md).
+
+E2B sandboxes live for one hour after the last command and then pause, keeping their disk. Names are DNS labels. See [E2B account and API key](e2b-account.md).
 
 ## Flags
 
 | Flag | Meaning |
 | --- | --- |
 | `--running` | Keep the sandbox up for one hour, serve tmux on its URL, and open that URL in a browser |
-| `--sync` | Copy the current Git repository into `/home/sprite/workspace/<repo>` (Sprites) or `/home/modal/workspace/<repo>` (Modal) |
+| `--sync` | Copy the current Git repository into `/home/sprite/workspace/<repo>` (Sprites) `/home/modal/workspace/<repo>` (Modal), or `/home/user/workspace/<repo>` (E2B) |
 | `--dir` | Git repository to copy. Requires `--sync`. Default: the current directory |
-| `--api` | Publish one HTTP service on the Sprites URL. Requires `--api-cmd` |
+| `--api` | Publish one HTTP service on the Sprites URL, or on the E2B sandbox URL for the API port. Requires `--api-cmd` |
 | `--api-cmd` | Comma-separated argv. The first item is the binary |
 | `--api-port` | Port the process listens on. Default `8000`. `8080` is reserved when `--running` is also set |
 | `--api-env` | Environment variable for the service: `KEY=VALUE`, or `KEY` to copy the value from your shell. Repeat for more. Requires `--api` |
 | `--public` | Make the Sprites URL reachable without an account. Refused with `--running` unless `--api` is set |
+| `--template` | E2B only: the template to start the sandbox from. Default: `KAXA_E2B_TEMPLATE`, then `base`. See [Templates on E2B](#templates-on-e2b) |
 
 `--api-cmd`, `--api-env`, and a changed `--api-port` require `--api`. `--dir` requires `--sync`.
 
@@ -41,7 +44,7 @@ kaxa create --sync my-sprite
 kaxa create --sync --dir ~/projects/api-python my-sprite
 ```
 
-`exec` and `console` on a sandbox created with `--sync` start in the workspace: `/home/sprite/workspace` on Sprites, `/home/modal/workspace` on Modal.
+`exec` and `console` on a sandbox created with `--sync` start in the workspace: `/home/sprite/workspace` on Sprites, `/home/modal/workspace` on Modal, `/home/user/workspace` on E2B.
 
 ### Sync on Modal
 
@@ -54,6 +57,29 @@ A Modal sandbox created with `--sync` uses a larger image than a plain one: Debi
 `exec` and `console` on a synced Modal sandbox run as `modal`, not root, starting in `/home/modal/workspace`. A Modal sandbox created without `--sync` is unchanged: root, starting in the image root.
 
 Modal builds the sync image the first time you use `--sync` and caches it, so that first create can take a few minutes. Later creates start as fast as a plain sandbox, plus the copy and the install.
+
+### Sync on E2B
+
+```bash
+kaxa create --provider e2b --sync my-box
+```
+
+An E2B sandbox uses E2B's `base` template, which already has `curl`, `git`, and build tools. The repository lands in `/home/user/workspace/<repo>`, owned by `user`. Toolchains are installed under `/home/user/.local` and `/home/user/.cargo` and put on the `PATH` of `exec` and `console`, the same way as on Modal. Downloads are checked against pinned SHA-256 hashes.
+
+The E2B `base` template has 512 MiB of memory, and E2B sets memory per template, not per sandbox. Compiling a large package there is killed by the kernel (`signal: killed`). So on the `base` template the install step only downloads Go and Rust dependencies (`go mod download`, `cargo fetch`) instead of building them. The first build runs later, with `exec`; if it is killed too, use a template with more memory (see below). With `--template`, the install step runs the normal build.
+
+### Templates on E2B
+
+```bash
+kaxa create --provider e2b --template my-big-template --sync my-box
+export KAXA_E2B_TEMPLATE=my-big-template   # default for every E2B create
+```
+
+A template is a sandbox image you build outside kaxa, with the [E2B CLI or SDK](https://e2b.dev/docs/template/quickstart), where you pick the CPU, the memory, and the tools already installed. kaxa only starts sandboxes from it. The `--template` flag wins over `KAXA_E2B_TEMPLATE`, and `base` (or neither) means E2B's default.
+
+kaxa expects the same layout as `base`: user `user`, home `/home/user`, workspace `/home/user/workspace`. A template made with `fromBaseImage()` has it. Another user breaks `exec`, `console`, `--sync`, and `--api`, and kaxa does not detect that. A name that does not exist fails with `template "<name>" not found`; run `e2b template list` to see the names. Other providers reject `--template`, and `list_providers` reports `template` as a capability only for E2B.
+
+`exec` and `console` on an E2B sandbox created with `--sync` start in `/home/user/workspace`. Without `--sync` they start in `/home/user`. The sandbox pauses an hour after the last command; the next `exec`, `console`, or `sync` resumes it.
 
 ## API
 
@@ -70,6 +96,12 @@ kaxa create --sync --api --public \
   --api-cmd .venv/bin/uvicorn,app.main:app,--host,0.0.0.0,--port,8000 \
   my-sprite
 ```
+
+### API on E2B
+
+On E2B, `--api` runs the service as `user` in the repository directory (or `/home/user` without `--sync`) and waits for the port to accept connections, for up to 90 seconds. If the process exits first, kaxa deletes the sandbox and shows its last output. The service log is not kept.
+
+E2B sandboxes are private. `--api` is what opens the API port to the internet, at `https://<port>-<sandbox id>.e2b.app`, and E2B fixes that when the sandbox is created. `list` shows the URL. Anyone who has the URL can call the service. `--public` does not apply, because the URL is already open on that one port. `restart` stops the service; start it again with `exec`, or create the sandbox again.
 
 ## API environment
 

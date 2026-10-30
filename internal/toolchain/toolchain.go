@@ -173,7 +173,7 @@ func (i *installer) runProjectCommands(ctx context.Context, workDir string, step
 		}
 		cmd := append([]string{}, argv...)
 		cmd[0] = bin
-		if _, err := i.runIn(ctx, workDir, env, cmd, nil); err != nil {
+		if err := i.runWithRetry(ctx, workDir, env, cmd); err != nil {
 			return fmt.Errorf("%s: %w", step.Kind, err)
 		}
 	}

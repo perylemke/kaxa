@@ -11,7 +11,7 @@ alwaysApply: false
 - Call `t.Parallel()` in tests that do not share mutable state.
 - Unit tests live next to the package; no build tag.
 - Integration tests use `//go:build integration` under the package they exercise. They use in-memory fakes and must never call a paid API or need credentials.
-- Tests that call the real Sprites or Modal APIs use `//go:build live` (`*_live_test.go`), run only through `make test-live`, and are not part of `make ci`.
+- Tests that call the real Sprites, Modal, or E2B APIs use `//go:build live` (`*_live_test.go`), run only through `make test-live`, and are not part of `make ci`.
 - E2E and acceptance tests live under `test/e2e` and `test/acceptance` with `//go:build e2e` and `//go:build acceptance`.
 - Use `t.Setenv`, `t.TempDir`, and `t.Helper()` instead of global env or fixed paths.
 - Assert errors with `errors.Is` / `errors.As`; avoid brittle string matching on full error text unless necessary.

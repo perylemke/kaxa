@@ -33,6 +33,8 @@ type Request struct {
 	// APIEnv holds resolved KEY=VALUE entries for the API service. See ResolveAPIEnv.
 	APIEnv []string
 	Public bool
+	// Template is the template to start from. Empty means the provider default.
+	Template string
 	// Root and Repo locate the Git repository to copy. Both are set when Sync is true.
 	Root string
 	Repo string
@@ -68,6 +70,11 @@ func Check(p sandbox.Provider, req Request) error {
 	if req.Running {
 		if _, ok := p.(sandbox.RunningSupport); !ok {
 			return Unsupported(p, sandbox.FeatureRunning)
+		}
+	}
+	if req.Template != "" {
+		if _, ok := p.(sandbox.TemplateSupport); !ok {
+			return Unsupported(p, sandbox.FeatureTemplate)
 		}
 	}
 	if req.Sync {
@@ -156,10 +163,20 @@ func createSandbox(ctx context.Context, p sandbox.Provider, req Request, run Run
 			Labels:    req.Labels(),
 			Running:   req.Running,
 			ExposeAPI: req.API,
+			APIPort:   apiPortOf(req),
+			Template:  req.Template,
 		})
 		return createErr
 	})
 	return id, err
+}
+
+// apiPortOf is the port a published API will use, or 0 when there is no API.
+func apiPortOf(req Request) int {
+	if !req.API {
+		return 0
+	}
+	return req.APIPort
 }
 
 func syncAndInstall(ctx context.Context, p sandbox.Provider, id sandbox.ID, req Request, run Runner) error {

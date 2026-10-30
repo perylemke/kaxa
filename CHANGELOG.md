@@ -10,7 +10,8 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 
 ### Added
 
-- Sandbox providers: Fly.io Sprites and Modal, behind one CLI.
+- Sandbox providers: Fly.io Sprites, Modal, and E2B, behind one CLI. E2B supports create (with `--sync` and `--api`), list, exec, console, restart, sync, and destroy, and reads `KAXA_E2B_API_KEY`.
+  - E2B sandboxes can start from your own template with `create --template`, `KAXA_E2B_TEMPLATE`, or `template` in the MCP `create_sandbox`.
 - `kaxa mcp`, which serves sandboxes to AI agents over the Model Context Protocol.
 - Toolchain installation in Sprites sandboxes.
 - Sandbox snapshots: create, list, restore, and delete.
@@ -30,6 +31,7 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 - `--api-env` and `api_env` reject names starting with `MODAL_TOKEN_`, `FLY_`, or `SPRITES_` as well as `KAXA_`.
 - GitHub Actions are pinned to commit SHAs, the release job runs in the `release` environment with a read-only default token, and the Homebrew token reaches only the step that needs it.
 - The Modal base image is pinned by digest.
+- Dependency installs after `--sync` and `sync` are tried up to three times when a network error such as an HTTP/2 `GOAWAY` or a connection reset interrupts them.
 - Updated `golang.org/x/net` to v0.62.0.
 
 ### Security

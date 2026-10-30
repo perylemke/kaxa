@@ -43,6 +43,12 @@ type Spec struct {
 	Labels    []string
 	Running   bool
 	ExposeAPI bool
+	// APIPort is the port the published API will listen on. Only set with
+	// ExposeAPI; a provider whose URL is per port uses it to build the URL.
+	APIPort int
+	// Template names the image the sandbox starts from. Empty means the
+	// provider default. Only a provider that implements TemplateSupport accepts it.
+	Template string
 }
 
 // Info summarizes an existing sandbox.
@@ -158,6 +164,12 @@ type Upgrader interface {
 // terminal on its URL when Spec.Running is set.
 type RunningSupport interface {
 	SupportsRunning()
+}
+
+// TemplateSupport marks a provider that can start a sandbox from a named
+// template when Spec.Template is set.
+type TemplateSupport interface {
+	SupportsTemplate()
 }
 
 // Provider is a sandbox backend (Sprites, Modal, etc.).

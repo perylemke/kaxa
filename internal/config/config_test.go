@@ -42,6 +42,8 @@ func TestLoadFromEnv(t *testing.T) {
 	t.Setenv("KAXA_SPRITES_TOKEN", token)
 	t.Setenv("KAXA_MODAL_TOKEN_ID", "modal-id")
 	t.Setenv("KAXA_MODAL_TOKEN_SECRET", "modal-secret")
+	t.Setenv("KAXA_E2B_API_KEY", "e2b-key")
+	t.Setenv("KAXA_E2B_TEMPLATE", "big")
 
 	cfg, err := config.Load(config.LoadOptions{}, reg)
 	if err != nil {
@@ -55,6 +57,12 @@ func TestLoadFromEnv(t *testing.T) {
 	}
 	if cfg.Modal.TokenID != "modal-id" || cfg.Modal.TokenSecret != "modal-secret" {
 		t.Fatalf("modal credentials not loaded from env")
+	}
+	if cfg.E2B.Template != "big" {
+		t.Fatalf("e2b template = %q", cfg.E2B.Template)
+	}
+	if cfg.E2B.APIKey != "e2b-key" {
+		t.Fatalf("e2b api key not loaded from env")
 	}
 }
 
