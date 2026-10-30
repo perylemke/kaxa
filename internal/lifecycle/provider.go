@@ -13,6 +13,7 @@ const (
 	spritesProvider = "sprites"
 	modalProvider   = "modal"
 	e2bProvider     = "e2b"
+	dockerProvider  = "docker"
 )
 
 type tokenConfigurer interface {
@@ -43,30 +44,58 @@ func ResolveProvider(reg *registry.Registry, cfg config.Config, name string) (sa
 		return nil, err
 	}
 
+	if err := configureProvider(p, name, cfg); err != nil {
+		return nil, err
+	}
+
+	return p, nil
+}
+
+// configureProvider applies the credentials and defaults of cfg that belong to
+// the provider called name. A provider with none is left alone.
+func configureProvider(p sandbox.Provider, name string, cfg config.Config) error {
 	switch name {
 	case spritesProvider:
 		c, ok := p.(tokenConfigurer)
 		if !ok {
-			return nil, fmt.Errorf("sprites provider %T does not support Configure", p)
+			return fmt.Errorf("sprites provider %T does not support Configure", p)
 		}
 		if err := c.Configure(cfg.Sprites.Token); err != nil {
-			return nil, err
+			return err
 		}
 	case modalProvider:
 		c, ok := p.(credentialsConfigurer)
 		if !ok {
-			return nil, fmt.Errorf("modal provider %T does not support ConfigureCredentials", p)
+			return fmt.Errorf("modal provider %T does not support ConfigureCredentials", p)
 		}
 		if err := c.ConfigureCredentials(cfg.Modal.TokenID, cfg.Modal.TokenSecret); err != nil {
-			return nil, err
+			return err
 		}
 	case e2bProvider:
 		if err := configureE2B(p, cfg.E2B); err != nil {
-			return nil, err
+			return err
+		}
+	case dockerProvider:
+		if err := configureDocker(p, cfg.Docker); err != nil {
+			return err
 		}
 	}
 
-	return p, nil
+	return nil
+}
+
+func configureDocker(p sandbox.Provider, cfg config.DockerConfig) error {
+	c, ok := p.(credentialsConfigurer)
+	if !ok {
+		return fmt.Errorf("docker provider %T does not support ConfigureCredentials", p)
+	}
+	if err := c.ConfigureCredentials(cfg.ID, cfg.PAT); err != nil {
+		return err
+	}
+	if d, ok := p.(templateDefaulter); ok {
+		return d.SetDefaultTemplate(cfg.Template)
+	}
+	return nil
 }
 
 func configureE2B(p sandbox.Provider, cfg config.E2BConfig) error {

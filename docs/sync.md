@@ -1,6 +1,6 @@
 # kaxa sync
 
-Copy another Git repository into a sandbox that already exists. This works for Sprites, Modal, and E2B.
+Copy another Git repository into a sandbox that already exists. This works for Sprites, Modal, E2B, and Docker.
 
 ```bash
 kaxa sync <name> [--dir <path>]
@@ -15,7 +15,7 @@ kaxa --provider modal sync my-box
 kaxa --provider e2b sync my-box
 ```
 
-The repository lands in `/home/sprite/workspace/<repo>` on Sprites, `/home/modal/workspace/<repo>` on Modal, owned by `modal`, and `/home/user/workspace/<repo>` on E2B, owned by `user`. `<repo>` is the name of the local directory. After the copy, kaxa installs the toolchain and dependencies it detects at the repository root, the same way as `create --sync`. A toolchain that is already installed is reused. On success kaxa prints the directory inside the sandbox.
+The repository lands in `/home/sprite/workspace/<repo>` on Sprites, `/home/modal/workspace/<repo>` on Modal, owned by `modal`, `/home/user/workspace/<repo>` on E2B, owned by `user`, and `/home/agent/workspace/<repo>` on Docker, owned by `agent`. `<repo>` is the name of the local directory. After the copy, kaxa installs the toolchain and dependencies it detects at the repository root, the same way as `create --sync`. A toolchain that is already installed is reused. On success kaxa prints the directory inside the sandbox.
 
 ## Limits
 

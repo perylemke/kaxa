@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/perylemke/kaxa/internal/cli"
+	"github.com/perylemke/kaxa/internal/provider/docker"
 	"github.com/perylemke/kaxa/internal/provider/e2b"
 	"github.com/perylemke/kaxa/internal/provider/modal"
 	"github.com/perylemke/kaxa/internal/provider/sprites"
@@ -21,6 +22,7 @@ func main() {
 		{"sprites", func() error { return reg.Register(sprites.New()) }},
 		{"modal", func() error { return reg.Register(modal.New()) }},
 		{"e2b", func() error { return reg.Register(e2b.New()) }},
+		{"docker", func() error { return reg.Register(docker.New()) }},
 	} {
 		if err := p.reg(); err != nil {
 			_ = cli.WriteError(os.Stderr, fmt.Errorf("register %s: %w", p.name, err))

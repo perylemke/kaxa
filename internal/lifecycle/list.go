@@ -34,7 +34,7 @@ func ListTargets(reg *registry.Registry, cfg config.Config) (map[string]sandbox.
 	if len(names) == 0 {
 		return nil, nil, usererr.New(
 			"no provider is configured",
-			"set KAXA_SPRITES_TOKEN, KAXA_E2B_API_KEY, or KAXA_MODAL_TOKEN_ID and KAXA_MODAL_TOKEN_SECRET",
+			"set KAXA_SPRITES_TOKEN, KAXA_E2B_API_KEY, or KAXA_MODAL_TOKEN_ID and KAXA_MODAL_TOKEN_SECRET, or KAXA_DOCKER_ID and KAXA_DOCKER_PAT for docker",
 		)
 	}
 	return providers, names, nil

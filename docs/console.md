@@ -39,3 +39,12 @@ Differences from Sprites:
 - The terminal size is applied when the shell starts. Resizing the window during the session is not applied, because the Modal SDK cannot resize a running terminal. Run `stty rows <n> cols <m>` in the shell, or reopen the console, after resizing.
 - Modal merges standard error into standard output in a terminal session.
 - Without `--sync` the shell runs as root in the root directory of the sandbox image. With `--sync` it runs as `modal` in `/home/modal/workspace`.
+
+## Docker
+
+Pick the provider with `--provider docker`. kaxa opens a process with a terminal in the sandbox, sizes it from your window and follows resizing. The shell runs as `agent`. A stopped sandbox is started first.
+
+```bash
+kaxa --provider docker console my-box
+```
+

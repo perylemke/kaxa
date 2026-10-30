@@ -38,6 +38,7 @@ A snapshot ID is one segment of letters, digits, dots, underscores, and hyphens.
 | --- | --- | --- | --- |
 | Sprites | In place: the same sandbox returns to the snapshot state and what changed after it is lost | Rejected | A checkpoint, such as `v7` |
 | Modal | New sandbox: kaxa creates the sandbox named by `--to` and keeps the source | Required | A filesystem image, such as `im-...` |
+| Docker | New sandbox: kaxa creates the sandbox named by `--to` and keeps the source | Required | A disk snapshot, such as `0abc...` |
 
 `kaxa mcp` reports this as `snapshot_restore` (`in_place` or `new_sandbox`) in `list_providers`, so a new provider only has to declare its mode.
 
@@ -52,7 +53,7 @@ kaxa snapshot restore my-sprite v7 --provider sprites
 kaxa snapshot delete my-sprite v7 --provider sprites
 ```
 
-A Sprites checkpoint does not include `/tmp`, which is in memory. Keep what you want to save under `/home/sprite`, `/opt`, or `/var`. Modal snapshots hold the whole filesystem. E2B has no snapshots in kaxa yet: `snapshot` prints that they are not available and names the providers that have them.
+A Sprites checkpoint does not include `/tmp`, which is in memory. Keep what you want to save under `/home/sprite`, `/opt`, or `/var`. Modal and Docker snapshots hold the whole filesystem. E2B has no snapshots in kaxa yet: `snapshot` prints that they are not available and names the providers that have them.
 
 Deleting a checkpoint uses `DELETE /v1/sprites/{name}/checkpoints/{id}`. That route is not in the public Sprites API reference, so a failure names the status code. `create` finds the new checkpoint by listing before and after, because the create stream does not return its ID.
 
@@ -73,13 +74,33 @@ kaxa snapshot delete my-box im-abc123 --provider modal
 - The Modal SDK cannot list images, so kaxa keeps its own index of the snapshots it took in `modal-snapshots.json` under your user config directory (`~/Library/Application Support/kaxa` on macOS, `$XDG_CONFIG_HOME/kaxa` or `~/.config/kaxa` on Linux, `%AppData%\kaxa` on Windows). The directory is mode `0700` and the file `0600`. Entries older than 30 days are dropped.
 - The index is per machine. `list` shows only snapshots taken on this machine, and two kaxa processes writing at the same moment can lose an entry because the file is not locked. `list` works after the sandbox has been destroyed.
 
+### Docker
+
+```bash
+kaxa snapshot create my-box --comment "before the upgrade" --provider docker
+kaxa snapshot list my-box --provider docker
+kaxa snapshot restore my-box 0abc123 --to my-box-copy --provider docker
+kaxa snapshot delete my-box 0abc123 --provider docker
+```
+
+Docker does not restore in place. `restore` forks a new sandbox from the snapshot, so `--to` is required and must differ from the source. The source and the snapshot stay.
+
+- `create` saves the disk only; running processes and memory are not captured. Docker only snapshots a running sandbox, so `create` starts a stopped one first. It waits until the snapshot is ready, and removes one that failed.
+- A snapshot is named `kaxa-<sandbox>-<timestamp>` in Docker, and the comment is its description. That name is how kaxa tells its snapshots, and the sandbox they belong to, from yours: `list`, `restore`, and `delete` ignore any other snapshot in the account.
+- Docker keeps the snapshots server side, so `list` shows those taken from any machine and works after the sandbox was destroyed. A restore needs only the sandbox name the snapshot was taken from.
+- Docker gives a restored sandbox none of the labels kaxa uses to find its sandboxes, and labels cannot be added later. kaxa records the restored sandbox in `docker-restored.json` under your user config directory (`~/Library/Application Support/kaxa` on macOS, `$XDG_CONFIG_HOME/kaxa` or `~/.config/kaxa` on Linux, `%AppData%\kaxa` on Windows; directory mode `0700`, file `0600`), together with the labels of the source sandbox, which the snapshot keeps in its description. That is how the restored sandbox keeps its workspace. `destroy` drops the record. If the record cannot be written, kaxa removes the new sandbox and says so; the snapshot is kept.
+- The record is per machine: a restored sandbox appears in `list`, `exec`, and `destroy` only on the machine that restored it, and two kaxa processes writing at the same moment can lose an entry because the file is not locked. The snapshots themselves are listed from any machine.
+- The personal access token needs permission to read and write snapshots (`snapshotsRead`, `snapshotsWrite`). A denial says so.
+- Docker refuses to delete a snapshot while a sandbox restored from it is still running, or while the snapshot is still being created. `snapshot delete` then says so; destroy the restored sandbox first.
+- Snapshots count against your Docker storage until you run `snapshot delete`.
+
 ## destroy keeps snapshots
 
-`kaxa destroy` does not delete snapshots. On Modal a snapshot is the way to recover a sandbox that has finished, so it stays until you run `snapshot delete` or Modal expires it. Sprites checkpoints belong to the sprite and go with it when you destroy it.
+`kaxa destroy` does not delete snapshots. On Modal and Docker a snapshot is the way to recover a sandbox that has finished, so it stays until you run `snapshot delete`, or on Modal until Modal expires it. Sprites checkpoints belong to the sprite and go with it when you destroy it.
 
 ## Security
 
-A snapshot copies the whole filesystem. Secrets written inside the sandbox, such as tokens in a file or in shell history, are stored in the snapshot and come back on restore. Do not put secrets in the comment. kaxa never prints Sprites or Modal tokens in messages or errors.
+A snapshot copies the whole filesystem. Secrets written inside the sandbox, such as tokens in a file or in shell history, are stored in the snapshot and come back on restore. Do not put secrets in the comment. kaxa never prints Sprites, Modal, or Docker tokens in messages or errors.
 
 ## Agents
 
