@@ -23,8 +23,8 @@ func newSnapshotCmd(reg *registry.Registry) *cobra.Command {
 		Long: `Save the filesystem of a sandbox and bring it back later.
 
 Whether a restore overwrites the sandbox or creates a new one depends on the
-provider: Sprites restores in place, Modal creates a new sandbox with --to and
-keeps the source. A snapshot copies the whole filesystem, including any
+provider: Sprites restores in place, Modal and Docker create a new sandbox with
+--to and keep the source. A snapshot copies the whole filesystem, including any
 secrets written inside the sandbox.`,
 	}
 	cmd.AddCommand(
@@ -161,10 +161,11 @@ func newSnapshotRestoreCmd(reg *registry.Registry) *cobra.Command {
 		Long: `Restore a snapshot of a sandbox.
 
 Sprites restores the sandbox itself and discards what changed after the
-snapshot, so it asks first. Modal creates a new sandbox named by --to and
-keeps the source.`,
+snapshot, so it asks first. Modal and Docker create a new sandbox named by --to
+and keep the source.`,
 		Example: `  kaxa snapshot restore my-sprite v3 --provider sprites
-  kaxa snapshot restore my-sandbox im-abc123 --to my-copy --provider modal`,
+  kaxa snapshot restore my-sandbox im-abc123 --to my-copy --provider modal
+  kaxa snapshot restore my-sandbox 0abc123 --to my-copy --provider docker`,
 		Args: snapshotArgs("snapshot restore", "kaxa snapshot restore <name> <snapshot-id> [--to <new-name>]", "a sandbox name and a snapshot id", 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			p, s, err := snapshotterFromCmd(cmd, reg)

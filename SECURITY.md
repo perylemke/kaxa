@@ -65,7 +65,7 @@ When using **kaxa**:
 
 1. Keep **kaxa** and Go up to date.
 2. Use [Go modules](https://go.dev/blog/using-go-modules) for builds.
-3. Store Sprites, Modal, and E2B credentials in environment variables—never commit tokens or paste them into issues or PRs.
+3. Store Sprites, Modal, E2B, and Docker credentials in environment variables—never commit tokens or paste them into issues or PRs.
 4. Prefer the latest documented provider APIs and tokens with least privilege.
 
 ## Security Best Practices for Contributors

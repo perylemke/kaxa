@@ -17,6 +17,9 @@ const (
 	envModalTokenSecret = "KAXA_MODAL_TOKEN_SECRET" // #nosec G101 -- env var name, not a credential value
 	envE2BAPIKey        = "KAXA_E2B_API_KEY"        // #nosec G101 -- env var name, not a credential value
 	envE2BTemplate      = "KAXA_E2B_TEMPLATE"
+	envDockerID         = "KAXA_DOCKER_ID"
+	envDockerPAT        = "KAXA_DOCKER_PAT" // #nosec G101 -- env var name, not a credential value
+	envDockerTpl        = "KAXA_DOCKER_TEMPLATE"
 )
 
 // Config holds resolved CLI settings (secrets are never logged via String).
@@ -25,6 +28,19 @@ type Config struct {
 	Sprites  SpritesConfig
 	Modal    ModalConfig
 	E2B      E2BConfig
+	// Docker configures the docker provider.
+	Docker DockerConfig
+}
+
+// DockerConfig holds the Docker credentials and the image new docker
+// sandboxes start from.
+type DockerConfig struct {
+	// ID is the Docker ID, the user name of the account.
+	ID string
+	// PAT is a personal access token created with Allow Cloud Sandboxes access.
+	PAT string
+	// Template is the default image. Empty means the image of the shell agent.
+	Template string
 }
 
 // E2BConfig holds the E2B API key and the template new sandboxes start from.
@@ -62,6 +78,11 @@ func Load(opts LoadOptions, reg *registry.Registry) (Config, error) {
 			TokenSecret: os.Getenv(envModalTokenSecret),
 		},
 		E2B: E2BConfig{APIKey: os.Getenv(envE2BAPIKey), Template: os.Getenv(envE2BTemplate)},
+		Docker: DockerConfig{
+			ID:       os.Getenv(envDockerID),
+			PAT:      os.Getenv(envDockerPAT),
+			Template: os.Getenv(envDockerTpl),
+		},
 	}
 
 	if opts.Provider != "" {

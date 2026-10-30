@@ -30,7 +30,7 @@ The tokens stay in the environment of that process. Put `KAXA_DEFAULT_PROVIDER` 
 
 A bare `KEY` in `api_env` copies a variable from the `kaxa mcp` environment, so an agent could ask for any secret that environment holds. kaxa refuses it unless the name is in `KAXA_MCP_API_ENV`, a comma-separated list that you set in the same `env` block, for example `"KAXA_MCP_API_ENV": "DATABASE_URL,REDIS_URL"`. Without it, the agent can only pass `KEY=VALUE`.
 
-After the server is connected, ask the agent to call `list_providers`. Sprites, Modal, and E2B are available. Modal supports create (with `sync`), list, inspect, exec, snapshots, and destroy; its `capabilities` report `sync`, `setup`, `workspace_layout`, and `snapshot` as true and the rest as false. On Modal, `exec` commands start in the image root unless the sandbox was created with `sync`; then they run as the `modal` user in `/home/modal/workspace`. E2B supports create (with `sync` and `api`), list, inspect, exec, restart, and destroy; its `capabilities` report `sync`, `setup`, `api`, `workspace_layout`, and `restart` as true and the rest as false. On E2B, `exec` commands run as `user`, starting in `/home/user`, or in `/home/user/workspace` when the sandbox was created with `sync`.
+After the server is connected, ask the agent to call `list_providers`. Sprites, Modal, E2B, and Docker are available. Modal supports create (with `sync`), list, inspect, exec, snapshots, and destroy; its `capabilities` report `sync`, `setup`, `workspace_layout`, and `snapshot` as true and the rest as false. On Modal, `exec` commands start in the image root unless the sandbox was created with `sync`; then they run as the `modal` user in `/home/modal/workspace`. E2B supports create (with `sync` and `api`), list, inspect, exec, restart, and destroy; its `capabilities` report `sync`, `setup`, `api`, `workspace_layout`, and `restart` as true and the rest as false. On E2B, `exec` commands run as `user`, starting in `/home/user`, or in `/home/user/workspace` when the sandbox was created with `sync`. Docker supports create (with `sync`, `template`, and `api`), list, inspect, exec, restart, snapshots, and destroy through the Docker Sandboxes API, with `KAXA_DOCKER_ID` and `KAXA_DOCKER_PAT` set in the environment of `kaxa mcp` and `KAXA_DOCKER_TEMPLATE` for a default template; its `capabilities` report `sync`, `setup`, `api`, `workspace_layout`, `restart`, `template`, and `snapshot` as true and the rest as false. `api` publishes one HTTP service on a URL that Docker chooses (anyone with the URL can call it). On Docker, `exec` commands run as `agent`, starting where the image starts, or in `/home/agent/workspace` when the sandbox was created with `sync`. A Docker sandbox is billed to your Docker subscription while it runs.
 
 ### Cursor
 
@@ -239,9 +239,9 @@ On a sandbox created with `sync`, the command starts in the provider workspace d
 | `snapshot_restore` | Provider | `target` | Effect |
 | --- | --- | --- | --- |
 | `in_place` | Sprites | Rejected | Overwrites the sandbox and discards what changed after the snapshot |
-| `new_sandbox` | Modal | Required, and different from `name` | Creates `target` from the snapshot and keeps the source |
+| `new_sandbox` | Modal, Docker | Required, and different from `name` | Creates `target` from the snapshot and keeps the source |
 
-The result has `sandbox` (the one that holds the restored state), `snapshot`, `provider`, and `status`. `restore_snapshot` and `delete_snapshot` are marked destructive so a client can ask first; call them only when the user asks. A snapshot holds everything in the sandbox, including secrets written there. Modal snapshots are kept for 30 days and are listed only on the machine that took them. See [snapshot](snapshot.md).
+The result has `sandbox` (the one that holds the restored state), `snapshot`, `provider`, and `status`. `restore_snapshot` and `delete_snapshot` are marked destructive so a client can ask first; call them only when the user asks. A snapshot holds everything in the sandbox, including secrets written there. Modal snapshots are kept for 30 days and are listed only on the machine that took them. Docker snapshots are kept until deleted and are listed from any machine. See [snapshot](snapshot.md).
 
 ## Limits
 
@@ -249,7 +249,7 @@ The result has `sandbox` (the one that holds the restored state), `snapshot`, `p
 - `sync_repository` adds a repository but never refreshes one. To send new local changes, create a new sandbox or move the code with `git` inside `exec`.
 - `sync` and `sync_repository` copy only a repository that contains the server working directory or sits below it. This keeps a prompt from sending an unrelated repository to a remote provider. Start `kaxa mcp` from the project, or pass a `dir` inside it. A symlink that leaves the working directory is rejected. The server refuses to start sync when its working directory is the filesystem root or your home directory, because that would allow every repository under it; set `cwd` to the project.
 - Network policy and connectors are not exposed. Use the provider's own tools for them. Memory snapshots are not supported.
-- `destroy` is permanent, and its tool is marked destructive so a client can ask first. On Modal it does not delete snapshots, which outlive the sandbox; on Sprites the checkpoints are destroyed with the sprite.
+- `destroy` is permanent, and its tool is marked destructive so a client can ask first. On Modal and Docker it does not delete snapshots, which outlive the sandbox; on Sprites the checkpoints are destroyed with the sprite.
 
 ## Errors
 

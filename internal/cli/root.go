@@ -2,7 +2,6 @@
 package cli
 
 import (
-	"context"
 	"errors"
 	"os"
 	"strings"
@@ -66,7 +65,6 @@ Configure the credentials of each provider via KAXA_* environment variables (see
 
 	root.PersistentFlags().StringVar(&provider, "provider", "", "sandbox provider ("+strings.Join(reg.Names(), ", ")+")")
 	root.SetUsageTemplate(usageTemplate)
-	root.SetContext(withRegistry(context.Background(), reg))
 
 	root.AddCommand(newVersionCmd())
 	root.AddCommand(newCreateCmd(reg))

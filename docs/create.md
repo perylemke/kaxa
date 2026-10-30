@@ -9,25 +9,27 @@ kaxa new [name]
 
 Without a name, a form asks for the name, provider, and the same yes/no choices as the flags. When API is yes, the form asks for the command and the port. The form uses the Dracula theme. It does not ask for `--dir`; pass that flag if you need it.
 
-Sprites, Modal, and E2B implement create. `--running` and public URLs exist only for Sprites; Modal and E2B reject them with a message that names the providers that have them. API publish works on Sprites and E2B. `--sync` works on all three; see [Sync](#sync).
+Sprites, Modal, E2B, and Docker implement create. `--running` and public URLs exist only for Sprites; the others reject them with a message that names the providers that have them. API publish works on Sprites, E2B, and Docker. `--sync` works on all five; see [Sync](#sync).
 
 Modal sandboxes use a Debian image, live for up to 24 hours, and stop after one idle hour. Names are DNS labels. See [Modal account and token](modal-account.md).
 
 E2B sandboxes live for one hour after the last command and then pause, keeping their disk. Names are DNS labels. See [E2B account and API key](e2b-account.md).
+
+Docker sandboxes run in Docker's cloud, created through the Docker Sandboxes API with `KAXA_DOCKER_ID` and `KAXA_DOCKER_PAT`. Names are DNS labels. Create waits until the sandbox runs and deletes it if it fails to start. Cloud compute is billed to your Docker subscription, and Docker stops a sandbox after an hour; kaxa renews that time on every command, and `exec` starts a stopped sandbox again. See [Docker Sandboxes](docker-account.md).
 
 ## Flags
 
 | Flag | Meaning |
 | --- | --- |
 | `--running` | Keep the sandbox up for one hour, serve tmux on its URL, and open that URL in a browser |
-| `--sync` | Copy the current Git repository into `/home/sprite/workspace/<repo>` (Sprites) `/home/modal/workspace/<repo>` (Modal), or `/home/user/workspace/<repo>` (E2B) |
+| `--sync` | Copy the current Git repository into `/home/sprite/workspace/<repo>` (Sprites) `/home/modal/workspace/<repo>` (Modal), `/home/user/workspace/<repo>` (E2B), or `/home/agent/workspace/<repo>` (Docker) |
 | `--dir` | Git repository to copy. Requires `--sync`. Default: the current directory |
-| `--api` | Publish one HTTP service on the Sprites URL, or on the E2B sandbox URL for the API port. Requires `--api-cmd` |
+| `--api` | Publish one HTTP service on the Sprites URL, on the E2B sandbox URL for the API port, or on the Docker URL that Docker gives the published port. Requires `--api-cmd` |
 | `--api-cmd` | Comma-separated argv. The first item is the binary |
 | `--api-port` | Port the process listens on. Default `8000`. `8080` is reserved when `--running` is also set |
 | `--api-env` | Environment variable for the service: `KEY=VALUE`, or `KEY` to copy the value from your shell. Repeat for more. Requires `--api` |
 | `--public` | Make the Sprites URL reachable without an account. Refused with `--running` unless `--api` is set |
-| `--template` | E2B only: the template to start the sandbox from. Default: `KAXA_E2B_TEMPLATE`, then `base`. See [Templates on E2B](#templates-on-e2b) |
+| `--template` | E2B and Docker: the template to start the sandbox from. Default: `KAXA_E2B_TEMPLATE` or `KAXA_DOCKER_TEMPLATE`, then the base image. See [Templates on E2B](#templates-on-e2b) and [Templates on Docker](#templates-on-docker) |
 
 `--api-cmd`, `--api-env`, and a changed `--api-port` require `--api`. `--dir` requires `--sync`.
 
@@ -44,7 +46,7 @@ kaxa create --sync my-sprite
 kaxa create --sync --dir ~/projects/api-python my-sprite
 ```
 
-`exec` and `console` on a sandbox created with `--sync` start in the workspace: `/home/sprite/workspace` on Sprites, `/home/modal/workspace` on Modal, `/home/user/workspace` on E2B.
+`exec` and `console` on a sandbox created with `--sync` start in the workspace: `/home/sprite/workspace` on Sprites, `/home/modal/workspace` on Modal, `/home/user/workspace` on E2B, `/home/agent/workspace` on Docker.
 
 ### Sync on Modal
 
@@ -97,11 +99,40 @@ kaxa create --sync --api --public \
   my-sprite
 ```
 
+### Sync on Docker
+
+```bash
+kaxa create --provider docker --sync my-box
+```
+
+kaxa creates the sandbox through the Docker Sandboxes API and waits until it runs, then streams the repository, as a gzip tar, to `tar` inside it over the process API. The repository lands in `/home/agent/workspace/<repo>`, owned by `agent`. The same checks as on the other providers apply: credentials in `.git/config` are removed and untracked secret files stop the copy. Toolchains are installed under `/home/agent/.local` and `/home/agent/.cargo` and put on the `PATH` of `exec` and `console`. Downloads are checked against pinned SHA-256 hashes. Docker's network policy for the sandbox must allow the download hosts. See [Docker Sandboxes](docker-account.md).
+
+### Templates on Docker
+
+```bash
+kaxa create --provider docker --template ghcr.io/me/img:v1 --sync my-box
+export KAXA_DOCKER_TEMPLATE=ghcr.io/me/img:v1   # default for every Docker create
+```
+
+A template is an image reference that Docker can pull. The `--template` flag wins over `KAXA_DOCKER_TEMPLATE`; without either, kaxa uses `docker/sandbox-templates:shell`, the image of the shell agent. kaxa expects the layout of the Docker agent images: user `agent`, home `/home/agent`, workspace `/home/agent/workspace`, and `tail` on `PATH`; kaxa starts the sandbox with `tail -f /dev/null` so it stays up. Another user breaks `exec`, `console`, and `--sync`, and kaxa does not detect that.
+
 ### API on E2B
 
 On E2B, `--api` runs the service as `user` in the repository directory (or `/home/user` without `--sync`) and waits for the port to accept connections, for up to 90 seconds. If the process exits first, kaxa deletes the sandbox and shows its last output. The service log is not kept.
 
 E2B sandboxes are private. `--api` is what opens the API port to the internet, at `https://<port>-<sandbox id>.e2b.app`, and E2B fixes that when the sandbox is created. `list` shows the URL. Anyone who has the URL can call the service. `--public` does not apply, because the URL is already open on that one port. `restart` stops the service; start it again with `exec`, or create the sandbox again.
+
+### API on Docker
+
+```bash
+kaxa create --provider docker --sync --api \
+  --api-cmd .venv/bin/uvicorn,app.main:app,--host,0.0.0.0,--port,8000 my-box
+kaxa list --provider docker   # the detail view shows the URL
+```
+
+On Docker, `--api` runs the service as `agent` in the repository directory (or `/home/agent` without `--sync`), waits for the port to accept connections, for up to 90 seconds, and then asks Docker to publish that port. If the process exits first, or Docker refuses to publish the port, kaxa deletes the sandbox and shows the reason. The service log is not kept.
+
+Docker chooses the URL, and kaxa does not change who may open it, so treat anyone who has the URL as able to call the service. The token needs permission to publish sandbox ports; a refusal prints `Docker denied publishing the port`. The service ends when Docker stops the sandbox, an hour after the last command, and `restart` stops it too. `exec` starts the sandbox again but not the service, so start it again with `exec`, or create the sandbox again. `--public` and `--running` do not apply.
 
 ## API environment
 
