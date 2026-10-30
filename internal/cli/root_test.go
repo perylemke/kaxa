@@ -46,7 +46,7 @@ func TestRootHelp(t *testing.T) {
 			t.Fatalf("help should list %q: %s", sub, help)
 		}
 	}
-	for _, unwanted := range []string{"create, new", "list, ls", "destroy, rm", "console, ssh", "(alias:"} {
+	for _, unwanted := range []string{"create, new", "list, ls", "destroy, rm", "console, ssh", "(alias:", "Available Commands:", "Additional Commands:"} {
 		if strings.Contains(help, unwanted) {
 			t.Fatalf("help should not include %q in command descriptions: %s", unwanted, help)
 		}

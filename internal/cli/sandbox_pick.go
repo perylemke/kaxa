@@ -38,9 +38,10 @@ func newSandboxActionCmd(
 	action func(context.Context, sandbox.Provider, sandbox.ID) error,
 ) *cobra.Command {
 	return &cobra.Command{
-		Use:   spec.verb + " [name]",
-		Short: spec.title + " a sandbox",
-		Args:  atMostOneName(spec.verb),
+		Use:         spec.verb + " [name]",
+		Short:       spec.title + " a sandbox",
+		Annotations: featureCommand(spec.feature),
+		Args:        atMostOneName(spec.verb),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			p, err := providerFromCmd(cmd, reg)
 			if err != nil {

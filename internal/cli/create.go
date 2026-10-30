@@ -68,6 +68,7 @@ Without a name, the form asks for the same choices. When API is yes, it asks for
 	cmd.Flags().StringArrayVar(&apiEnv, "api-env", nil, "environment variable for the --api service: KEY=VALUE, or KEY to copy it from this shell; repeat for more (no commas in values)")
 	cmd.Flags().StringVar(&template, "template", "", "template to start the sandbox from (E2B only; default: KAXA_E2B_TEMPLATE, then base)")
 	cmd.Flags().BoolVar(&publicURL, "public", false, "make the Sprites URL reachable without authentication")
+	markProviderFlags(cmd, "running", "api", "api-cmd", "api-port", "api-env", "template", "public")
 	return cmd
 }
 
