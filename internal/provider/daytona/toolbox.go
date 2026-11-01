@@ -1,6 +1,7 @@
 package daytona
 
 import (
+	"bufio"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -9,6 +10,7 @@ import (
 	"io"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	sdk "github.com/daytona/clients/sdk-go/pkg/daytona"
@@ -20,7 +22,8 @@ import (
 
 const (
 	// logPoll is how often a running command is asked for its output and status.
-	logPoll = 300 * time.Millisecond
+	logPoll      = 300 * time.Millisecond
+	logPollFirst = 25 * time.Millisecond
 	// maxStagedInput caps the standard input of a command that is not a
 	// terminal. It is uploaded as a file before the command starts.
 	maxStagedInput = 64 << 20
@@ -54,7 +57,7 @@ type sdkToolbox struct {
 }
 
 func (t *sdkToolbox) sandbox(ctx context.Context, id string) (*sdk.Sandbox, error) {
-	return t.c.get(ctx, id)
+	return t.c.handle(ctx, id)
 }
 
 // quote quotes s for a POSIX shell. The sandbox daemon takes one command
@@ -130,11 +133,14 @@ func (t *sdkToolbox) runCommand(ctx context.Context, sb *sdk.Sandbox, spec runSp
 	if err := sb.Process.CreateSession(ctx, session); err != nil {
 		return 0, convertErr(err)
 	}
-	defer func() {
+	// The session is deleted once, either while the last output is read or when
+	// the command fails before that.
+	deleteSession := sync.OnceFunc(func() {
 		bg, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupTimeout)
 		defer cancel()
 		_ = sb.Process.DeleteSession(bg, session)
-	}()
+	})
+	defer deleteSession()
 	line := commandLine(spec, "")
 	if staged != "" {
 		line += " < " + quote(staged)
@@ -144,13 +150,15 @@ func (t *sdkToolbox) runCommand(ctx context.Context, sb *sdk.Sandbox, spec runSp
 		return 0, convertErr(err)
 	}
 	cmdID, _ := started["id"].(string)
-	return t.follow(ctx, sb, session, cmdID, spec)
+	return t.follow(ctx, sb, session, cmdID, spec, deleteSession)
 }
 
 // follow copies the output of a command to the writers of spec until the
 // command ends, and returns its exit code. The daemon keeps the whole log, so
-// each poll writes only what is new.
-func (t *sdkToolbox) follow(ctx context.Context, sb *sdk.Sandbox, session, cmdID string, spec runSpec) (int, error) {
+// each poll writes only what is new. Every call costs a round trip, so the
+// first polls come fast, which is when a short command ends, and when the
+// command is done the last read of the log runs while the session is deleted.
+func (t *sdkToolbox) follow(ctx context.Context, sb *sdk.Sandbox, session, cmdID string, spec runSpec, cleanup func()) (int, error) {
 	var seenOut, seenErr int
 	var copyErr error
 	drain := func() error {
@@ -162,21 +170,36 @@ func (t *sdkToolbox) follow(ctx context.Context, sb *sdk.Sandbox, session, cmdID
 		seenErr = emit(spec.stderr, logs.GetStderr(), seenErr, &copyErr)
 		return nil
 	}
-	for {
+	for poll := 0; ; poll++ {
 		code, done, err := commandStatus(ctx, sb, session, cmdID)
 		if err != nil {
 			return 0, err
 		}
+		if done {
+			cleaned := make(chan struct{})
+			go func() {
+				defer close(cleaned)
+				cleanup()
+			}()
+			err := drain()
+			<-cleaned
+			if err != nil {
+				return 0, err
+			}
+			return code, copyErr
+		}
 		if err := drain(); err != nil {
 			return 0, err
 		}
-		if done {
-			return code, copyErr
-		}
-		if err := sleep(ctx, logPoll); err != nil {
+		if err := sleep(ctx, pollDelay(poll)); err != nil {
 			return 0, err
 		}
 	}
+}
+
+// pollDelay is the wait before poll number n+1: short at first, then up to logPoll.
+func pollDelay(n int) time.Duration {
+	return min(logPollFirst<<min(n, 8), logPoll)
 }
 
 // emit writes the part of text after the first seen bytes and returns the new count.
@@ -217,11 +240,17 @@ func commandStatus(ctx context.Context, sb *sdk.Sandbox, session, cmdID string) 
 
 // stage uploads the standard input of a command to a file in the sandbox.
 func (t *sdkToolbox) stage(ctx context.Context, sb *sdk.Sandbox, in io.Reader) (string, error) {
+	buffered := bufio.NewReader(in)
+	if _, err := buffered.Peek(1); err != nil && errors.Is(err, io.EOF) {
+		// No input at all, which is what a closed stdin looks like: skip the
+		// upload and the cleanup, two round trips.
+		return "", nil
+	}
 	path, err := randomID("/tmp/kaxa-in-")
 	if err != nil {
 		return "", err
 	}
-	limited := &io.LimitedReader{R: in, N: maxStagedInput + 1}
+	limited := &io.LimitedReader{R: buffered, N: maxStagedInput + 1}
 	if err := sb.FileSystem.UploadFileStream(ctx, limited, path); err != nil {
 		return "", convertErr(err)
 	}

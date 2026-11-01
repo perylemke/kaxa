@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"slices"
 	"strings"
 
@@ -84,6 +85,9 @@ func (p *Provider) Exec(ctx context.Context, id sandbox.ID, opts sandbox.ExecOpt
 		argv: opts.Command, stdin: opts.Stdin, stdout: opts.Stdout, stderr: opts.Stderr,
 		tty: opts.TTY, size: opts.Size, resize: opts.Resize,
 	}
+	if !opts.TTY {
+		spec.stdin = pipedInput(opts.Stdin)
+	}
 	if s.synced() {
 		spec.dir, spec.env = workspaceDir, daytonaLayout.Env()
 	}
@@ -138,4 +142,20 @@ func (s *session) capture(ctx context.Context, dir string, env, argv []string, s
 		return "", fmt.Errorf("%w: %s", err, detail)
 	}
 	return "", err
+}
+
+// pipedInput returns r unless it is a character device, such as a terminal or
+// /dev/null. kaxa reads standard input to its end before the command starts, so
+// reading a terminal would make exec wait for Ctrl-D, and /dev/null has nothing.
+// Use console for a command that needs the keyboard.
+func pipedInput(r io.Reader) io.Reader {
+	f, ok := r.(*os.File)
+	if !ok {
+		return r
+	}
+	info, err := f.Stat()
+	if err != nil || info.Mode()&os.ModeCharDevice != 0 {
+		return nil
+	}
+	return r
 }

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	sdkerrors "github.com/daytona/clients/sdk-go/pkg/errors"
 	"github.com/daytona/clients/sdk-go/pkg/types"
@@ -112,4 +113,17 @@ func TestImageOf(t *testing.T) {
 			expect(t, "error", img.Error, reason)
 		})
 	}
+}
+
+func TestPollDelayGrowsToTheLimit(t *testing.T) {
+	t.Parallel()
+	prev := time.Duration(0)
+	for n := range 20 {
+		d := pollDelay(n)
+		if d < prev || d > logPoll || d <= 0 {
+			t.Fatalf("pollDelay(%d) = %v after %v", n, d, prev)
+		}
+		prev = d
+	}
+	expect(t, "last delay", prev, logPoll)
 }

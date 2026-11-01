@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	sdk "github.com/daytona/clients/sdk-go/pkg/daytona"
@@ -105,6 +106,10 @@ type apiClient interface {
 // sdkClient is the apiClient over the official Daytona Go SDK.
 type sdkClient struct {
 	c *sdk.Client
+	// handles keeps the last sandbox read per ID. The SDK handle only holds
+	// the sandbox ID and its toolbox address, which never change, so process
+	// calls reuse it instead of reading the sandbox again.
+	handles sync.Map
 }
 
 func newSDKClient(apiKey string) (*sdkClient, error) {
@@ -138,7 +143,18 @@ func (s *sdkClient) get(ctx context.Context, id string) (*sdk.Sandbox, error) {
 	if err != nil {
 		return nil, notFound(convertErr(err))
 	}
+	s.handles.Store(sb.ID, sb)
 	return sb, nil
+}
+
+// handle returns the cached sandbox for id, or reads it.
+func (s *sdkClient) handle(ctx context.Context, id string) (*sdk.Sandbox, error) {
+	if sb, ok := s.handles.Load(id); ok {
+		if cached, ok := sb.(*sdk.Sandbox); ok {
+			return cached, nil
+		}
+	}
+	return s.get(ctx, id)
 }
 
 func (s *sdkClient) Create(ctx context.Context, p CreateParams) (Record, error) {
@@ -259,6 +275,7 @@ func (s *sdkClient) Delete(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
+	s.handles.Delete(sb.ID)
 	return notFound(convertErr(sb.DeleteAndWait(ctx, deleteTimeout)))
 }
 

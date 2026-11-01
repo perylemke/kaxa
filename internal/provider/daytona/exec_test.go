@@ -3,6 +3,7 @@ package daytona
 import (
 	"bytes"
 	"errors"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -168,5 +169,29 @@ func TestExecHidesAPIKeyInErrors(t *testing.T) {
 	err := p.Exec(t.Context(), boxName, sandbox.ExecOptions{Command: []string{"true"}})
 	if err == nil || strings.Contains(err.Error(), "test-key") {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestPipedInputSkipsCharacterDevices(t *testing.T) {
+	t.Parallel()
+	null, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = null.Close() })
+	if pipedInput(null) != nil {
+		t.Fatal("/dev/null was kept as input")
+	}
+	file, err := os.Open("exec_test.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = file.Close() })
+	if pipedInput(file) == nil {
+		t.Fatal("a regular file was dropped")
+	}
+	reader := strings.NewReader("x")
+	if pipedInput(reader) != reader {
+		t.Fatal("a reader was changed")
 	}
 }
