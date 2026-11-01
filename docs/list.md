@@ -8,6 +8,7 @@ kaxa ls
 kaxa list --provider modal
 kaxa list --provider e2b
 kaxa list --provider docker
+kaxa list --provider daytona
 ```
 
 Without `--provider`, list shows the sandboxes of every provider that has credentials, one table with a `Provider` column. A provider without credentials is skipped. `KAXA_DEFAULT_PROVIDER` does not narrow the list; only `--provider` does. With `--provider`, list shows that provider only, and missing credentials are an error.

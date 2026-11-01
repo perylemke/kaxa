@@ -1,6 +1,6 @@
 # kaxa exec
 
-Run a command in a sandbox. This works for Sprites, Modal, E2B, and Docker.
+Run a command in a sandbox. This works for Sprites, Modal, E2B, Docker, and Daytona.
 
 ```bash
 kaxa exec <name> <command> [args...]
@@ -35,6 +35,16 @@ kaxa --provider docker exec my-box -- ls -la
 ```
 
 Standard output, standard error, and standard input are passed through, and the remote exit code is the kaxa exit code. Commands run as `agent`, starting in `/home/agent/workspace` with `--sync` and where the image starts without it. The command is not run through a shell; use `sh -c` for pipes. Cloud compute is billed to your Docker subscription while the sandbox runs.
+
+## Daytona
+
+Pick the provider with `--provider daytona` or `KAXA_DEFAULT_PROVIDER=daytona`. kaxa starts a stopped sandbox and runs the command through the toolbox process API of the sandbox.
+
+```bash
+kaxa --provider daytona exec my-box -- ls -la
+```
+
+Standard output, standard error, and standard input are passed through, and the remote exit code is the kaxa exit code. Commands run as `daytona`, starting in `/home/daytona/workspace` with `--sync` and where the image starts without it. The command is not run through a shell; use `sh -c` for pipes. Daytona bills the account while the sandbox runs.
 
 ## Modal
 

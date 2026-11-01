@@ -23,7 +23,7 @@ func newSnapshotCmd(reg *registry.Registry) *cobra.Command {
 		Long: `Save the filesystem of a sandbox and bring it back later.
 
 Whether a restore overwrites the sandbox or creates a new one depends on the
-provider: Sprites restores in place, Modal and Docker create a new sandbox with
+provider: Sprites restores in place, Modal, Docker, and Daytona create a new sandbox with
 --to and keep the source. A snapshot copies the whole filesystem, including any
 secrets written inside the sandbox.`,
 	}
@@ -161,7 +161,7 @@ func newSnapshotRestoreCmd(reg *registry.Registry) *cobra.Command {
 		Long: `Restore a snapshot of a sandbox.
 
 Sprites restores the sandbox itself and discards what changed after the
-snapshot, so it asks first. Modal and Docker create a new sandbox named by --to
+snapshot, so it asks first. Modal, Docker, and Daytona create a new sandbox named by --to
 and keep the source.`,
 		Example: `  kaxa snapshot restore my-sprite v3 --provider sprites
   kaxa snapshot restore my-sandbox im-abc123 --to my-copy --provider modal

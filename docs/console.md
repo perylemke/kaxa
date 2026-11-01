@@ -48,3 +48,10 @@ Pick the provider with `--provider docker`. kaxa opens a process with a terminal
 kaxa --provider docker console my-box
 ```
 
+## Daytona
+
+Pick the provider with `--provider daytona`. kaxa opens a process with a terminal in the sandbox through the toolbox, sizes it from your window and follows resizing. The shell runs as `daytona`. A stopped sandbox is started first.
+
+```bash
+kaxa --provider daytona console my-box
+```
