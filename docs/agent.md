@@ -24,13 +24,25 @@ go install ./cmd/kaxa
 
 A client started from a terminal inherits your `PATH`, so `command` can be `kaxa`. Cursor and Claude Desktop, started from the desktop, do not inherit that `PATH`. Give them the absolute path, for example `/Users/you/go/bin/kaxa`. A missing file shows the server as disconnected.
 
-`sync` uses the working directory of the `kaxa mcp` process, not the directory that contains the binary. The repository must contain that working directory or sit below it. A desktop client uses the opened project. Set `cwd` when the client has that field and might start elsewhere.
+`sync` uses the working directory of the `kaxa mcp` process, not the directory that contains the binary. The repository must contain that working directory or sit below it, and kaxa refuses a working directory that is the filesystem root or your home directory, because either would allow every repository you have. A client started from the desktop may start the server in your home directory, so fix the directory yourself: set `cwd` when the client has that field, or `cd` in the command as the Cursor example below does. Pick a folder that holds the repositories you want to copy, such as `/Users/you/workspace`, and pass `dir` to name the repository.
 
-The tokens stay in the environment of that process. Put `KAXA_DEFAULT_PROVIDER` and the token of each provider you use in the client's `env` block: `KAXA_SPRITES_TOKEN` for Sprites, `KAXA_MODAL_TOKEN_ID` with `KAXA_MODAL_TOKEN_SECRET` for Modal, and `KAXA_E2B_API_KEY` for E2B. Do not commit a file that contains a token, and do not paste a token into a prompt. See [Sprites account and token](sprites-account.md) [Modal account and token](modal-account.md), and [E2B account and API key](e2b-account.md). `--provider` on the command also sets the default.
+The tokens stay in the environment of that process. Put `KAXA_DEFAULT_PROVIDER` and the token of each provider you use in the client's `env` block: `KAXA_SPRITES_TOKEN` for Sprites, `KAXA_MODAL_TOKEN_ID` with `KAXA_MODAL_TOKEN_SECRET` for Modal, `KAXA_E2B_API_KEY` for E2B, and `KAXA_DOCKER_ID` with `KAXA_DOCKER_PAT` for Docker. Do not commit a file that contains a token, and do not paste a token into a prompt. See [Sprites account and token](sprites-account.md), [Modal account and token](modal-account.md), [E2B account and API key](e2b-account.md), and [Docker Sandboxes](docker-account.md). `--provider` on the command also sets the default.
 
 A bare `KEY` in `api_env` copies a variable from the `kaxa mcp` environment, so an agent could ask for any secret that environment holds. kaxa refuses it unless the name is in `KAXA_MCP_API_ENV`, a comma-separated list that you set in the same `env` block, for example `"KAXA_MCP_API_ENV": "DATABASE_URL,REDIS_URL"`. Without it, the agent can only pass `KEY=VALUE`.
 
-After the server is connected, ask the agent to call `list_providers`. Sprites, Modal, E2B, and Docker are available. Modal supports create (with `sync`), list, inspect, exec, snapshots, and destroy; its `capabilities` report `sync`, `setup`, `workspace_layout`, and `snapshot` as true and the rest as false. On Modal, `exec` commands start in the image root unless the sandbox was created with `sync`; then they run as the `modal` user in `/home/modal/workspace`. E2B supports create (with `sync` and `api`), list, inspect, exec, restart, and destroy; its `capabilities` report `sync`, `setup`, `api`, `workspace_layout`, and `restart` as true and the rest as false. On E2B, `exec` commands run as `user`, starting in `/home/user`, or in `/home/user/workspace` when the sandbox was created with `sync`. Docker supports create (with `sync`, `template`, and `api`), list, inspect, exec, restart, snapshots, and destroy through the Docker Sandboxes API, with `KAXA_DOCKER_ID` and `KAXA_DOCKER_PAT` set in the environment of `kaxa mcp` and `KAXA_DOCKER_TEMPLATE` for a default template; its `capabilities` report `sync`, `setup`, `api`, `workspace_layout`, `restart`, `template`, and `snapshot` as true and the rest as false. `api` publishes one HTTP service on a URL that Docker chooses (anyone with the URL can call it). On Docker, `exec` commands run as `agent`, starting where the image starts, or in `/home/agent/workspace` when the sandbox was created with `sync`. A Docker sandbox is billed to your Docker subscription while it runs.
+After the server is connected, ask the agent to call `list_providers`. Sprites, Modal, E2B, and Docker are available. Each provider reports the features it supports as `capabilities`; any feature not listed below is false.
+
+| Provider | Supports | `capabilities` true |
+| --- | --- | --- |
+| Modal | create (with `sync`), list, inspect, exec, snapshots, destroy | `sync`, `setup`, `workspace_layout`, `snapshot` |
+| E2B | create (with `sync` and `api`), list, inspect, exec, restart, destroy | `sync`, `setup`, `api`, `workspace_layout`, `restart` |
+| Docker | create (with `sync`, `template`, and `api`), list, inspect, exec, restart, snapshots, destroy | `sync`, `setup`, `api`, `workspace_layout`, `restart`, `template`, `snapshot` |
+
+What to expect from `exec` and the other tools on each provider:
+
+- **Modal:** commands start in the image root. A sandbox created with `sync` runs them as the `modal` user in `/home/modal/workspace`.
+- **E2B:** commands run as `user`, starting in `/home/user`, or in `/home/user/workspace` when the sandbox was created with `sync`.
+- **Docker:** it works through the Docker Sandboxes API. Set `KAXA_DOCKER_ID` and `KAXA_DOCKER_PAT` in the environment of `kaxa mcp`, and `KAXA_DOCKER_TEMPLATE` for a default template. Commands run as `agent`, starting where the image starts, or in `/home/agent/workspace` when the sandbox was created with `sync`. `api` publishes one HTTP service on a URL that Docker chooses, and anyone with the URL can call it. A Docker sandbox is billed to your Docker subscription while it runs.
 
 ### Cursor
 
@@ -40,21 +52,25 @@ User config is `~/.cursor/mcp.json`. Project config is `.cursor/mcp.json`. Prefe
 {
   "mcpServers": {
     "kaxa": {
-      "command": "/Users/you/go/bin/kaxa",
-      "args": ["mcp"],
+      "command": "sh",
+      "args": ["-c", "cd /Users/you/workspace && exec /Users/you/go/bin/kaxa mcp"],
       "env": {
         "KAXA_DEFAULT_PROVIDER": "sprites",
         "KAXA_SPRITES_TOKEN": "paste-the-dashboard-value",
         "KAXA_MODAL_TOKEN_ID": "ak-paste-the-token-id",
         "KAXA_MODAL_TOKEN_SECRET": "as-paste-the-token-secret",
-        "KAXA_E2B_API_KEY": "e2b_paste-the-key"
+        "KAXA_E2B_API_KEY": "e2b_paste-the-key",
+        "KAXA_DOCKER_ID": "your-docker-id",
+        "KAXA_DOCKER_PAT": "dckr_pat_paste-the-token"
       }
     }
   }
 }
 ```
 
-Open Cursor Settings, MCP, and enable the kaxa tools. Reload the server after changing the file.
+The command changes to the folder that bounds `sync` and then replaces the shell with `kaxa mcp` (`exec`), so no extra process is left. Use the absolute path of the binary, because Cursor started from the desktop does not inherit your `PATH`. Without the `cd`, a server started from the desktop can run in your home directory, and `create_sandbox` with `sync` and `sync_repository` fail with `the server working directory /Users/you is too broad to bound which repositories sync may copy`. Tools that do not copy a repository, such as `exec` and the snapshot tools, work either way.
+
+Open Cursor Settings, MCP, and enable the kaxa tools. The server reads its working directory when it starts, so turn the kaxa server off and on, or restart Cursor, after changing the file. If you start Cursor from a terminal inside the project, the server inherits that folder and the `cd` is not needed.
 
 ### Claude Code
 
@@ -72,12 +88,16 @@ Project config is `.mcp.json` at the repository root. Claude Code asks you to ap
         "KAXA_SPRITES_TOKEN": "paste-the-dashboard-value",
         "KAXA_MODAL_TOKEN_ID": "ak-paste-the-token-id",
         "KAXA_MODAL_TOKEN_SECRET": "as-paste-the-token-secret",
-        "KAXA_E2B_API_KEY": "e2b_paste-the-key"
+        "KAXA_E2B_API_KEY": "e2b_paste-the-key",
+        "KAXA_DOCKER_ID": "your-docker-id",
+        "KAXA_DOCKER_PAT": "dckr_pat_paste-the-token"
       }
     }
   }
 }
 ```
+
+Claude Code starts the server in the folder where you run it, so `sync` sees that project and the `cd` of the Cursor example is not needed. Start it from the project, or from a folder that holds the repositories you want to copy, and never from your home directory or `/`.
 
 From a terminal:
 
@@ -88,6 +108,8 @@ claude mcp add --transport stdio \
   --env KAXA_MODAL_TOKEN_ID=ak-paste-the-token-id \
   --env KAXA_MODAL_TOKEN_SECRET=as-paste-the-token-secret \
   --env KAXA_E2B_API_KEY=e2b_paste-the-key \
+  --env KAXA_DOCKER_ID=your-docker-id \
+  --env KAXA_DOCKER_PAT=dckr_pat_paste-the-token \
   kaxa -- /Users/you/go/bin/kaxa mcp
 ```
 
@@ -95,11 +117,11 @@ Check with `claude mcp list` or `/mcp`.
 
 ### Claude Desktop
 
-On macOS the file is `~/Library/Application Support/Claude/claude_desktop_config.json`. On Windows it is `%APPDATA%\Claude\claude_desktop_config.json`. Use the same `mcpServers` object as Cursor. Quit and reopen Claude Desktop after saving.
+On macOS the file is `~/Library/Application Support/Claude/claude_desktop_config.json`. On Windows it is `%APPDATA%\Claude\claude_desktop_config.json`. Use the same `mcpServers` object as Cursor, including the `sh -c "cd ... && exec ..."` command: a desktop app does not start the server in your project, and without the `cd` the `sync` tools are refused when it lands in your home directory. Quit and reopen Claude Desktop after saving.
 
 ### Gemini CLI
 
-User config is `~/.gemini/settings.json`. Project config is `.gemini/settings.json`. `env` values expand `$KAXA_SPRITES_TOKEN` and `${KAXA_SPRITES_TOKEN}`, and the Modal and E2B variables the same way, from the environment that launches Gemini. Set `cwd` to the project so `sync` can see it.
+User config is `~/.gemini/settings.json`. Project config is `.gemini/settings.json`. `env` values expand `$KAXA_SPRITES_TOKEN` and `${KAXA_SPRITES_TOKEN}`, and the Modal, E2B, and Docker variables the same way, from the environment that launches Gemini. Set `cwd` to the project, or to a folder that holds the repositories you want to copy, so `sync` can see them. It cannot be your home directory or `/`.
 
 ```json
 {
@@ -113,7 +135,9 @@ User config is `~/.gemini/settings.json`. Project config is `.gemini/settings.js
         "KAXA_SPRITES_TOKEN": "${KAXA_SPRITES_TOKEN}",
         "KAXA_MODAL_TOKEN_ID": "${KAXA_MODAL_TOKEN_ID}",
         "KAXA_MODAL_TOKEN_SECRET": "${KAXA_MODAL_TOKEN_SECRET}",
-        "KAXA_E2B_API_KEY": "${KAXA_E2B_API_KEY}"
+        "KAXA_E2B_API_KEY": "${KAXA_E2B_API_KEY}",
+        "KAXA_DOCKER_ID": "${KAXA_DOCKER_ID}",
+        "KAXA_DOCKER_PAT": "${KAXA_DOCKER_PAT}"
       }
     }
   }
@@ -122,7 +146,7 @@ User config is `~/.gemini/settings.json`. Project config is `.gemini/settings.js
 
 ### Another client
 
-Use the stdio entry your client documents: a command, the argument `mcp`, and the `KAXA_` variables of the providers you use. An HTTP URL is a different transport. `kaxa mcp` does not listen on a port.
+Use the stdio entry your client documents: a command, the argument `mcp`, and the `KAXA_` variables of the providers you use. If the client has no `cwd` field, or may start the server in your home directory, wrap the command as in the Cursor example (`sh -c "cd <folder> && exec <kaxa> mcp"`) so that `sync` has a working directory it accepts. An HTTP URL is a different transport. `kaxa mcp` does not listen on a port.
 
 ## Tools
 
