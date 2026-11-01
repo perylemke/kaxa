@@ -1,8 +1,8 @@
 // Package daytona is the Daytona sandbox provider.
 //
-// Daytona has no official Go SDK, so the package talks to the control plane
-// (api.daytona.com) and to the toolbox of each sandbox with net/http. Sandboxes
-// are persistent: after the idle timeout Daytona stops them and keeps the disk,
+// It uses the official Daytona Go SDK (github.com/daytona/clients/sdk-go)
+// behind the apiClient and toolboxClient interfaces, so tests run on fakes.
+// Sandboxes are persistent: after the idle timeout Daytona stops them and keeps the disk,
 // and the next kaxa command starts them again.
 package daytona
 
@@ -70,7 +70,11 @@ func (p *Provider) Configure(apiKey string) error {
 	if p.api != nil && subtle.ConstantTimeCompare([]byte(apiKey), []byte(p.apiKey)) == 1 {
 		return nil
 	}
-	p.apiKey, p.api, p.tb = apiKey, newRESTClient(apiKey), newHTTPToolbox(apiKey)
+	c, err := newSDKClient(apiKey)
+	if err != nil {
+		return userErr(err, "", apiKey)
+	}
+	p.apiKey, p.api, p.tb = apiKey, c, &sdkToolbox{c: c}
 	return nil
 }
 
@@ -261,7 +265,7 @@ func (p *Provider) waitStatus(ctx context.Context, c apiClient, rec Record, targ
 		switch rec.Status {
 		case target:
 			return rec, nil
-		case "failed", "lost", "error":
+		case statusFailed, "lost", statusError:
 			return Record{}, usererr.New(
 				fmt.Sprintf("sandbox %q is %s", rec.Name, rec.Status),
 				"destroy it and create a new one; the Daytona dashboard shows the cause")

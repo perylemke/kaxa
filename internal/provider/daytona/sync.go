@@ -39,7 +39,7 @@ func (p *Provider) RepoDir(repo string) (string, error) {
 }
 
 // SyncWorkspace extracts a gzip tar from archive into /home/daytona/workspace.
-// The archive is first uploaded to a temporary file, since the toolbox takes a
+// The archive is first uploaded to a temporary file, since the SDK takes a
 // whole file and not a stream of input.
 func (p *Provider) SyncWorkspace(ctx context.Context, id sandbox.ID, archive io.Reader) error {
 	if archive == nil {
@@ -55,7 +55,7 @@ func (p *Provider) SyncWorkspace(ctx context.Context, id sandbox.ID, archive io.
 	}
 	// The temporary archive is removed even when the context is canceled.
 	defer s.removeFile(tmp)
-	if err := s.tb.Upload(ctx, s.conn, tmp, archive); err != nil {
+	if err := s.tb.Upload(ctx, s.rec.ID, tmp, archive); err != nil {
 		return fmt.Errorf("upload workspace: %w", s.err(err))
 	}
 	if _, err := s.capture(ctx, "", nil, []string{"mkdir", "-p", workspaceDir}, nil); err != nil {

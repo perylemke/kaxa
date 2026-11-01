@@ -38,7 +38,7 @@ Standard output, standard error, and standard input are passed through, and the 
 
 ## Daytona
 
-Pick the provider with `--provider daytona` or `KAXA_DEFAULT_PROVIDER=daytona`. kaxa starts a stopped sandbox and runs the command through the toolbox process API of the sandbox.
+Pick the provider with `--provider daytona` or `KAXA_DEFAULT_PROVIDER=daytona`. kaxa starts a stopped sandbox and runs the command in the sandbox through the Daytona SDK. Input from stdin is read in full and handed to the command as a file (up to 64 MiB), so a command cannot read input typed later.
 
 ```bash
 kaxa --provider daytona exec my-box -- ls -la

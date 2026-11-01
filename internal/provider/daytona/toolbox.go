@@ -1,267 +1,388 @@
 package daytona
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
-	"mime/multipart"
-	"net/http"
-	"net/url"
-	"strconv"
+	"slices"
 	"strings"
 	"time"
+
+	sdk "github.com/daytona/clients/sdk-go/pkg/daytona"
+	"github.com/daytona/clients/sdk-go/pkg/options"
+	"github.com/daytona/clients/sdk-go/pkg/types"
+
+	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
 const (
-	kindExec = "exec"
-	kindPTY  = "pty"
-
-	reasonExited   = "exited"
-	reasonSignaled = "signaled"
-	reasonTimedOut = "timed_out"
-
-	toolboxTimeout = 2 * time.Minute
-	logPageLimit   = 1000
+	// logPoll is how often a running command is asked for its output and status.
+	logPoll = 300 * time.Millisecond
+	// maxStagedInput caps the standard input of a command that is not a
+	// terminal. It is uploaded as a file before the command starts.
+	maxStagedInput = 64 << 20
+	inputChunk     = 32 << 10
+	termName       = "xterm-256color"
 )
 
-// Conn locates the toolbox of one sandbox.
-type Conn struct {
-	// SandboxID is the ID Daytona generated.
-	SandboxID string
-	// BaseURL is the toolbox proxy of the sandbox region. Empty means the default.
-	BaseURL string
-}
-
-// ProcessRequest describes a process to start in a sandbox.
-type ProcessRequest struct {
-	Kind  string
-	Argv  []string
-	Dir   string
-	Stdin bool
-	// Rows and Cols size the terminal of a pty process.
-	Rows, Cols uint16
-}
-
-// LogFrame is a piece of output of a process.
-type LogFrame struct {
-	// Channel is stdout, stderr, or another channel such as setup.
-	Channel string
-	Data    string
-	Cursor  string
-}
-
-// WaitResult is how a process ended, or that the wait window elapsed.
-type WaitResult struct {
-	Reason   string
-	ExitCode int
-	HasCode  bool
-	Signal   string
-}
-
-// Done reports whether the process finished, as opposed to the wait timing out.
-func (w WaitResult) Done() bool { return w.Reason != reasonTimedOut && w.Reason != "" }
-
-// Attachment is the live terminal stream of a pty process.
-type Attachment interface {
-	// Read returns the next output, or io.EOF when the stream closes.
-	Read() ([]byte, error)
-	Write(data []byte) error
-	Close() error
-}
-
+// toolboxClient runs commands in a sandbox and moves files into it.
 type toolboxClient interface {
-	Start(ctx context.Context, c Conn, r ProcessRequest) (string, error)
-	Logs(ctx context.Context, c Conn, id, cursor string) ([]LogFrame, error)
-	// Wait blocks up to timeout for the process to finish. A zero timeout waits
-	// until it does.
-	Wait(ctx context.Context, c Conn, id string, timeout time.Duration) (WaitResult, error)
-	Stdin(ctx context.Context, c Conn, id string, data []byte, eof bool) error
-	Resize(ctx context.Context, c Conn, id string, rows, cols uint16) error
-	Attach(ctx context.Context, c Conn, id string) (Attachment, error)
-	Upload(ctx context.Context, c Conn, path string, r io.Reader) error
+	// Run runs one command to its end and returns its exit code. Output goes to
+	// the writers of spec. With spec.tty the command runs in a terminal.
+	Run(ctx context.Context, id string, spec runSpec) (int, error)
+	// Spawn starts a command that keeps running after kaxa leaves.
+	Spawn(ctx context.Context, id string, spec runSpec) (process, error)
+	// Upload writes r to path in the sandbox.
+	Upload(ctx context.Context, id, path string, r io.Reader) error
 }
 
-type httpToolbox struct {
-	key  string
-	http *http.Client
+// process is a command started by Spawn.
+type process interface {
+	// Wait waits up to window for the command to end and reports its exit code.
+	Wait(ctx context.Context, window time.Duration) (code int, done bool, err error)
+	// Output returns what the command printed, within a size limit.
+	Output(ctx context.Context) string
 }
 
-func newHTTPToolbox(apiKey string) *httpToolbox {
-	return &httpToolbox{key: apiKey, http: &http.Client{}}
+// sdkToolbox is the toolboxClient over the Daytona Go SDK. Commands run in
+// sessions of the sandbox daemon, and terminals use its PTY.
+type sdkToolbox struct {
+	c *sdkClient
 }
 
-// processBase returns <toolbox>/toolbox/<sandbox>, after checking that the
-// toolbox URL the API gave is HTTPS: the API key goes to it.
-func processBase(c Conn) (string, error) {
-	raw := c.BaseURL
-	if raw == "" {
-		raw = defaultToolboxURL
-	}
-	u, err := checkEndpoint(raw)
-	if err != nil {
-		return "", err
-	}
-	if c.SandboxID == "" || strings.ContainsAny(c.SandboxID, `/\?#`) {
-		return "", errors.New("daytona: invalid sandbox ID")
-	}
-	return strings.TrimRight(u.String(), "/") + "/toolbox/" + url.PathEscape(c.SandboxID), nil
+func (t *sdkToolbox) sandbox(ctx context.Context, id string) (*sdk.Sandbox, error) {
+	return t.c.get(ctx, id)
 }
 
-type startBody struct {
-	Kind     string        `json:"kind"`
-	Argv     []string      `json:"argv"`
-	Cwd      string        `json:"cwd,omitempty"`
-	Stdin    string        `json:"stdin"`
-	Terminal *terminalBody `json:"terminal,omitempty"`
+// quote quotes s for a POSIX shell. The sandbox daemon takes one command
+// string, so every word is quoted and nothing the user typed is parsed.
+func quote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
-type terminalBody struct {
-	Cols uint16 `json:"cols"`
-	Rows uint16 `json:"rows"`
-}
-
-func (t *httpToolbox) Start(ctx context.Context, c Conn, r ProcessRequest) (string, error) {
-	body := startBody{Kind: r.Kind, Argv: r.Argv, Cwd: r.Dir, Stdin: "closed"}
-	if r.Stdin {
-		body.Stdin = "open"
+// commandLine builds the command string for a sandbox session: the directory,
+// then env(1) to set the variables and look the command up in the PATH they set.
+func commandLine(spec runSpec, prefix string) string {
+	var b strings.Builder
+	if spec.dir != "" {
+		b.WriteString("cd " + quote(spec.dir) + " && ")
 	}
-	if r.Kind == kindPTY {
-		body.Terminal = &terminalBody{Cols: r.Cols, Rows: r.Rows}
-	}
-	var out struct {
-		ID string `json:"id"`
-	}
-	if err := t.do(ctx, c, http.MethodPost, "/processes", nil, body, &out); err != nil {
-		return "", err
-	}
-	if out.ID == "" {
-		return "", errors.New("daytona: the toolbox returned no process ID")
-	}
-	return out.ID, nil
-}
-
-func (t *httpToolbox) Logs(ctx context.Context, c Conn, id, cursor string) ([]LogFrame, error) {
-	q := url.Values{"limit": {strconv.Itoa(logPageLimit)}}
-	if cursor != "" {
-		q.Set("cursor", cursor)
-	}
-	var page struct {
-		Items []struct {
-			Channel string `json:"channel"`
-			Stream  string `json:"stream"`
-			Data    string `json:"data"`
-			Cursor  string `json:"cursor"`
-		} `json:"items"`
-	}
-	if err := t.do(ctx, c, http.MethodGet, "/processes/"+url.PathEscape(id)+"/logs", q, nil, &page); err != nil {
-		return nil, err
-	}
-	frames := make([]LogFrame, 0, len(page.Items))
-	for _, it := range page.Items {
-		ch := it.Channel
-		if ch == "" {
-			ch = it.Stream
+	b.WriteString(prefix)
+	if len(spec.env) > 0 {
+		b.WriteString("env")
+		for _, e := range spec.env {
+			b.WriteString(" " + quote(e))
 		}
-		frames = append(frames, LogFrame{Channel: ch, Data: it.Data, Cursor: it.Cursor})
+		b.WriteString(" ")
 	}
-	return frames, nil
+	words := make([]string, len(spec.argv))
+	for i, w := range spec.argv {
+		words[i] = quote(w)
+	}
+	b.WriteString(strings.Join(words, " "))
+	return b.String()
 }
 
-func (t *httpToolbox) Wait(ctx context.Context, c Conn, id string, timeout time.Duration) (WaitResult, error) {
-	q := url.Values{"timeoutMs": {strconv.FormatInt(timeout.Milliseconds(), 10)}}
-	var out struct {
-		Reason   string `json:"reason"`
-		ExitCode *int   `json:"exitCode"`
-		Signal   string `json:"signal"`
+func randomID(prefix string) (string, error) {
+	b := make([]byte, 6)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("daytona: random id: %w", err)
 	}
-	if err := t.do(ctx, c, http.MethodGet, "/processes/"+url.PathEscape(id)+"/wait", q, nil, &out); err != nil {
-		return WaitResult{}, err
-	}
-	res := WaitResult{Reason: out.Reason, Signal: out.Signal}
-	if out.ExitCode != nil {
-		res.ExitCode, res.HasCode = *out.ExitCode, true
-	}
-	return res, nil
+	return prefix + hex.EncodeToString(b), nil
 }
 
-func (t *httpToolbox) Stdin(ctx context.Context, c Conn, id string, data []byte, eof bool) error {
-	body := map[string]any{"data": string(data), "eof": eof}
-	return t.do(ctx, c, http.MethodPost, "/processes/"+url.PathEscape(id)+"/stdin", nil, body, nil)
-}
-
-func (t *httpToolbox) Resize(ctx context.Context, c Conn, id string, rows, cols uint16) error {
-	body := map[string]uint16{"cols": cols, "rows": rows}
-	return t.do(ctx, c, http.MethodPost, "/processes/"+url.PathEscape(id)+"/resize", nil, body, nil)
-}
-
-func (t *httpToolbox) Upload(ctx context.Context, c Conn, path string, r io.Reader) error {
-	var buf bytes.Buffer
-	mw := multipart.NewWriter(&buf)
-	part, err := mw.CreateFormFile("file", "upload")
+func (t *sdkToolbox) Upload(ctx context.Context, id, path string, r io.Reader) error {
+	sb, err := t.sandbox(ctx, id)
 	if err != nil {
 		return err
 	}
-	if _, err := io.Copy(part, r); err != nil {
-		return fmt.Errorf("read upload: %w", err)
-	}
-	if err := mw.Close(); err != nil {
-		return err
-	}
-	return t.send(ctx, c, http.MethodPost, "/files/upload", url.Values{"path": {path}}, mw.FormDataContentType(), &buf, nil)
+	return convertErr(sb.FileSystem.UploadFileStream(ctx, r, path))
 }
 
-func (t *httpToolbox) do(ctx context.Context, c Conn, method, path string, query url.Values, body, out any) error {
-	if body == nil {
-		return t.send(ctx, c, method, path, query, "", nil, out)
-	}
-	raw, err := json.Marshal(body)
+func (t *sdkToolbox) Run(ctx context.Context, id string, spec runSpec) (int, error) {
+	sb, err := t.sandbox(ctx, id)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	return t.send(ctx, c, method, path, query, "application/json", bytes.NewReader(raw), out)
+	if spec.tty {
+		return t.runTerminal(ctx, sb, spec)
+	}
+	return t.runCommand(ctx, sb, spec)
 }
 
-func (t *httpToolbox) send(ctx context.Context, c Conn, method, path string, query url.Values, contentType string, body io.Reader, out any) error {
-	base, err := processBase(c)
+func (t *sdkToolbox) runCommand(ctx context.Context, sb *sdk.Sandbox, spec runSpec) (int, error) {
+	staged := ""
+	if spec.stdin != nil {
+		path, err := t.stage(ctx, sb, spec.stdin)
+		if err != nil {
+			return 0, err
+		}
+		defer t.remove(ctx, sb, path)
+		staged = path
+	}
+	session, err := randomID("kaxa-")
 	if err != nil {
-		return err
+		return 0, err
 	}
-	endpoint := base + path
-	if len(query) > 0 {
-		endpoint += "?" + query.Encode()
+	if err := sb.Process.CreateSession(ctx, session); err != nil {
+		return 0, convertErr(err)
 	}
-	// A wait can park the request for as long as the command runs, so only the
-	// caller's context bounds it; everything else gets a default limit.
-	if !strings.HasSuffix(path, "/wait") {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, toolboxTimeout)
+	defer func() {
+		bg, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupTimeout)
 		defer cancel()
+		_ = sb.Process.DeleteSession(bg, session)
+	}()
+	line := commandLine(spec, "")
+	if staged != "" {
+		line += " < " + quote(staged)
 	}
-	req, err := http.NewRequestWithContext(ctx, method, endpoint, body)
+	started, err := sb.Process.ExecuteSessionCommand(ctx, session, line, true, false)
 	if err != nil {
-		return fmt.Errorf("create request: %w", err)
+		return 0, convertErr(err)
 	}
-	req.Header.Set("Authorization", "Bearer "+t.key)
-	req.Header.Set("Accept", "application/json")
-	if contentType != "" {
-		req.Header.Set("Content-Type", contentType)
-	}
-	resp, err := t.http.Do(req)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return apiErrorOf(resp)
-	}
-	if out == nil || resp.StatusCode == http.StatusNoContent {
+	cmdID, _ := started["id"].(string)
+	return t.follow(ctx, sb, session, cmdID, spec)
+}
+
+// follow copies the output of a command to the writers of spec until the
+// command ends, and returns its exit code. The daemon keeps the whole log, so
+// each poll writes only what is new.
+func (t *sdkToolbox) follow(ctx context.Context, sb *sdk.Sandbox, session, cmdID string, spec runSpec) (int, error) {
+	var seenOut, seenErr int
+	var copyErr error
+	drain := func() error {
+		logs, err := sb.Process.GetSessionCommandLogs(ctx, session, cmdID)
+		if err != nil {
+			return convertErr(err)
+		}
+		seenOut = emit(spec.stdout, logs.GetStdout(), seenOut, &copyErr)
+		seenErr = emit(spec.stderr, logs.GetStderr(), seenErr, &copyErr)
 		return nil
 	}
-	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-		return fmt.Errorf("decode response: %w", err)
+	for {
+		code, done, err := commandStatus(ctx, sb, session, cmdID)
+		if err != nil {
+			return 0, err
+		}
+		if err := drain(); err != nil {
+			return 0, err
+		}
+		if done {
+			return code, copyErr
+		}
+		if err := sleep(ctx, logPoll); err != nil {
+			return 0, err
+		}
 	}
-	return nil
+}
+
+// emit writes the part of text after the first seen bytes and returns the new count.
+func emit(w io.Writer, text string, seen int, copyErr *error) int {
+	if len(text) <= seen {
+		return seen
+	}
+	if w != nil {
+		if _, err := io.WriteString(w, text[seen:]); err != nil && *copyErr == nil {
+			*copyErr = err
+		}
+	}
+	return len(text)
+}
+
+// commandStatus reports whether a session command ended and its exit code.
+func commandStatus(ctx context.Context, sb *sdk.Sandbox, session, cmdID string) (code int, done bool, err error) {
+	st, err := sb.Process.GetSessionCommand(ctx, session, cmdID)
+	if err != nil {
+		return 0, false, convertErr(err)
+	}
+	raw, ok := st["exitCode"]
+	if !ok {
+		return 0, false, nil
+	}
+	switch v := raw.(type) {
+	case int32:
+		return int(v), true, nil
+	case int:
+		return v, true, nil
+	case int64:
+		return int(v), true, nil
+	case float64:
+		return int(v), true, nil
+	}
+	return 0, true, fmt.Errorf("daytona: unexpected exit code type %T", raw)
+}
+
+// stage uploads the standard input of a command to a file in the sandbox.
+func (t *sdkToolbox) stage(ctx context.Context, sb *sdk.Sandbox, in io.Reader) (string, error) {
+	path, err := randomID("/tmp/kaxa-in-")
+	if err != nil {
+		return "", err
+	}
+	limited := &io.LimitedReader{R: in, N: maxStagedInput + 1}
+	if err := sb.FileSystem.UploadFileStream(ctx, limited, path); err != nil {
+		return "", convertErr(err)
+	}
+	if limited.N <= 0 {
+		t.remove(ctx, sb, path)
+		return "", fmt.Errorf("daytona: standard input is larger than %d MiB", maxStagedInput>>20)
+	}
+	return path, nil
+}
+
+func (t *sdkToolbox) remove(ctx context.Context, sb *sdk.Sandbox, path string) {
+	bg, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupTimeout)
+	defer cancel()
+	_, _ = sb.Process.ExecuteCommand(bg, "rm -f "+quote(path))
+}
+
+func (t *sdkToolbox) runTerminal(ctx context.Context, sb *sdk.Sandbox, spec runSpec) (int, error) {
+	rows, cols := termSize(spec.size)
+	id, err := randomID("kaxa-pty-")
+	if err != nil {
+		return 0, err
+	}
+	pty, err := sb.Process.CreatePty(ctx, id,
+		options.WithCreatePtySize(types.PtySize{Rows: int(rows), Cols: int(cols)}),
+		options.WithCreatePtyEnv(map[string]string{"TERM": termName}),
+	)
+	if err != nil {
+		return 0, convertErr(err)
+	}
+	defer func() { _ = pty.Disconnect() }()
+	if err := pty.WaitForConnection(ctx); err != nil {
+		return 0, convertErr(err)
+	}
+	// The terminal is the login shell of the sandbox; exec replaces it with the
+	// command, so the terminal ends when the command does.
+	if err := pty.SendInput([]byte(commandLine(spec, "exec ") + "\n")); err != nil {
+		return 0, convertErr(err)
+	}
+	go pumpTerminal(pty, spec.stdin)
+	go watchResize(ctx, pty, spec.resize)
+
+	var copyErr error
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for data := range pty.DataChan() {
+			if spec.stdout == nil {
+				continue
+			}
+			if _, werr := spec.stdout.Write(data); werr != nil && copyErr == nil {
+				copyErr = werr
+			}
+		}
+	}()
+	res, err := pty.Wait(ctx)
+	if err != nil {
+		return 0, convertErr(err)
+	}
+	select {
+	case <-done:
+	case <-time.After(cleanupTimeout):
+	}
+	if res.ExitCode == nil {
+		return 0, errors.New("daytona: terminal ended without an exit code")
+	}
+	return *res.ExitCode, copyErr
+}
+
+// pumpTerminal copies in to the terminal. It is not awaited: it may be blocked
+// reading when the command ends. A terminal has no end of input.
+func pumpTerminal(pty *sdk.PtyHandle, in io.Reader) {
+	if in == nil {
+		return
+	}
+	buf := make([]byte, inputChunk)
+	for {
+		n, readErr := in.Read(buf)
+		if n > 0 {
+			if err := pty.SendInput(slices.Clone(buf[:n])); err != nil {
+				return
+			}
+		}
+		if readErr != nil {
+			return
+		}
+	}
+}
+
+func watchResize(ctx context.Context, pty *sdk.PtyHandle, resize <-chan sandbox.TermSize) {
+	if resize == nil {
+		return
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case size, ok := <-resize:
+			if !ok {
+				return
+			}
+			if size.Rows > 0 && size.Cols > 0 {
+				_, _ = pty.Resize(ctx, int(size.Cols), int(size.Rows))
+			}
+		}
+	}
+}
+
+func (t *sdkToolbox) Spawn(ctx context.Context, id string, spec runSpec) (process, error) {
+	sb, err := t.sandbox(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	session, err := randomID("kaxa-svc-")
+	if err != nil {
+		return nil, err
+	}
+	if err := sb.Process.CreateSession(ctx, session); err != nil {
+		return nil, convertErr(err)
+	}
+	started, err := sb.Process.ExecuteSessionCommand(ctx, session, commandLine(spec, ""), true, false)
+	if err != nil {
+		return nil, convertErr(err)
+	}
+	cmdID, _ := started["id"].(string)
+	return &sessionProcess{sb: sb, session: session, cmdID: cmdID}, nil
+}
+
+// sessionProcess is a command running in a session that outlives kaxa.
+type sessionProcess struct {
+	sb      *sdk.Sandbox
+	session string
+	cmdID   string
+}
+
+func (p *sessionProcess) Wait(ctx context.Context, window time.Duration) (int, bool, error) {
+	deadline := time.Now().Add(window)
+	for {
+		code, done, err := commandStatus(ctx, p.sb, p.session, p.cmdID)
+		if err != nil || done {
+			return code, done, err
+		}
+		left := time.Until(deadline)
+		if left <= 0 {
+			return 0, false, nil
+		}
+		if err := sleep(ctx, min(logPoll, left)); err != nil {
+			return 0, false, err
+		}
+	}
+}
+
+func (p *sessionProcess) Output(ctx context.Context) string {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupTimeout)
+	defer cancel()
+	logs, err := p.sb.Process.GetSessionCommandLogs(ctx, p.session, p.cmdID)
+	if err != nil {
+		return ""
+	}
+	out := logs.GetOutput()
+	if len(out) > failureOutput {
+		out = out[:failureOutput]
+	}
+	return out
 }

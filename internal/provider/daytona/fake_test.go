@@ -67,7 +67,6 @@ func (f *fakeAPI) Create(_ context.Context, p CreateParams) (Record, error) {
 	rec := &Record{
 		ID: "sb-" + strconv.Itoa(f.seq), Name: p.Name, Labels: slices.Clone(p.Labels), Status: f.createStatus,
 		CreatedAt: time.Unix(int64(1000+f.seq), 0), Template: p.Template, APIPort: p.APIPort,
-		ToolboxURL: "https://toolbox.example.test",
 	}
 	f.sandboxes[rec.ID] = rec
 	return *rec, nil
@@ -178,7 +177,7 @@ func (f *fakeAPI) CaptureImage(_ context.Context, id, name string) (Image, error
 	f.seq++
 	img := &Image{ID: "img_" + strconv.Itoa(f.seq), Name: name, Status: f.imageStatus, CreatedAt: time.Unix(int64(5000+f.seq), 0)}
 	if f.failImage {
-		img.Status, img.Error = "failed", "disk full"
+		img.Status, img.Error = statusFailed, "disk full"
 	}
 	f.images[name] = img
 	return *img, nil
@@ -240,137 +239,101 @@ func (f *fakeAPI) add(name, status string, labels ...string) string {
 	return rec.ID
 }
 
-// fakeResult is what a fake process does.
+// fakeResult is what a fake command does.
 type fakeResult struct {
 	stdout, stderr string
 	code           int
-	reason         string
-	// running keeps the process alive.
+	// err is a failure of the transport, such as a lost sandbox.
+	err error
+	// running keeps a spawned command alive.
 	running bool
 }
 
-type fakeProc struct {
-	req    ProcessRequest
-	frames []LogFrame
-	res    fakeResult
-	done   bool
-	stdin  strings.Builder
-}
-
 // fakeToolbox is an in-memory toolboxClient. The handler decides what each
-// started process prints and how it ends.
+// command prints and how it ends.
 type fakeToolbox struct {
 	mu      sync.Mutex
-	handler func(req ProcessRequest, stdin string) fakeResult
-	procs   map[string]*fakeProc
-	reqs    []ProcessRequest
+	handler func(spec runSpec, stdin string) fakeResult
+	reqs    []runSpec
+	stdins  []string
 	uploads map[string]string
-	// attachOutput is what a pty process prints.
-	attachOutput []string
-	attached     *fakeAttachment
-	resizes      [][2]uint16
-	startErr     error
-	// holdForResize keeps a pty stream open until a resize arrives.
+	// ttyOutput is what a terminal command prints.
+	ttyOutput []string
+	resizes   [][2]uint16
+	startErr  error
+	// holdForResize keeps a terminal command alive until a resize arrives.
 	holdForResize bool
 }
 
-func newFakeToolbox(h func(ProcessRequest, string) fakeResult) *fakeToolbox {
-	return &fakeToolbox{handler: h, procs: map[string]*fakeProc{}, uploads: map[string]string{}}
+func newFakeToolbox(h func(runSpec, string) fakeResult) *fakeToolbox {
+	return &fakeToolbox{handler: h, uploads: map[string]string{}}
 }
 
-func (f *fakeToolbox) finish(p *fakeProc) {
-	p.res = f.handler(p.req, p.stdin.String())
-	if p.res.stdout != "" {
-		p.frames = append(p.frames, LogFrame{Channel: "stdout", Data: p.res.stdout})
-	}
-	if p.res.stderr != "" {
-		p.frames = append(p.frames, LogFrame{Channel: "stderr", Data: p.res.stderr})
-	}
-	for i := range p.frames {
-		p.frames[i].Cursor = strconv.Itoa(i + 1)
-	}
-	p.done = !p.res.running
-}
-
-func (f *fakeToolbox) Start(_ context.Context, _ Conn, r ProcessRequest) (string, error) {
+func (f *fakeToolbox) record(spec runSpec, stdin string) fakeResult {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.reqs = append(f.reqs, spec)
+	f.stdins = append(f.stdins, stdin)
+	return f.handler(spec, stdin)
+}
+
+func (f *fakeToolbox) Run(_ context.Context, _ string, spec runSpec) (int, error) {
 	if f.startErr != nil {
-		return "", f.startErr
+		return 0, f.startErr
 	}
-	f.reqs = append(f.reqs, r)
-	id := "proc-" + strconv.Itoa(len(f.reqs))
-	p := &fakeProc{req: r}
-	f.procs[id] = p
-	if !r.Stdin {
-		f.finish(p)
+	stdin := ""
+	if spec.stdin != nil && !spec.tty {
+		data, _ := io.ReadAll(spec.stdin)
+		stdin = string(data)
 	}
-	return id, nil
+	res := f.record(spec, stdin)
+	if res.err != nil {
+		return 0, res.err
+	}
+	if spec.tty {
+		f.runTerminal(spec)
+		return res.code, nil
+	}
+	if spec.stdout != nil {
+		_, _ = io.WriteString(spec.stdout, res.stdout)
+	}
+	if spec.stderr != nil {
+		_, _ = io.WriteString(spec.stderr, res.stderr)
+	}
+	return res.code, nil
 }
 
-func (f *fakeToolbox) Logs(_ context.Context, _ Conn, id, cursor string) ([]LogFrame, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	p := f.procs[id]
-	from := 0
-	if cursor != "" {
-		from, _ = strconv.Atoi(cursor)
+func (f *fakeToolbox) runTerminal(spec runSpec) {
+	for _, chunk := range f.ttyOutput {
+		_, _ = io.WriteString(spec.stdout, chunk)
 	}
-	if from >= len(p.frames) {
-		return nil, nil
+	if spec.resize == nil {
+		return
 	}
-	return slices.Clone(p.frames[from:]), nil
+	if !f.holdForResize {
+		return
+	}
+	select {
+	case size := <-spec.resize:
+		f.mu.Lock()
+		f.resizes = append(f.resizes, [2]uint16{size.Rows, size.Cols})
+		f.mu.Unlock()
+	case <-time.After(2 * time.Second):
+	}
 }
 
-func (f *fakeToolbox) Wait(_ context.Context, _ Conn, id string, _ time.Duration) (WaitResult, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	p := f.procs[id]
-	if !p.done {
-		return WaitResult{Reason: reasonTimedOut}, nil
+func (f *fakeToolbox) Spawn(_ context.Context, _ string, spec runSpec) (process, error) {
+	if f.startErr != nil {
+		return nil, f.startErr
 	}
-	reason := p.res.reason
-	if reason == "" {
-		reason = reasonExited
+	res := f.record(spec, "")
+	if res.err != nil {
+		return nil, res.err
 	}
-	return WaitResult{Reason: reason, ExitCode: p.res.code, HasCode: reason == reasonExited}, nil
+	return &fakeProcess{res: res}, nil
 }
 
-func (f *fakeToolbox) Stdin(_ context.Context, _ Conn, id string, data []byte, eof bool) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	p := f.procs[id]
-	p.stdin.Write(data)
-	if eof && !p.done {
-		f.finish(p)
-	}
-	return nil
-}
-
-func (f *fakeToolbox) Resize(_ context.Context, _ Conn, _ string, rows, cols uint16) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.resizes = append(f.resizes, [2]uint16{rows, cols})
-	return nil
-}
-
-func (f *fakeToolbox) Attach(_ context.Context, _ Conn, id string) (Attachment, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	a := &fakeAttachment{chunks: slices.Clone(f.attachOutput)}
-	if f.holdForResize {
-		a.hold = func() bool {
-			f.mu.Lock()
-			defer f.mu.Unlock()
-			return len(f.resizes) == 0
-		}
-	}
-	f.attached = a
-	f.finish(f.procs[id])
-	return a, nil
-}
-
-func (f *fakeToolbox) Upload(_ context.Context, _ Conn, path string, r io.Reader) error {
+func (f *fakeToolbox) Upload(_ context.Context, _, path string, r io.Reader) error {
 	data, err := io.ReadAll(r)
 	if err != nil {
 		return err
@@ -381,72 +344,26 @@ func (f *fakeToolbox) Upload(_ context.Context, _ Conn, path string, r io.Reader
 	return nil
 }
 
-// argvs returns the commands that were started, without the env(1) prefix.
+// argvs returns the commands that were run.
 func (f *fakeToolbox) argvs() [][]string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	var out [][]string
 	for _, r := range f.reqs {
-		out = append(out, plain(r.Argv))
+		out = append(out, r.argv)
 	}
 	return out
 }
 
-// plain drops a leading env(1) and its KEY=VALUE entries.
-func plain(argv []string) []string {
-	if len(argv) == 0 || argv[0] != "env" {
-		return argv
-	}
-	i := 1
-	for i < len(argv) && strings.Contains(argv[i], "=") && !strings.HasPrefix(argv[i], "/") {
-		i++
-	}
-	return argv[i:]
+type fakeProcess struct{ res fakeResult }
+
+func (p *fakeProcess) Wait(context.Context, time.Duration) (int, bool, error) {
+	return p.res.code, !p.res.running, nil
 }
 
-type fakeAttachment struct {
-	mu      sync.Mutex
-	chunks  []string
-	written []string
-	closed  bool
-	// hold keeps the stream open while it returns true.
-	hold func() bool
-}
+func (p *fakeProcess) Output(context.Context) string { return p.res.stdout + p.res.stderr }
 
-func (a *fakeAttachment) Read() ([]byte, error) {
-	if a.hold != nil {
-		for range 400 {
-			if !a.hold() {
-				break
-			}
-			time.Sleep(5 * time.Millisecond)
-		}
-	}
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if len(a.chunks) == 0 {
-		return nil, io.EOF
-	}
-	c := a.chunks[0]
-	a.chunks = a.chunks[1:]
-	return []byte(c), nil
-}
-
-func (a *fakeAttachment) Write(data []byte) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.written = append(a.written, string(data))
-	return nil
-}
-
-func (a *fakeAttachment) Close() error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.closed = true
-	return nil
-}
-
-func okHandler(ProcessRequest, string) fakeResult { return fakeResult{} }
+func okHandler(runSpec, string) fakeResult { return fakeResult{} }
 
 // newTestProvider returns a provider over the fakes with fast polling.
 func newTestProvider(t interface{ TempDir() string }, tb *fakeToolbox) (*Provider, *fakeAPI) {

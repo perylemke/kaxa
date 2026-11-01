@@ -6,7 +6,7 @@ Cursor users: the same rules live in `.cursor/rules/*.mdc`; Claude Code reads `.
 ## Stack
 
 - Go 1.27+ (see `go.mod`), Cobra CLI, `CGO_ENABLED=0` builds.
-- Providers: Sprites, Modal, and E2B (stdlib REST and Connect-JSON client, no SDK), and Docker (`docker`, stdlib REST plus a WebSocket for processes, with a Docker ID and personal access token; `--api` publishes one port), and Daytona (`daytona`, stdlib REST for control, the sandbox toolbox for processes with a WebSocket for terminals, and an API key; snapshots are disk images; `--api` makes one port public), registered in `internal/registry`.
+- Providers: Sprites, Modal, and Daytona use their official Go SDKs; E2B (stdlib REST and Connect-JSON client) and Docker (`docker`, stdlib REST plus a WebSocket for processes, with a Docker ID and personal access token; `--api` publishes one port) have no official Go SDK and use internal clients. Daytona (`daytona`) uses an API key; snapshots are disk images; `--api` makes one sandbox public. Convention: a provider with an official Go SDK uses it, otherwise it uses an internal client. All are registered in `internal/registry`.
 - `kaxa mcp` serves sandboxes to AI agents over the Model Context Protocol.
 - Releases: semtag tags (`make release`, `make prerelease`), GoReleaser (`.goreleaser.yml`), and the Homebrew cask in `perylemke/homebrew-tap`. Only final `vX.Y.Z` tags reach Homebrew; `-alpha/-beta/-rc` tags are GitHub pre-releases.
 

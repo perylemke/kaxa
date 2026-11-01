@@ -11,7 +11,7 @@
 [![Lint](https://github.com/perylemke/kaxa/actions/workflows/lint.yml/badge.svg)](https://github.com/perylemke/kaxa/actions/workflows/lint.yml)
 [![Sec](https://github.com/perylemke/kaxa/actions/workflows/sec.yml/badge.svg)](https://github.com/perylemke/kaxa/actions/workflows/sec.yml)
 
-Wrapper CLI for sandbox providers. **kaxa** puts isolated execution environments behind one command-line interface. Sprites and Modal go through their official Go SDKs, E2B through kaxa's own HTTP client, Docker Sandboxes through the Docker Sandboxes API, and Daytona through its REST and toolbox APIs. Providers: [Fly.io Sprites](https://docs.fly.io/sprites), [Modal Sandboxes](https://modal.com/docs/guide/sdk-javascript-go), [E2B](https://e2b.dev), [Docker Sandboxes](https://docs.docker.com/ai/sandboxes/), and [Daytona](https://www.daytona.io).
+Wrapper CLI for sandbox providers. **kaxa** puts isolated execution environments behind one command-line interface. Sprites, Modal, and Daytona go through their official Go SDKs, E2B through kaxa's own HTTP client, and Docker Sandboxes through the Docker Sandboxes API. Providers: [Fly.io Sprites](https://docs.fly.io/sprites), [Modal Sandboxes](https://modal.com/docs/guide/sdk-javascript-go), [E2B](https://e2b.dev), [Docker Sandboxes](https://docs.docker.com/ai/sandboxes/), and [Daytona](https://www.daytona.io).
 
 Provider support:
 
@@ -19,7 +19,7 @@ Provider support:
 - **Modal** (`--provider modal`): `create`, `list`, `exec`, `console`, `snapshot`, `destroy`. Set it up with [Modal account and token](docs/modal-account.md).
 - **E2B** (`--provider e2b`): `create` (with `--sync` and `--api`), `list`, `exec`, `console`, `restart`, `sync`, `destroy`. Set it up with [E2B account and API key](docs/e2b-account.md).
 - **Docker** (`--provider docker`): `create` (with `--sync`, `--template`, and `--api`), `list`, `exec`, `console`, `restart`, `sync`, `snapshot`, `destroy`, on Docker's cloud through the Docker Sandboxes API (experimental; needs a Docker Agentic Platform subscription). Set it up with [Docker Sandboxes](docs/docker-account.md).
-- **Daytona** (`--provider daytona`): `create` (with `--sync`, `--template`, and `--api`), `list`, `exec`, `console`, `restart`, `sync`, `snapshot`, `destroy`, through the Daytona API and the sandbox toolbox. Set it up with [Daytona](docs/daytona-account.md).
+- **Daytona** (`--provider daytona`): `create` (with `--sync`, `--template`, and `--api`), `list`, `exec`, `console`, `restart`, `sync`, `snapshot`, `destroy`, through the Daytona Go SDK. Set it up with [Daytona](docs/daytona-account.md).
 
 Features that only exist for Sprites (`restart`, `upgrade`, `url`, `--running`, `--public`) print that they are not available for Modal, E2B, Docker, or Daytona and name the providers that have them (`restart` also works on E2B, Docker, and Daytona). `--sync` works on Modal, E2B, Docker, and Daytona too, with the workspace in `/home/modal/workspace`, `/home/user/workspace`, `/home/agent/workspace`, and `/home/daytona/workspace`.
 
@@ -85,7 +85,7 @@ Never commit real tokens.
 | `KAXA_DOCKER_PAT` | Docker personal access token (created with Allow Cloud Sandboxes access) |
 | `KAXA_DOCKER_TEMPLATE` | Docker image for new sandboxes (optional; default the shell agent image). `create --template` overrides it |
 | `KAXA_DAYTONA_API_KEY` | Daytona API key |
-| `KAXA_DAYTONA_TEMPLATE` | Daytona image or snapshot for new sandboxes (optional; default the Daytona default image). `create --template` overrides it |
+| `KAXA_DAYTONA_TEMPLATE` | Daytona snapshot for new sandboxes (optional; default the Daytona default snapshot). `create --template` overrides it |
 
 ## Usage
 
@@ -152,7 +152,7 @@ You can pass `--provider sprites` instead of `KAXA_DEFAULT_PROVIDER`.
 - `--running` keeps the sandbox up for one hour, serves tmux on its URL, and opens that URL.
 - `--sync` copies the Git repository, including `.git` and excluding ignored files, into `/home/sprite/workspace/<repo>` (Sprites) `/home/modal/workspace/<repo>` (Modal, as the `modal` user), `/home/user/workspace/<repo>` (E2B, as `user`), `/home/agent/workspace/<repo>` (Docker, as `agent`), or `/home/daytona/workspace/<repo>` (Daytona, as `daytona`). `--dir` selects another repository. A subdirectory still copies the whole repository. Credentials in `.git/config` are removed, and untracked secret files such as `.env` or `*.pem` stop the copy; see [sync](docs/sync.md). The root selects Go, Rust, Python, Node, Ruby (`Gemfile`), and Clojure (`deps.edn`); missing tools are installed, then project dependencies. A failed copy or install deletes the sandbox.
 - `--api` publishes one HTTP service on the Sprites URL, on `https://<port>-<id>.e2b.app` on E2B, where `--api` is what makes that port public, on the URL that Docker gives the published port on Docker, or on the public preview URL of the API port on Daytona. `--api-cmd` is comma-separated argv, and the process must listen on `0.0.0.0` and on `--api-port` (8000 by default). With `--sync`, the repository must be an HTTP API; a CLI project is rejected before create. Create waits until the service is running, for up to 90 seconds, and deletes the sandbox if it does not. With `--running`, port `8080` stays with tmux and the URL forwards to the API. `--api-env KEY=VALUE` or `--api-env KEY` (value copied from your shell) sets service variables; see [create](docs/create.md). Names starting with `KAXA_`, `MODAL_TOKEN_`, `FLY_`, or `SPRITES_` are rejected.
-- `--template` (E2B, Docker, and Daytona) starts the sandbox from a template. On E2B it is one you built with the E2B CLI or SDK and must keep the `base` layout (user `user`); `KAXA_E2B_TEMPLATE` sets a default. On Docker it is an image reference that keeps the agent layout (user `agent`); `KAXA_DOCKER_TEMPLATE` sets a default. On Daytona it is an image or snapshot name that keeps the `daytona` user layout; `KAXA_DAYTONA_TEMPLATE` sets a default. See [docs/create.md](docs/create.md#templates-on-e2b).
+- `--template` (E2B, Docker, and Daytona) starts the sandbox from a template. On E2B it is one you built with the E2B CLI or SDK and must keep the `base` layout (user `user`); `KAXA_E2B_TEMPLATE` sets a default. On Docker it is an image reference that keeps the agent layout (user `agent`); `KAXA_DOCKER_TEMPLATE` sets a default. On Daytona it is a snapshot name that keeps the `daytona` user layout; `KAXA_DAYTONA_TEMPLATE` sets a default. See [docs/create.md](docs/create.md#templates-on-e2b).
 - `--public` makes that URL reachable without a Sprites account. A failed auth change leaves the sandbox in place. Change it later with `kaxa url <name> public` or `kaxa url <name> sprite`. Only the sprites provider accepts `url`. `--public` is refused with `--running` and no `--api`, because that URL serves a tmux terminal with no login.
 
 ### exec and console

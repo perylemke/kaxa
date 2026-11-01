@@ -23,7 +23,7 @@ const (
 // known to be final keeps the wait going until it times out.
 var (
 	imageReady  = []string{"ready", "available", "completed", "succeeded", "built", "active"}
-	imageFailed = []string{"failed", "error"}
+	imageFailed = []string{statusFailed, statusError}
 )
 
 // RestoreMode reports that Daytona restores a snapshot into a new sandbox.

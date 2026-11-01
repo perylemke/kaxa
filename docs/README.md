@@ -23,7 +23,7 @@ Every command except `version` and `--help` loads configuration before it runs.
 | `KAXA_DOCKER_PAT` | Docker personal access token, created with Allow Cloud Sandboxes access |
 | `KAXA_DOCKER_TEMPLATE` | Docker image for new sandboxes. Optional; default the shell agent image |
 | `KAXA_DAYTONA_API_KEY` | Daytona API key |
-| `KAXA_DAYTONA_TEMPLATE` | Daytona image or snapshot for new sandboxes. Optional; default the Daytona default image |
+| `KAXA_DAYTONA_TEMPLATE` | Daytona snapshot for new sandboxes. Optional; default the Daytona default snapshot |
 
 `--provider` wins over `KAXA_DEFAULT_PROVIDER`. Tokens are never read from a flag, from the Sprites CLI config file, from `~/.modal.toml`, or from `E2B_API_KEY`.
 

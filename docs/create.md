@@ -115,7 +115,7 @@ kaxa creates the sandbox through the Docker Sandboxes API and waits until it run
 kaxa create --provider daytona --sync my-box
 ```
 
-kaxa creates the sandbox through the Daytona API and waits until it runs, then uploads the repository, as a gzip tar, through the toolbox and unpacks it with `tar` inside the sandbox. The repository lands in `/home/daytona/workspace/<repo>`, owned by `daytona`. The same checks as on the other providers apply: credentials in `.git/config` are removed and untracked secret files stop the copy. Toolchains are installed under `/home/daytona/.local` and `/home/daytona/.cargo` and put on the `PATH` of `exec` and `console`. Downloads are checked against pinned SHA-256 hashes. See [Daytona](daytona-account.md).
+kaxa creates the sandbox through the Daytona API and waits until it runs, then uploads the repository, as a gzip tar, and unpacks it with `tar` inside the sandbox. The repository lands in `/home/daytona/workspace/<repo>`, owned by `daytona`. The same checks as on the other providers apply: credentials in `.git/config` are removed and untracked secret files stop the copy. Toolchains are installed under `/home/daytona/.local` and `/home/daytona/.cargo` and put on the `PATH` of `exec` and `console`. Downloads are checked against pinned SHA-256 hashes. See [Daytona](daytona-account.md).
 
 ### Templates on Docker
 
@@ -133,7 +133,7 @@ kaxa create --provider daytona --template my-image --sync my-box
 export KAXA_DAYTONA_TEMPLATE=my-image   # default for every Daytona create
 ```
 
-A template is an image or snapshot name that Daytona can start. The `--template` flag wins over `KAXA_DAYTONA_TEMPLATE`; without either, kaxa uses the Daytona default image. kaxa expects its layout: user `daytona`, home `/home/daytona`, workspace `/home/daytona/workspace`. Another user breaks `exec`, `console`, and `--sync`, and kaxa does not detect that.
+A template is the name of a Daytona snapshot. The `--template` flag wins over `KAXA_DAYTONA_TEMPLATE`; without either, kaxa uses the Daytona default image. kaxa expects its layout: user `daytona`, home `/home/daytona`, workspace `/home/daytona/workspace`. Another user breaks `exec`, `console`, and `--sync`, and kaxa does not detect that.
 
 ### API on E2B
 

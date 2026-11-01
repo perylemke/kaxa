@@ -146,7 +146,7 @@ func TestCreateAPIPortOnlyWithExposeAPI(t *testing.T) {
 func TestCreateFailedSandboxIsRemoved(t *testing.T) {
 	t.Parallel()
 	p, api := newTestProvider(t, newFakeToolbox(okHandler))
-	api.createStatus = "failed"
+	api.createStatus = statusFailed
 	if _, err := p.Create(t.Context(), sandbox.Spec{Name: boxName}); err == nil {
 		t.Fatal("Create succeeded")
 	}

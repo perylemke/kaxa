@@ -100,8 +100,8 @@ func apiPortMismatch(created, want int) error {
 }
 
 func (p *Provider) startService(ctx context.Context, s *session, workDir string, port int, argv, env []string) error {
-	id, err := s.tb.Start(ctx, s.conn, ProcessRequest{
-		Kind: kindExec, Argv: commandOf(argv, append(daytonaLayout.Env(), env...)), Dir: workDir,
+	proc, err := s.tb.Spawn(ctx, s.rec.ID, runSpec{
+		argv: argv, dir: workDir, env: append(daytonaLayout.Env(), env...),
 	})
 	if err != nil {
 		return fmt.Errorf("start api service: %w", s.err(err))
@@ -109,12 +109,12 @@ func (p *Provider) startService(ctx context.Context, s *session, workDir string,
 	timeout, interval := p.readiness()
 	deadline := time.Now().Add(timeout)
 	for {
-		res, err := s.tb.Wait(ctx, s.conn, id, interval)
+		code, done, err := proc.Wait(ctx, interval)
 		if err != nil {
 			return s.err(err)
 		}
-		if res.Done() {
-			return apiServiceFailed(res, s.serviceOutput(ctx, id))
+		if done {
+			return apiServiceFailed(code, proc.Output(ctx))
 		}
 		if s.listening(ctx, port) {
 			return nil
@@ -125,30 +125,15 @@ func (p *Provider) startService(ctx context.Context, s *session, workDir string,
 	}
 }
 
-// serviceOutput reads what a failed service printed, within a size limit.
-func (s *session) serviceOutput(ctx context.Context, id string) string {
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupTimeout)
-	defer cancel()
-	frames, err := s.tb.Logs(ctx, s.conn, id, "")
-	if err != nil {
-		return ""
-	}
-	out := sandbox.NewCappedBuffer(failureOutput)
-	for _, f := range frames {
-		_, _ = out.Write([]byte(f.Data))
-	}
-	return out.String()
-}
-
 func (s *session) listening(ctx context.Context, port int) bool {
 	_, err := s.capture(ctx, "", nil, []string{"bash", "-c", probeScript, "kaxa", strconv.Itoa(port)}, nil)
 	return err == nil
 }
 
-func apiServiceFailed(res WaitResult, output string) error {
+func apiServiceFailed(code int, output string) error {
 	msg := "api service stopped"
-	if res.HasCode && res.ExitCode > 0 {
-		msg += " with exit status " + strconv.Itoa(res.ExitCode)
+	if code > 0 {
+		msg += " with exit status " + strconv.Itoa(code)
 	}
 	if detail := strings.TrimSpace(output); detail != "" {
 		msg += ": " + detail

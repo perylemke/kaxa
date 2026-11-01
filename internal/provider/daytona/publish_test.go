@@ -11,9 +11,9 @@ import (
 
 var serviceArgv = []string{"python", "-m", "http.server", "8000"}
 
-func isService(req ProcessRequest) bool { return plain(req.Argv)[0] == "python" }
+func isService(req runSpec) bool { return req.argv[0] == "python" }
 
-func publishFixture(t *testing.T, h func(ProcessRequest, string) fakeResult) (*Provider, *fakeAPI, *fakeToolbox) {
+func publishFixture(t *testing.T, h func(runSpec, string) fakeResult) (*Provider, *fakeAPI, *fakeToolbox) {
 	t.Helper()
 	tb := newFakeToolbox(h)
 	p, api := newTestProvider(t, tb)
@@ -25,7 +25,7 @@ func publishFixture(t *testing.T, h func(ProcessRequest, string) fakeResult) (*P
 
 func TestPublishAPIStartsServiceAndExposesPort(t *testing.T) {
 	t.Parallel()
-	p, api, tb := publishFixture(t, func(req ProcessRequest, _ string) fakeResult {
+	p, api, tb := publishFixture(t, func(req runSpec, _ string) fakeResult {
 		return fakeResult{running: isService(req)}
 	})
 	err := p.PublishAPI(t.Context(), "api", daytonaHome, 8000, serviceArgv, []string{"MODE=prod"})
@@ -33,7 +33,7 @@ func TestPublishAPIStartsServiceAndExposesPort(t *testing.T) {
 		t.Fatalf("PublishAPI: %v", err)
 	}
 	svc := tb.reqs[0]
-	if svc.Kind != kindExec || svc.Dir != daytonaHome || !slices.Contains(svc.Argv, "MODE=prod") {
+	if svc.dir != daytonaHome || !slices.Contains(svc.env, "MODE=prod") {
 		t.Fatalf("service request = %+v", svc)
 	}
 	if !api.has("setport sb-1 8000") {
@@ -43,14 +43,14 @@ func TestPublishAPIStartsServiceAndExposesPort(t *testing.T) {
 	if err != nil || d.URL == "" || d.Auth != sandbox.URLAuthPublic {
 		t.Fatalf("Inspect = %+v, %v", d, err)
 	}
-	if probe := plain(tb.reqs[1].Argv); probe[0] != bashCmd || probe[len(probe)-1] != "8000" {
+	if probe := tb.reqs[1].argv; probe[0] != bashCmd || probe[len(probe)-1] != "8000" {
 		t.Fatalf("probe = %v", probe)
 	}
 }
 
 func TestPublishAPIServiceExitsEarly(t *testing.T) {
 	t.Parallel()
-	p, api, _ := publishFixture(t, func(req ProcessRequest, _ string) fakeResult {
+	p, api, _ := publishFixture(t, func(req runSpec, _ string) fakeResult {
 		if isService(req) {
 			return fakeResult{code: 1, stdout: "address in use"}
 		}
@@ -67,7 +67,7 @@ func TestPublishAPIServiceExitsEarly(t *testing.T) {
 
 func TestPublishAPIServiceNeverListens(t *testing.T) {
 	t.Parallel()
-	p, api, _ := publishFixture(t, func(req ProcessRequest, _ string) fakeResult {
+	p, api, _ := publishFixture(t, func(req runSpec, _ string) fakeResult {
 		if isService(req) {
 			return fakeResult{running: true}
 		}

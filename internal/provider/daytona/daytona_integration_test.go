@@ -25,8 +25,8 @@ func infoHas(infos []sandbox.Info, id sandbox.ID) bool {
 func TestDaytonaLifecycleFlow(t *testing.T) {
 	t.Parallel()
 
-	tb := newFakeToolbox(func(req ProcessRequest, _ string) fakeResult {
-		if plain(req.Argv)[0] == "pwd" {
+	tb := newFakeToolbox(func(req runSpec, _ string) fakeResult {
+		if req.argv[0] == "pwd" {
 			return fakeResult{stdout: daytonaHome + "\n"}
 		}
 		return fakeResult{}
@@ -84,7 +84,7 @@ func TestDaytonaLifecycleFlow(t *testing.T) {
 func TestDaytonaCreateAPIThroughLifecycle(t *testing.T) {
 	t.Parallel()
 
-	tb := newFakeToolbox(func(req ProcessRequest, _ string) fakeResult {
+	tb := newFakeToolbox(func(req runSpec, _ string) fakeResult {
 		return fakeResult{running: isService(req)}
 	})
 	p, api := newTestProvider(t, tb)

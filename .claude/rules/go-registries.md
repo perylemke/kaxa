@@ -9,3 +9,4 @@ paths:
 - Provider `Name()` returns a stable lowercase identifier (`sprites`, `modal`, `e2b`, `docker`, `daytona`).
 - Lookup uses `registry.Get(name)`; unknown names return a clear error at config validation time when possible.
 - Do not hardcode provider lists in help text; derive from `registry.Names()` when listing supported providers.
+- A provider with an official Go SDK uses that SDK (Sprites, Modal, Daytona); one without an official Go SDK uses an internal client in its package (E2B, Docker). Hide either behind small interfaces so tests run on fakes.

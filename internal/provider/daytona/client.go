@@ -1,25 +1,28 @@
 package daytona
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
-	"net/http"
-	"net/url"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
+
+	sdk "github.com/daytona/clients/sdk-go/pkg/daytona"
+	sdkerrors "github.com/daytona/clients/sdk-go/pkg/errors"
+	"github.com/daytona/clients/sdk-go/pkg/options"
+	"github.com/daytona/clients/sdk-go/pkg/types"
 )
 
 const (
-	defaultAPIURL     = "https://api.daytona.com"
-	defaultToolboxURL = "https://toolbox.daytona.com"
-	maxPageSize       = 100
-	maxErrorBody      = 4 << 10
+	defaultAPIURL = "https://app.daytona.io/api"
+	pageSize      = 100
+	// createTimeout bounds the create call itself. The provider waits for the
+	// sandbox to run on its own, with its own timeout.
+	createTimeout = 2 * time.Minute
+	// snapshotTimeout bounds the capture of a sandbox disk.
+	snapshotTimeout = 10 * time.Minute
+	deleteTimeout   = 2 * time.Minute
 
 	labelManaged  = "kaxa.managed"
 	labelName     = "kaxa.name"
@@ -28,16 +31,20 @@ const (
 	labelTemplate = "kaxa.template"
 	labelTrue     = "true"
 
+	// Statuses kaxa reasons about. Daytona calls a running sandbox "started";
+	// the adapter renames it.
 	statusRunning = "running"
 	statusStopped = "stopped"
 	statusPaused  = "paused"
+	statusError   = "error"
+	statusFailed  = "failed"
 )
 
 // CreateParams describes the sandbox to create.
 type CreateParams struct {
 	Name   string
 	Labels []string
-	// Template is the image to start from. Empty means the platform default.
+	// Template is the Daytona snapshot to start from. Empty means the platform default.
 	Template string
 	// APIPort is the port of the API that will be published. Zero means none.
 	APIPort int
@@ -46,19 +53,18 @@ type CreateParams struct {
 // Record is one Daytona sandbox as kaxa sees it.
 type Record struct {
 	// ID is the identifier Daytona generated. Name is the kaxa name.
-	ID         string
-	Name       string
-	Labels     []string
-	Status     string
-	CreatedAt  time.Time
-	ToolboxURL string
+	ID        string
+	Name      string
+	Labels    []string
+	Status    string
+	CreatedAt time.Time
 	// APIPort is the port of the published API, or zero.
 	APIPort int
-	// Template is the image the sandbox was created from. Empty means default.
+	// Template is the snapshot the sandbox was created from. Empty means default.
 	Template string
 }
 
-// Image is a disk image captured from a sandbox.
+// Image is a disk snapshot captured from a sandbox.
 type Image struct {
 	ID        string
 	Name      string
@@ -67,7 +73,7 @@ type Image struct {
 	CreatedAt time.Time
 }
 
-// PortEndpoint is an exposed sandbox port.
+// PortEndpoint is the preview address of a sandbox port.
 type PortEndpoint struct {
 	Port   int
 	Public bool
@@ -85,6 +91,8 @@ type apiClient interface {
 	Start(ctx context.Context, id string) error
 	Resume(ctx context.Context, id string) error
 	Stop(ctx context.Context, id string) error
+	// SetPort makes the sandbox public when asked and returns the preview of port.
+	// Daytona makes every port of a sandbox public together, not one by one.
 	SetPort(ctx context.Context, id string, port int, public bool) (PortEndpoint, error)
 	GetPort(ctx context.Context, id string, port int) (PortEndpoint, error)
 	CaptureImage(ctx context.Context, id, name string) (Image, error)
@@ -94,59 +102,46 @@ type apiClient interface {
 	DeleteImage(ctx context.Context, id string) error
 }
 
-type restClient struct {
-	base *url.URL
-	key  string
-	http *http.Client
+// sdkClient is the apiClient over the official Daytona Go SDK.
+type sdkClient struct {
+	c *sdk.Client
 }
 
-func newRESTClient(apiKey string) *restClient {
-	c, _ := newRESTClientAt(defaultAPIURL, apiKey)
-	return c
-}
-
-func newRESTClientAt(base, apiKey string) (*restClient, error) {
-	u, err := checkEndpoint(base)
+func newSDKClient(apiKey string) (*sdkClient, error) {
+	// Polling is deprecated, but the event stream of the SDK can stall behind
+	// proxies, and kaxa waits on its own timeouts.
+	polling := true
+	c, err := sdk.NewClientWithConfig(&types.DaytonaConfig{
+		APIKey: apiKey, APIUrl: defaultAPIURL,
+		UseDeprecatedPolling: &polling, //nolint:staticcheck // see the comment above
+	})
 	if err != nil {
-		return nil, err
+		return nil, convertErr(err)
 	}
-	return &restClient{base: u, key: apiKey, http: &http.Client{Timeout: 2 * time.Minute}}, nil
+	return &sdkClient{c: c}, nil
 }
 
-type sandboxJSON struct {
-	ID         string            `json:"id"`
-	Name       string            `json:"name"`
-	Status     string            `json:"status"`
-	Labels     map[string]string `json:"labels"`
-	CreatedAt  time.Time         `json:"created_at"`
-	ToolboxURL string            `json:"toolbox_proxy_url"`
+// convertErr turns an SDK error into an *APIError, which the provider knows
+// how to explain to the user. Other errors pass through.
+func convertErr(err error) error {
+	if err == nil {
+		return nil
+	}
+	if de, ok := errors.AsType[*sdkerrors.DaytonaError](err); ok && de.StatusCode != 0 {
+		return &APIError{Status: de.StatusCode, Message: de.Message}
+	}
+	return err
 }
 
-type sandboxPage struct {
-	Items      []sandboxJSON `json:"items"`
-	NextCursor string        `json:"next_cursor"`
+func (s *sdkClient) get(ctx context.Context, id string) (*sdk.Sandbox, error) {
+	sb, err := s.c.Get(ctx, id)
+	if err != nil {
+		return nil, notFound(convertErr(err))
+	}
+	return sb, nil
 }
 
-type imageJSON struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Status    string    `json:"status"`
-	Error     string    `json:"error"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
-type imagePage struct {
-	Items      []imageJSON `json:"items"`
-	NextCursor string      `json:"next_cursor"`
-}
-
-type portJSON struct {
-	Port   int    `json:"port"`
-	Public bool   `json:"public"`
-	URL    string `json:"url"`
-}
-
-func (c *restClient) Create(ctx context.Context, p CreateParams) (Record, error) {
+func (s *sdkClient) Create(ctx context.Context, p CreateParams) (Record, error) {
 	labels := map[string]string{
 		labelManaged: labelTrue,
 		labelName:    p.Name,
@@ -155,245 +150,230 @@ func (c *restClient) Create(ctx context.Context, p CreateParams) (Record, error)
 	if p.APIPort > 0 {
 		labels[labelAPIPort] = strconv.Itoa(p.APIPort)
 	}
-	body := map[string]any{"name": p.Name, "persistent": true, "labels": labels}
 	if p.Template != "" {
 		labels[labelTemplate] = p.Template
-		body["image"] = p.Template
 	}
-	var out sandboxJSON
-	if err := c.do(ctx, http.MethodPost, "/sandboxes", nil, body, &out); err != nil {
-		return Record{}, err
+	sb, err := s.c.Create(ctx, types.SnapshotParams{
+		Snapshot: p.Template,
+		Name:     p.Name,
+		Labels:   labels,
+	}, options.WithTimeout(createTimeout), options.WithWaitForStart(false))
+	if err != nil {
+		return Record{}, conflict(convertErr(err))
 	}
-	rec, ok := recordOf(out)
-	if !ok || rec.ID == "" {
-		return Record{}, errors.New("daytona: create returned no sandbox ID")
+	rec, ok := recordOf(sb)
+	if !ok {
+		return Record{}, errors.New("daytona: create returned no managed sandbox")
 	}
 	return rec, nil
 }
 
-// List pages through every sandbox of the project and keeps the managed ones.
-// It reads the control plane directly: the search index is eventually
-// consistent, so a sandbox created a moment ago could be missing from it.
-func (c *restClient) List(ctx context.Context) ([]Record, error) {
-	var records []Record
-	cursor := ""
-	for {
-		q := url.Values{"limit": {strconv.Itoa(maxPageSize)}}
-		if cursor != "" {
-			q.Set("cursor", cursor)
-		}
-		var page sandboxPage
-		if err := c.do(ctx, http.MethodGet, "/sandboxes", q, nil, &page); err != nil {
-			return nil, err
-		}
-		for _, s := range page.Items {
-			if rec, ok := recordOf(s); ok {
-				records = append(records, rec)
-			}
-		}
-		if page.NextCursor == "" {
-			return records, nil
-		}
-		cursor = page.NextCursor
+// conflict maps the answer for a name that is taken.
+func conflict(err error) error {
+	if api, ok := errors.AsType[*APIError](err); ok && api.Status == 409 {
+		return ErrAlreadyExists
 	}
+	return err
 }
 
-func (c *restClient) Find(ctx context.Context, name string) (Record, error) {
-	records, err := c.List(ctx)
+// List returns every managed sandbox. It reads the sandboxes by label, so it
+// never shows one that kaxa did not create.
+func (s *sdkClient) List(ctx context.Context) ([]Record, error) {
+	limit := pageSize
+	it := s.c.List(ctx, &sdk.ListSandboxesQuery{Limit: &limit, Labels: map[string]string{labelManaged: labelTrue}})
+	var records []Record
+	for it.Next() {
+		if rec, ok := recordOf(it.Value()); ok {
+			records = append(records, rec)
+		}
+	}
+	if err := it.Err(); err != nil {
+		return nil, convertErr(err)
+	}
+	return records, nil
+}
+
+// Find reads the sandbox by name. Daytona keeps names unique, and reading by
+// name sees a new sandbox at once, which the label listing does not.
+func (s *sdkClient) Find(ctx context.Context, name string) (Record, error) {
+	rec, err := s.Get(ctx, name)
 	if err != nil {
 		return Record{}, err
 	}
-	// Names are not unique in Daytona; the newest sandbox wins.
-	var best Record
-	found := false
-	for _, r := range records {
-		if r.Name == name && (!found || r.CreatedAt.After(best.CreatedAt)) {
-			best, found = r, true
-		}
-	}
-	if !found {
+	if rec.Name != name {
 		return Record{}, ErrNotFound
 	}
-	return best, nil
+	return rec, nil
 }
 
-func (c *restClient) Get(ctx context.Context, id string) (Record, error) {
-	var out sandboxJSON
-	if err := c.do(ctx, http.MethodGet, "/sandboxes/"+url.PathEscape(id), nil, nil, &out); err != nil {
-		return Record{}, notFound(err)
+func (s *sdkClient) Get(ctx context.Context, id string) (Record, error) {
+	sb, err := s.get(ctx, id)
+	if err != nil {
+		return Record{}, err
 	}
-	rec, ok := recordOf(out)
+	rec, ok := recordOf(sb)
 	if !ok {
 		return Record{}, ErrNotFound
 	}
 	return rec, nil
 }
 
+// statusOf renames a Daytona sandbox state to the status kaxa uses.
+func statusOf(state string) string {
+	switch state {
+	case "started":
+		return statusRunning
+	case "build_failed":
+		return statusError
+	case "destroying", "destroyed":
+		return "deleted"
+	}
+	return state
+}
+
 // recordOf converts a sandbox. A sandbox that kaxa did not create, or that is
 // being deleted, is not a record.
-func recordOf(s sandboxJSON) (Record, bool) {
-	if s.Labels[labelManaged] != labelTrue || s.Labels[labelName] == "" {
+func recordOf(sb *sdk.Sandbox) (Record, bool) {
+	if sb == nil || sb.Labels[labelManaged] != labelTrue || sb.Labels[labelName] == "" {
 		return Record{}, false
 	}
-	if s.Status == "deleting" || s.Status == "deleted" {
+	status := statusOf(string(sb.State))
+	if status == "deleted" {
 		return Record{}, false
 	}
-	rec := Record{
-		ID: s.ID, Name: s.Labels[labelName], Status: s.Status,
-		CreatedAt: s.CreatedAt, ToolboxURL: s.ToolboxURL, Template: s.Labels[labelTemplate],
+	rec := Record{ID: sb.ID, Name: sb.Labels[labelName], Status: status, Template: sb.Labels[labelTemplate]}
+	if sb.CreatedAt != nil {
+		rec.CreatedAt, _ = time.Parse(time.RFC3339, *sb.CreatedAt)
 	}
-	if raw := s.Labels[labelLabels]; raw != "" {
+	if raw := sb.Labels[labelLabels]; raw != "" {
 		rec.Labels = slices.DeleteFunc(strings.Split(raw, ","), func(l string) bool { return l == "" })
 	}
-	if port, err := strconv.Atoi(s.Labels[labelAPIPort]); err == nil && port > 0 {
+	if port, err := strconv.Atoi(sb.Labels[labelAPIPort]); err == nil && port > 0 {
 		rec.APIPort = port
 	}
 	return rec, true
 }
 
-func (c *restClient) Delete(ctx context.Context, id string) error {
-	return notFound(c.do(ctx, http.MethodDelete, "/sandboxes/"+url.PathEscape(id), nil, nil, nil))
-}
-
-func (c *restClient) Start(ctx context.Context, id string) error {
-	return notFound(c.do(ctx, http.MethodPost, "/sandboxes/"+url.PathEscape(id)+"/start", nil, nil, nil))
-}
-
-func (c *restClient) Resume(ctx context.Context, id string) error {
-	return notFound(c.do(ctx, http.MethodPost, "/sandboxes/"+url.PathEscape(id)+"/resume", nil, nil, nil))
-}
-
-func (c *restClient) Stop(ctx context.Context, id string) error {
-	return notFound(c.do(ctx, http.MethodPost, "/sandboxes/"+url.PathEscape(id)+"/stop", nil, nil, nil))
-}
-
-func portPath(id string, port int) string {
-	return "/sandboxes/" + url.PathEscape(id) + "/ports/" + strconv.Itoa(port)
-}
-
-func (c *restClient) SetPort(ctx context.Context, id string, port int, public bool) (PortEndpoint, error) {
-	var out portJSON
-	if err := c.do(ctx, http.MethodPut, portPath(id, port), nil, map[string]bool{"public": public}, &out); err != nil {
-		return PortEndpoint{}, notFound(err)
+func (s *sdkClient) Delete(ctx context.Context, id string) error {
+	sb, err := s.get(ctx, id)
+	if err != nil {
+		return err
 	}
-	return PortEndpoint(out), nil
+	return notFound(convertErr(sb.DeleteAndWait(ctx, deleteTimeout)))
 }
 
-func (c *restClient) GetPort(ctx context.Context, id string, port int) (PortEndpoint, error) {
-	var out portJSON
-	if err := c.do(ctx, http.MethodGet, portPath(id, port), nil, nil, &out); err != nil {
-		return PortEndpoint{}, notFound(err)
+func (s *sdkClient) Start(ctx context.Context, id string) error {
+	sb, err := s.get(ctx, id)
+	if err != nil {
+		return err
 	}
-	return PortEndpoint(out), nil
+	return notFound(convertErr(sb.Start(ctx)))
 }
 
-func (c *restClient) CaptureImage(ctx context.Context, id, name string) (Image, error) {
-	var out imageJSON
-	if err := c.do(ctx, http.MethodPost, "/sandboxes/"+url.PathEscape(id)+"/images", nil, map[string]string{"name": name}, &out); err != nil {
-		return Image{}, notFound(err)
+// Resume wakes a paused sandbox. Daytona starts a paused sandbox the same way
+// as a stopped one.
+func (s *sdkClient) Resume(ctx context.Context, id string) error {
+	return s.Start(ctx, id)
+}
+
+func (s *sdkClient) Stop(ctx context.Context, id string) error {
+	sb, err := s.get(ctx, id)
+	if err != nil {
+		return err
 	}
-	return Image(out), nil
+	return notFound(convertErr(sb.Stop(ctx)))
 }
 
-func (c *restClient) ListImages(ctx context.Context, prefix string) ([]Image, error) {
-	var images []Image
-	cursor := ""
-	for {
-		q := url.Values{"limit": {strconv.Itoa(maxPageSize)}}
-		if cursor != "" {
-			q.Set("cursor", cursor)
-		}
-		var page imagePage
-		if err := c.do(ctx, http.MethodGet, "/images", q, nil, &page); err != nil {
-			return nil, err
-		}
-		for _, img := range page.Items {
-			if strings.HasPrefix(img.Name, prefix) {
-				images = append(images, Image(img))
-			}
-		}
-		if page.NextCursor == "" {
-			return images, nil
-		}
-		cursor = page.NextCursor
+func (s *sdkClient) SetPort(ctx context.Context, id string, port int, public bool) (PortEndpoint, error) {
+	sb, err := s.get(ctx, id)
+	if err != nil {
+		return PortEndpoint{}, err
 	}
+	if public {
+		if err := sb.SetPublic(ctx, true); err != nil {
+			return PortEndpoint{}, convertErr(err)
+		}
+	}
+	return s.preview(ctx, sb, port)
 }
 
-func (c *restClient) GetImage(ctx context.Context, name string) (Image, error) {
-	var page imagePage
-	if err := c.do(ctx, http.MethodGet, "/images", url.Values{"name": {name}}, nil, &page); err != nil {
+func (s *sdkClient) GetPort(ctx context.Context, id string, port int) (PortEndpoint, error) {
+	sb, err := s.get(ctx, id)
+	if err != nil {
+		return PortEndpoint{}, err
+	}
+	return s.preview(ctx, sb, port)
+}
+
+func (s *sdkClient) preview(ctx context.Context, sb *sdk.Sandbox, port int) (PortEndpoint, error) {
+	link, err := sb.GetPreviewLink(ctx, port)
+	if err != nil {
+		return PortEndpoint{}, convertErr(err)
+	}
+	return PortEndpoint{Port: port, Public: sb.Public, URL: link.URL}, nil
+}
+
+// CaptureImage snapshots the disk of the sandbox and returns once Daytona has
+// finished, so the result is the snapshot as the API reports it.
+func (s *sdkClient) CaptureImage(ctx context.Context, id, name string) (Image, error) {
+	sb, err := s.get(ctx, id)
+	if err != nil {
 		return Image{}, err
 	}
-	for _, img := range page.Items {
-		if img.Name == name {
-			return Image(img), nil
-		}
+	if err := sb.CreateSnapshotWithTimeout(ctx, name, snapshotTimeout); err != nil {
+		return Image{}, convertErr(err)
 	}
-	return Image{}, ErrImageNotFound
+	return s.GetImage(ctx, name)
 }
 
-func (c *restClient) DeleteImage(ctx context.Context, id string) error {
-	err := c.do(ctx, http.MethodDelete, "/images/"+url.PathEscape(id), nil, nil, nil)
-	if api, ok := errors.AsType[*APIError](err); ok && api.Status == http.StatusNotFound {
+func (s *sdkClient) ListImages(ctx context.Context, prefix string) ([]Image, error) {
+	var images []Image
+	limit := pageSize
+	for page := 1; ; page++ {
+		got, err := s.c.Snapshot.List(ctx, &page, &limit)
+		if err != nil {
+			return nil, convertErr(err)
+		}
+		for _, snap := range got.Items {
+			if strings.HasPrefix(snap.Name, prefix) {
+				images = append(images, imageOf(snap))
+			}
+		}
+		if page >= got.TotalPages || len(got.Items) == 0 {
+			return images, nil
+		}
+	}
+}
+
+func (s *sdkClient) GetImage(ctx context.Context, name string) (Image, error) {
+	snap, err := s.c.Snapshot.Get(ctx, name)
+	if err != nil {
+		return Image{}, imageNotFound(convertErr(err))
+	}
+	return imageOf(snap), nil
+}
+
+func (s *sdkClient) DeleteImage(ctx context.Context, id string) error {
+	return imageNotFound(convertErr(s.c.Snapshot.DeleteByNameOrID(ctx, id)))
+}
+
+func imageNotFound(err error) error {
+	if api, ok := errors.AsType[*APIError](err); ok && api.Status == 404 {
 		return ErrImageNotFound
 	}
 	return err
 }
 
-// do sends one JSON request. A non-2xx answer is an *APIError.
-func (c *restClient) do(ctx context.Context, method, path string, query url.Values, body, out any) error {
-	var reader io.Reader
-	if body != nil {
-		raw, err := json.Marshal(body)
-		if err != nil {
-			return err
-		}
-		reader = bytes.NewReader(raw)
+// imageOf converts a snapshot. Daytona calls a usable snapshot "active"; the
+// states that never recover are reported as "failed".
+func imageOf(snap *types.Snapshot) Image {
+	img := Image{ID: snap.ID, Name: snap.Name, Status: snap.State, CreatedAt: snap.CreatedAt}
+	switch snap.State {
+	case statusError, "build_failed":
+		img.Status = statusFailed
 	}
-	endpoint := strings.TrimRight(c.base.String(), "/") + path
-	if len(query) > 0 {
-		endpoint += "?" + query.Encode()
+	if snap.ErrorReason != nil {
+		img.Error = *snap.ErrorReason
 	}
-	req, err := http.NewRequestWithContext(ctx, method, endpoint, reader)
-	if err != nil {
-		return fmt.Errorf("create request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+c.key)
-	req.Header.Set("Accept", "application/json")
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return apiErrorOf(resp)
-	}
-	if out == nil || resp.StatusCode == http.StatusNoContent {
-		return nil
-	}
-	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-		return fmt.Errorf("decode response: %w", err)
-	}
-	return nil
-}
-
-// apiErrorOf reads the message of a failed response.
-func apiErrorOf(resp *http.Response) *APIError {
-	raw, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrorBody))
-	var body struct {
-		Message string `json:"message"`
-		Error   string `json:"error"`
-	}
-	msg := strings.TrimSpace(string(raw))
-	if json.Unmarshal(raw, &body) == nil {
-		if body.Message != "" {
-			msg = body.Message
-		} else if body.Error != "" {
-			msg = body.Error
-		}
-	}
-	return &APIError{Status: resp.StatusCode, Message: msg}
+	return img
 }

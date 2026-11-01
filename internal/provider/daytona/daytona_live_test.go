@@ -24,8 +24,8 @@ import (
 
 // liveProvider returns a configured provider, or skips the test without
 // KAXA_DAYTONA_API_KEY. These tests bill a few minutes of Daytona compute and
-// the storage of one image. They are also the first check of the toolbox and
-// image wire formats against the real service.
+// the storage of one image. They are the check of the SDK calls against the
+// real service.
 func liveProvider(t *testing.T) *daytona.Provider {
 	t.Helper()
 	key := os.Getenv("KAXA_DAYTONA_API_KEY")
@@ -66,7 +66,15 @@ func TestRealDaytonaCRUD(t *testing.T) {
 
 	id := liveSandbox(ctx, t, p, sandbox.Spec{Name: "kaxa-it", Labels: []string{"kaxa", "integration"}})
 
-	infos, err := p.List(ctx)
+	// The label listing lags behind a new sandbox, so give it a moment.
+	var infos []sandbox.Info
+	var err error
+	for range 30 {
+		if infos, err = p.List(ctx); err != nil || infoHas(infos, id) {
+			break
+		}
+		time.Sleep(2 * time.Second)
+	}
 	if err != nil || !infoHas(infos, id) {
 		t.Fatalf("list = %+v err = %v", infos, err)
 	}
@@ -173,7 +181,7 @@ func TestRealDaytonaSnapshot(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 
-	id := liveSandbox(ctx, t, p, sandbox.Spec{Name: "kaxa-it-snap", Labels: []string{"kaxa", sandbox.SyncLabel}})
+	id := liveSandbox(ctx, t, p, sandbox.Spec{Name: "kaxa-it-snap", Labels: []string{"kaxa"}})
 	if err := p.Exec(ctx, id, sandbox.ExecOptions{Command: []string{"sh", "-c", "echo snap > $HOME/snap.txt"}}); err != nil {
 		t.Fatalf("write file: %v", err)
 	}

@@ -62,8 +62,8 @@ func TestSyncWorkspaceUploadsExtractsAndCleansUp(t *testing.T) {
 
 func TestSyncWorkspaceFailsCleanly(t *testing.T) {
 	t.Parallel()
-	tb := newFakeToolbox(func(req ProcessRequest, _ string) fakeResult {
-		if plain(req.Argv)[0] == "tar" {
+	tb := newFakeToolbox(func(req runSpec, _ string) fakeResult {
+		if req.argv[0] == "tar" {
 			return fakeResult{code: 2, stderr: "not a tar"}
 		}
 		return fakeResult{}
@@ -97,7 +97,7 @@ func TestRepoExists(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			tb := newFakeToolbox(func(ProcessRequest, string) fakeResult { return fakeResult{code: tt.code} })
+			tb := newFakeToolbox(func(runSpec, string) fakeResult { return fakeResult{code: tt.code} })
 			p, api := newTestProvider(t, tb)
 			api.add(boxName, statusRunning)
 			got, err := p.RepoExists(t.Context(), boxName, "app")
@@ -132,7 +132,7 @@ func TestSetupProjects(t *testing.T) {
 	}
 	found := false
 	for _, r := range tb.reqs {
-		if slices.Equal(plain(r.Argv), []string{"go", "mod", "download"}) && r.Dir == workspaceDir+"/app" {
+		if slices.Equal(r.argv, []string{"go", "mod", "download"}) && r.dir == workspaceDir+"/app" {
 			found = true
 		}
 	}

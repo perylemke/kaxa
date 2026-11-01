@@ -6,14 +6,13 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
 func TestExecSplitsStdoutAndStderr(t *testing.T) {
 	t.Parallel()
-	tb := newFakeToolbox(func(ProcessRequest, string) fakeResult {
+	tb := newFakeToolbox(func(runSpec, string) fakeResult {
 		return fakeResult{stdout: "out\n", stderr: "err\n"}
 	})
 	p, api := newTestProvider(t, tb)
@@ -26,38 +25,25 @@ func TestExecSplitsStdoutAndStderr(t *testing.T) {
 	if stdout.String() != "out\n" || stderr.String() != "err\n" {
 		t.Fatalf("stdout=%q stderr=%q", stdout.String(), stderr.String())
 	}
-	if got := tb.reqs[0]; got.Kind != kindExec || !slices.Equal(got.Argv, []string{"echo", "hi"}) || got.Dir != "" {
+	if got := tb.reqs[0]; !slices.Equal(got.argv, []string{"echo", "hi"}) || got.dir != "" || got.tty {
 		t.Fatalf("request = %+v", got)
 	}
 }
 
 func TestExecReturnsExitError(t *testing.T) {
 	t.Parallel()
-	tests := []struct {
-		name string
-		res  fakeResult
-		code int
-	}{
-		{"exit code", fakeResult{code: 3}, 3},
-		{"signaled", fakeResult{reason: reasonSignaled}, 1},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			p, api := newTestProvider(t, newFakeToolbox(func(ProcessRequest, string) fakeResult { return tt.res }))
-			api.add(boxName, statusRunning)
-			err := p.Exec(t.Context(), boxName, sandbox.ExecOptions{Command: []string{"false"}})
-			exitErr, ok := errors.AsType[*sandbox.ExitError](err)
-			if !ok || exitErr.Code != tt.code {
-				t.Fatalf("err = %v", err)
-			}
-		})
+	p, api := newTestProvider(t, newFakeToolbox(func(runSpec, string) fakeResult { return fakeResult{code: 3} }))
+	api.add(boxName, statusRunning)
+	err := p.Exec(t.Context(), boxName, sandbox.ExecOptions{Command: []string{"false"}})
+	exitErr, ok := errors.AsType[*sandbox.ExitError](err)
+	if !ok || exitErr.Code != 3 {
+		t.Fatalf("err = %v", err)
 	}
 }
 
 func TestExecLostProcessIsPlainError(t *testing.T) {
 	t.Parallel()
-	p, api := newTestProvider(t, newFakeToolbox(func(ProcessRequest, string) fakeResult { return fakeResult{reason: "lost"} }))
+	p, api := newTestProvider(t, newFakeToolbox(func(runSpec, string) fakeResult { return fakeResult{err: errors.New("sandbox lost")} }))
 	api.add(boxName, statusRunning)
 	err := p.Exec(t.Context(), boxName, sandbox.ExecOptions{Command: []string{"sleep", "1"}})
 	if err == nil {
@@ -79,7 +65,7 @@ func TestExecEmptyCommand(t *testing.T) {
 
 func TestExecPipesStdinAndClosesIt(t *testing.T) {
 	t.Parallel()
-	tb := newFakeToolbox(func(_ ProcessRequest, stdin string) fakeResult {
+	tb := newFakeToolbox(func(_ runSpec, stdin string) fakeResult {
 		return fakeResult{stdout: strings.ToUpper(stdin)}
 	})
 	p, api := newTestProvider(t, tb)
@@ -91,8 +77,8 @@ func TestExecPipesStdinAndClosesIt(t *testing.T) {
 	if err != nil || stdout.String() != "HELLO" {
 		t.Fatalf("Exec = %v, stdout=%q", err, stdout.String())
 	}
-	if !tb.reqs[0].Stdin {
-		t.Fatal("stdin was not opened")
+	if tb.stdins[0] != "hello" {
+		t.Fatalf("stdin = %q", tb.stdins[0])
 	}
 }
 
@@ -105,11 +91,11 @@ func TestExecInSyncedSandboxUsesWorkspaceAndPath(t *testing.T) {
 		t.Fatal(err)
 	}
 	req := tb.reqs[0]
-	if req.Dir != workspaceDir || req.Argv[0] != "env" || !slices.Contains(req.Argv, "HOME="+daytonaHome) {
+	if req.dir != workspaceDir || !slices.Contains(req.env, "HOME="+daytonaHome) {
 		t.Fatalf("request = %+v", req)
 	}
-	if got := plain(req.Argv); !slices.Equal(got, []string{"go", "version"}) {
-		t.Fatalf("command = %v", got)
+	if !slices.Equal(req.argv, []string{"go", "version"}) {
+		t.Fatalf("command = %v", req.argv)
 	}
 }
 
@@ -139,8 +125,8 @@ func TestExecMissingSandbox(t *testing.T) {
 
 func TestExecTTYStreamsAndResizes(t *testing.T) {
 	t.Parallel()
-	tb := newFakeToolbox(func(ProcessRequest, string) fakeResult { return fakeResult{code: 2} })
-	tb.attachOutput = []string{"prompt$ ", "bye\r\n"}
+	tb := newFakeToolbox(func(runSpec, string) fakeResult { return fakeResult{code: 2} })
+	tb.ttyOutput = []string{"prompt$ ", "bye\r\n"}
 	tb.holdForResize = true
 	p, api := newTestProvider(t, tb)
 	api.add(boxName, statusRunning)
@@ -159,54 +145,28 @@ func TestExecTTYStreamsAndResizes(t *testing.T) {
 		t.Fatalf("stdout = %q", stdout.String())
 	}
 	req := tb.reqs[0]
-	if req.Kind != kindPTY || req.Rows != 30 || req.Cols != 100 || !req.Stdin {
+	if !req.tty || req.size.Rows != 30 || req.size.Cols != 100 || req.stdin == nil {
 		t.Fatalf("request = %+v", req)
 	}
-	if !slices.Contains(req.Argv, "TERM="+termName) {
-		t.Fatalf("argv = %v", req.Argv)
-	}
-	waitFor(t, func() bool {
-		tb.mu.Lock()
-		defer tb.mu.Unlock()
-		return len(tb.resizes) == 1 && tb.resizes[0] == [2]uint16{40, 120}
-	})
-	if !tb.attached.closed {
-		t.Fatal("attachment was not closed")
-	}
+	expect(t, "resizes", tb.resizes, [][2]uint16{{40, 120}})
 }
 
-func TestExecTTYDefaultSize(t *testing.T) {
+func TestTermSizeDefault(t *testing.T) {
 	t.Parallel()
-	tb := newFakeToolbox(okHandler)
-	p, api := newTestProvider(t, tb)
-	api.add(boxName, statusRunning)
-	if err := p.Exec(t.Context(), boxName, sandbox.ExecOptions{Command: []string{bashCmd}, TTY: true}); err != nil {
-		t.Fatal(err)
-	}
-	if tb.reqs[0].Rows != defaultRows || tb.reqs[0].Cols != defaultCols {
-		t.Fatalf("size = %dx%d", tb.reqs[0].Rows, tb.reqs[0].Cols)
-	}
+	rows, cols := termSize(sandbox.TermSize{})
+	expect(t, "default size", []uint16{rows, cols}, []uint16{defaultRows, defaultCols})
+	rows, cols = termSize(sandbox.TermSize{Rows: 30, Cols: 100})
+	expect(t, "given size", []uint16{rows, cols}, []uint16{30, 100})
 }
 
 func TestExecHidesAPIKeyInErrors(t *testing.T) {
 	t.Parallel()
 	tb := newFakeToolbox(okHandler)
-	tb.startErr = errors.New("dial https://toolbox.example.test with test-key failed")
+	tb.startErr = errors.New("dial https://proxy.example.test with test-key failed")
 	p, api := newTestProvider(t, tb)
 	api.add(boxName, statusRunning)
 	err := p.Exec(t.Context(), boxName, sandbox.ExecOptions{Command: []string{"true"}})
 	if err == nil || strings.Contains(err.Error(), "test-key") {
 		t.Fatalf("err = %v", err)
-	}
-}
-
-func waitFor(t *testing.T, cond func() bool) {
-	t.Helper()
-	deadline := time.Now().Add(2 * time.Second)
-	for !cond() {
-		if time.Now().After(deadline) {
-			t.Fatal("condition not met in time")
-		}
-		time.Sleep(5 * time.Millisecond)
 	}
 }

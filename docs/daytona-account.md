@@ -1,8 +1,6 @@
 # Daytona account and API key
 
-The `daytona` provider runs sandboxes on [Daytona](https://www.daytona.io). kaxa talks to the Daytona REST API and to the toolbox of each sandbox directly, with one API key. It lives in the environment. kaxa does not read `DAYTONA_API_KEY`, the Daytona CLI login, or any config file.
-
-> **Status:** the provider was written from the Daytona documentation and tested against fakes and local HTTP servers. The toolbox and image wire formats were not yet checked against the real service. Run `make test-live` with a key to verify them before relying on the provider.
+The `daytona` provider runs sandboxes on [Daytona](https://www.daytona.io). kaxa uses the official Daytona Go SDK (`https://app.daytona.io/api`), with one API key. It lives in the environment. kaxa does not read `DAYTONA_API_KEY`, the Daytona CLI login, or any config file.
 
 ## Create an account
 
@@ -40,14 +38,14 @@ Without `--provider`, `kaxa list` includes Daytona once the key is set. An empty
 
 ## Templates
 
-Set `KAXA_DAYTONA_TEMPLATE` (or pass `--template` to `create`) to start sandboxes from another image or snapshot name that Daytona can start. It must keep the layout of the Daytona default image: user `daytona`, home `/home/daytona`. Another user breaks `exec`, `console`, and `--sync`, and kaxa does not detect that.
+Set `KAXA_DAYTONA_TEMPLATE` (or pass `--template` to `create`) to start sandboxes from a Daytona snapshot you created. It must keep the layout of the Daytona default image: user `daytona`, home `/home/daytona`. Another user breaks `exec`, `console`, and `--sync`, and kaxa does not detect that.
 
 ## How sandboxes live
 
 - kaxa creates persistent sandboxes: files stay when Daytona stops one. Running processes, including a service published with `--api`, do not survive a stop.
 - A stopped sandbox is started, and a paused one resumed, by the next `exec`, `console`, `sync`, or `restart`. `restart` stops the sandbox and starts it again on purpose.
 - kaxa stores the sandbox name, labels, API port, and template as labels on the Daytona sandbox. Daytona generates its own sandbox ID, so `list` shows the kaxa name and `destroy` finds the sandbox by that name. kaxa only lists and destroys sandboxes it created. Names are DNS labels: lowercase letters, digits, and `-`.
-- `exec` and `console` use the toolbox API of the sandbox, over HTTPS and a WebSocket. There is no SSH and no extra dependency. Commands are not run through a shell; use `sh -c` for pipes.
+- `exec` and `console` use the SDK process API. The service takes one command string, so kaxa quotes every word and nothing you type is parsed by a shell; use `sh -c` for pipes. Standard input is staged as a file (up to 64 MiB). `create --api` makes the whole sandbox public, not one port.
 - `destroy` deletes the sandbox and everything in it. It does not delete snapshots.
 
 ## Snapshots
