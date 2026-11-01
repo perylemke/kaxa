@@ -71,13 +71,16 @@ func quote(s string) string {
 func commandLine(spec runSpec, prefix string) string {
 	var b strings.Builder
 	if spec.dir != "" {
-		b.WriteString("cd " + quote(spec.dir) + " && ")
+		b.WriteString("cd ")
+		b.WriteString(quote(spec.dir))
+		b.WriteString(" && ")
 	}
 	b.WriteString(prefix)
 	if len(spec.env) > 0 {
 		b.WriteString("env")
 		for _, e := range spec.env {
-			b.WriteString(" " + quote(e))
+			b.WriteString(" ")
+			b.WriteString(quote(e))
 		}
 		b.WriteString(" ")
 	}
