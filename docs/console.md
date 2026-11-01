@@ -16,7 +16,7 @@ kaxa ssh my-sprite
 
 The remote exit code is the kaxa exit code, from 0 through 255.
 
-On a sandbox created with `--sync`, the shell starts in `/home/sprite/workspace`. Other sandboxes start in the sprite home. On Modal, a sandbox created with `--sync` opens the shell as the `modal` user in `/home/modal/workspace`.
+On a sandbox created with `--sync`, the shell starts in `/home/sprite/workspace`. Other sandboxes start in the sprite home. The toolchain `PATH` is set either way. On Modal, a sandbox created with `--sync` opens the shell as the `modal` user in `/home/modal/workspace`.
 
 ## E2B
 

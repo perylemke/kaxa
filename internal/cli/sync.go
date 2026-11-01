@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -16,28 +17,32 @@ import (
 
 func newSyncCmd(reg *registry.Registry) *cobra.Command {
 	var dir string
+	var noInstall bool
 
 	cmd := &cobra.Command{
 		Use:   "sync <name>",
 		Short: "Copy another Git repository into a sandbox",
-		Long: `Copy a Git repository into a sandbox that was created with kaxa create --sync, then install its dependencies.
+		Long: `Copy a Git repository into a sandbox, then install its dependencies.
 
-The repository lands in /home/sprite/workspace/<repo> on Sprites or /home/modal/workspace/<repo> on Modal, including .git and excluding ignored files. --dir selects the repository; without it, sync uses the current directory. A subdirectory still copies the whole Git repository.
-A sandbox created without --sync has no workspace and is rejected, because a Modal sandbox picks its image when it is created.
+The repository lands in the workspace of the sandbox, including .git and excluding ignored files: /home/sprite/workspace/<repo> on Sprites, /home/modal/workspace/<repo> on Modal, /home/user/workspace/<repo> on E2B, /home/agent/workspace/<repo> on Docker, and /home/daytona/workspace/<repo> on Daytona. --dir selects the repository; without it, sync uses the current directory. A subdirectory still copies the whole Git repository.
+Every sandbox has a workspace, so one created without --sync accepts sync too, except on Modal: a Modal sandbox only has a workspace when it was created with --sync.
+--no-install still installs the toolchains and skips the dependency commands, then prints the commands to run them by hand.
 If <repo> already exists in the sandbox, sync stops before copying and does not replace it. A failed copy or install keeps the sandbox.`,
 		Example: `  kaxa sync my-sprite
   kaxa sync --dir ~/projects/api-python my-sprite
+  kaxa sync --no-install --dir ~/projects/api-go my-box
   kaxa --provider modal sync my-box`,
 		Args: requireSyncName,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runSync(cmd, reg, args[0], dir, cmd.Flags().Changed("dir"))
+			return runSync(cmd, reg, args[0], dir, cmd.Flags().Changed("dir"), noInstall)
 		},
 	}
 	cmd.Flags().StringVar(&dir, "dir", "", "Git repository to copy (default: the current directory)")
+	cmd.Flags().BoolVar(&noInstall, "no-install", false, "install the toolchains but skip the dependency commands")
 	return cmd
 }
 
-func runSync(cmd *cobra.Command, reg *registry.Registry, name, dir string, dirSet bool) error {
+func runSync(cmd *cobra.Command, reg *registry.Registry, name, dir string, dirSet, noInstall bool) error {
 	root, repo, err := resolveSyncRepo(dir, dirSet)
 	if err != nil {
 		return err
@@ -47,7 +52,7 @@ func runSync(cmd *cobra.Command, reg *registry.Registry, name, dir string, dirSe
 		return err
 	}
 	errOut := cmd.ErrOrStderr()
-	res, err := lifecycle.Sync(cmd.Context(), p, lifecycle.SyncRequest{Name: name, Root: root, Repo: repo}, func(ctx context.Context, label string, task func(context.Context) error) error {
+	res, err := lifecycle.Sync(cmd.Context(), p, lifecycle.SyncRequest{Name: name, Root: root, Repo: repo, NoInstall: noInstall}, func(ctx context.Context, label string, task func(context.Context) error) error {
 		return runTaskWithSpinner(ctx, errOut, label, task)
 	})
 	if err != nil {
@@ -72,10 +77,27 @@ func resolveSyncRepo(dir string, dirSet bool) (string, string, error) {
 
 func syncedMessage(p sandbox.Provider, res lifecycle.Result, repo string) string {
 	ref := sandboxLabel(p.Name(), res.ID)
-	if res.WorkDir == "" {
-		return fmt.Sprintf("%s copied to sandbox %s", repo, ref)
+	msg := fmt.Sprintf("%s copied to sandbox %s", repo, ref)
+	if res.WorkDir != "" {
+		msg = fmt.Sprintf("%s copied to sandbox %s at %s", repo, ref, res.WorkDir)
 	}
-	return fmt.Sprintf("%s copied to sandbox %s at %s", repo, ref, res.WorkDir)
+	if len(res.Skipped) == 0 {
+		return msg
+	}
+	var b strings.Builder
+	b.WriteString(msg + "\ndependencies were not installed; run them with:")
+	for _, argv := range res.Skipped {
+		fmt.Fprintf(&b, "\n  kaxa exec %s -- sh -c 'cd %s && %s'", res.ID, skippedDir(res.WorkDir), strings.Join(argv, " "))
+	}
+	return b.String()
+}
+
+// skippedDir is where the skipped commands run.
+func skippedDir(workDir string) string {
+	if workDir == "" {
+		return "$HOME/workspace/<repo>"
+	}
+	return workDir
 }
 
 func requireSyncName(_ *cobra.Command, args []string) error {

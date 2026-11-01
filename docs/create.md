@@ -48,7 +48,11 @@ kaxa create --sync my-sprite
 kaxa create --sync --dir ~/projects/api-python my-sprite
 ```
 
-`exec` and `console` on a sandbox created with `--sync` start in the workspace: `/home/sprite/workspace` on Sprites, `/home/modal/workspace` on Modal, `/home/user/workspace` on E2B, `/home/agent/workspace` on Docker, `/home/daytona/workspace` on Daytona.
+Every sandbox has a workspace directory (`$HOME/workspace`), created at create time, so `kaxa sync` works on a sandbox created without `--sync`. Modal is the exception: only a sandbox created with `--sync` has one.
+
+`--no-install`, together with `--sync`, installs the toolchains and skips the dependency commands. kaxa prints the commands to run them by hand.
+
+`exec` and `console` on a sandbox created with `--sync` start in the workspace: `/home/sprite/workspace` on Sprites, `/home/modal/workspace` on Modal, `/home/user/workspace` on E2B, `/home/agent/workspace` on Docker, `/home/daytona/workspace` on Daytona. Without `--sync` they start in the home directory, with the toolchain `PATH` set.
 
 ### Sync on Modal
 
@@ -70,7 +74,7 @@ kaxa create --provider e2b --sync my-box
 
 An E2B sandbox uses E2B's `base` template, which already has `curl`, `git`, and build tools. The repository lands in `/home/user/workspace/<repo>`, owned by `user`. Toolchains are installed under `/home/user/.local` and `/home/user/.cargo` and put on the `PATH` of `exec` and `console`, the same way as on Modal. Downloads are checked against pinned SHA-256 hashes.
 
-The E2B `base` template has 512 MiB of memory, and E2B sets memory per template, not per sandbox. Compiling a large package there is killed by the kernel (`signal: killed`). So on the `base` template the install step only downloads Go and Rust dependencies (`go mod download`, `cargo fetch`) instead of building them. The first build runs later, with `exec`; if it is killed too, use a template with more memory (see below). With `--template`, the install step runs the normal build.
+The E2B `base` template has 512 MiB of memory, and E2B sets memory per template, not per sandbox. Compiling a large package there is killed by the kernel (`signal: killed`). So the install step downloads dependencies instead of building them: Go always runs `go mod download`, and on the `base` template Rust runs `cargo fetch` instead of `cargo build`. The first build runs later, with `exec`; if it is killed too, use a template with more memory (see below). With `--template`, the Rust install step runs the normal build.
 
 ### Templates on E2B
 

@@ -16,6 +16,7 @@ import (
 func newCreateCmd(reg *registry.Registry) *cobra.Command {
 	var keepRunning bool
 	var syncWorkspace bool
+	var noInstall bool
 	var syncDir string
 	var exposeAPI bool
 	var apiCmd string
@@ -47,15 +48,16 @@ Without a name, the form asks for the same choices. When API is yes, it asks for
 		Args: atMostOneName("create"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runCreate(cmd, reg, args, createFlags{
-				Running: keepRunning,
-				Sync:    syncWorkspace,
-				Dir:     syncDir,
-				DirSet:  cmd.Flags().Changed("dir"),
-				API:     exposeAPI,
-				APICmd:  apiCmd,
-				APIPort: apiPort,
-				APIEnv:  apiEnv,
-				Public:  publicURL,
+				Running:   keepRunning,
+				Sync:      syncWorkspace,
+				NoInstall: noInstall,
+				Dir:       syncDir,
+				DirSet:    cmd.Flags().Changed("dir"),
+				API:       exposeAPI,
+				APICmd:    apiCmd,
+				APIPort:   apiPort,
+				APIEnv:    apiEnv,
+				Public:    publicURL,
 
 				Template: template,
 			})
@@ -63,6 +65,7 @@ Without a name, the form asks for the same choices. When API is yes, it asks for
 	}
 	cmd.Flags().BoolVar(&keepRunning, "running", false, "keep the sandbox running for 1 hour and open a tmux terminal in the browser")
 	cmd.Flags().BoolVar(&syncWorkspace, "sync", false, "copy the local git repository into the sandbox workspace")
+	cmd.Flags().BoolVar(&noInstall, "no-install", false, "with --sync, install the toolchains but skip the dependency commands")
 	cmd.Flags().StringVar(&syncDir, "dir", "", "git repository to copy with --sync (default: current directory)")
 	cmd.Flags().BoolVar(&exposeAPI, "api", false, "publish an HTTP service on the sandbox URL (requires --api-cmd; Sprites, E2B, Docker and Daytona)")
 	cmd.Flags().StringVar(&apiCmd, "api-cmd", "", "comma-separated argv; first item is the binary (example: .venv/bin/uvicorn,app.main:app,--host,0.0.0.0,--port,8000)")
@@ -103,7 +106,7 @@ func cancelledOrErr(cmd *cobra.Command, err error) error {
 
 func resolveCreateRequest(cmd *cobra.Command, reg *registry.Registry, args []string, flags createFlags, portSet bool) (createRequest, error) {
 	if len(args) == 1 {
-		req := createRequest{Name: args[0], Running: flags.Running, Sync: flags.Sync, Template: flags.Template}
+		req := createRequest{Name: args[0], Running: flags.Running, Sync: flags.Sync, Template: flags.Template, NoInstall: flags.NoInstall}
 		if err := applyAPIFlags(&req, flags, portSet); err != nil {
 			return createRequest{}, err
 		}
@@ -126,7 +129,8 @@ func resolveCreateRequest(cmd *cobra.Command, reg *registry.Registry, args []str
 		APICmd:  form.APICmd,
 		Public:  form.Public,
 
-		Template: flags.Template,
+		Template:  flags.Template,
+		NoInstall: flags.NoInstall,
 	}
 	if form.API {
 		if req.APIEnv, err = lifecycle.ResolveAPIEnv(flags.APIEnv, os.LookupEnv); err != nil {

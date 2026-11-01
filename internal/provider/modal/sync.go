@@ -124,6 +124,10 @@ func asModal(env, argv []string) []string {
 	return append(out, argv...)
 }
 
+// SyncRequiresCreate reports that a Modal sandbox only has a workspace when it
+// was created with sync, because that is when it uses the tools image.
+func (p *Provider) SyncRequiresCreate() bool { return true }
+
 func isSynced(rec Record) bool {
 	return slices.Contains(rec.Labels, sandbox.SyncLabel)
 }

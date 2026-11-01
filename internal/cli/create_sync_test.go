@@ -21,8 +21,9 @@ import (
 )
 
 const (
-	testSyncFlag = "--sync"
-	testDirFlag  = "--dir"
+	testSyncFlag      = "--sync"
+	testNoInstallFlag = "--no-install"
+	testDirFlag       = "--dir"
 )
 
 func TestCreateSyncWithoutGitDoesNotCreate(t *testing.T) {
@@ -357,4 +358,34 @@ func initGitRepo(t *testing.T) string {
 	}
 	t.Chdir(dir)
 	return dir
+}
+
+func TestCreateNoInstallRequiresSync(t *testing.T) {
+	fp := &fakeProvider{name: testSpritesName, createID: testBoxName}
+	cmd := newCreateCmd(t, fp)
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdCreate, testBoxName, testNoInstallFlag})
+
+	err := cmd.Execute()
+	if err == nil || !strings.Contains(err.Error(), "--no-install requires --sync") {
+		t.Fatalf("err = %v", err)
+	}
+	if fp.lastCreate.Name != "" {
+		t.Fatalf("created %q", fp.lastCreate.Name)
+	}
+}
+
+func TestCreateSyncNoInstallSkipsCommands(t *testing.T) {
+	repo := initGitRepo(t)
+	writeGoMod(t)
+
+	fp := newRepoSyncProvider("kaxa", sandbox.SyncLabel)
+	cmd := newCreateCmd(t, fp)
+	cmd.SetArgs([]string{testProviderFlag, testSpritesName, testCmdCreate, testBoxName, testSyncFlag, testNoInstallFlag, testDirFlag, repo})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if len(fp.setupSteps) != 1 || len(fp.setupSteps[0].Commands) != 0 {
+		t.Fatalf("steps = %#v", fp.setupSteps)
+	}
 }

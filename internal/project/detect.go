@@ -41,7 +41,7 @@ func Detect(root string) ([]Step, error) {
 		return nil, err
 	}
 	if goMod {
-		steps = append(steps, Step{Kind: KindGo, Commands: [][]string{{"go", "build", "./..."}}})
+		steps = append(steps, Step{Kind: KindGo, Commands: [][]string{{"go", "mod", "download"}}})
 	}
 	rust, err := rustStep(root)
 	if err != nil {

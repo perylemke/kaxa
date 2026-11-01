@@ -14,7 +14,7 @@ kaxa exec my-sprite -- ls -la
 
 The remote exit code is the kaxa exit code, from 0 through 255.
 
-On a sandbox created with `--sync`, the command starts in `/home/sprite/workspace`. Other sandboxes start in the sprite home. On Modal, a sandbox created with `--sync` runs the command as the `modal` user in `/home/modal/workspace`.
+On a sandbox created with `--sync`, the command starts in `/home/sprite/workspace`. Other sandboxes start in the sprite home. The toolchain `PATH` is set either way. On Modal, a sandbox created with `--sync` runs the command as the `modal` user in `/home/modal/workspace`.
 
 ## E2B
 
@@ -24,7 +24,7 @@ Pick the provider with `--provider e2b` or `KAXA_DEFAULT_PROVIDER=e2b`. A paused
 kaxa --provider e2b exec my-box -- ls -la
 ```
 
-Standard output, standard error, and standard input are passed through, and the remote exit code is the kaxa exit code. Commands run as `user`, starting in `/home/user/workspace` with `--sync` and in `/home/user` without it. The command is not run through a shell; use `sh -c` for pipes.
+Standard output, standard error, and standard input are passed through, and the remote exit code is the kaxa exit code. Commands run as `user`, starting in `/home/user/workspace` with `--sync` and in `/home/user` without it. The toolchain `PATH` is set either way. The command is not run through a shell; use `sh -c` for pipes.
 
 ## Docker
 
@@ -34,7 +34,7 @@ Pick the provider with `--provider docker` or `KAXA_DEFAULT_PROVIDER=docker`. ka
 kaxa --provider docker exec my-box -- ls -la
 ```
 
-Standard output, standard error, and standard input are passed through, and the remote exit code is the kaxa exit code. Commands run as `agent`, starting in `/home/agent/workspace` with `--sync` and where the image starts without it. The command is not run through a shell; use `sh -c` for pipes. Cloud compute is billed to your Docker subscription while the sandbox runs.
+Standard output, standard error, and standard input are passed through, and the remote exit code is the kaxa exit code. Commands run as `agent`, starting in `/home/agent/workspace` with `--sync` and where the image starts without it. The toolchain `PATH` is set either way. The command is not run through a shell; use `sh -c` for pipes. Cloud compute is billed to your Docker subscription while the sandbox runs.
 
 ## Daytona
 
@@ -44,7 +44,7 @@ Pick the provider with `--provider daytona` or `KAXA_DEFAULT_PROVIDER=daytona`. 
 kaxa --provider daytona exec my-box -- ls -la
 ```
 
-Standard output, standard error, and standard input are passed through, and the remote exit code is the kaxa exit code. Commands run as `daytona`, starting in `/home/daytona/workspace` with `--sync` and where the image starts without it. The command is not run through a shell; use `sh -c` for pipes. Daytona bills the account while the sandbox runs.
+Standard output, standard error, and standard input are passed through, and the remote exit code is the kaxa exit code. Commands run as `daytona`, starting in `/home/daytona/workspace` with `--sync` and where the image starts without it. The toolchain `PATH` is set either way. The command is not run through a shell; use `sh -c` for pipes. Daytona bills the account while the sandbox runs.
 
 ## Modal
 

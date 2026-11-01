@@ -17,9 +17,11 @@ kaxa --provider e2b sync my-box
 
 The repository lands in `/home/sprite/workspace/<repo>` on Sprites, `/home/modal/workspace/<repo>` on Modal, owned by `modal`, `/home/user/workspace/<repo>` on E2B, owned by `user`, `/home/agent/workspace/<repo>` on Docker, owned by `agent`, and `/home/daytona/workspace/<repo>` on Daytona, owned by `daytona`. `<repo>` is the name of the local directory. After the copy, kaxa installs the toolchain and dependencies it detects at the repository root, the same way as `create --sync`. A toolchain that is already installed is reused. On success kaxa prints the directory inside the sandbox.
 
+`--no-install` still installs the toolchains and skips the dependency commands, then prints the commands to run them by hand, for example `kaxa exec <name> -- sh -c 'cd <dir> && go mod download'`. Use it when the sandbox is too small to install everything at once. `create --sync --no-install` does the same at create time.
+
 ## Limits
 
-- A sandbox created without `--sync` is rejected: `sandbox <name> was not created with sync`. On Modal that choice is final. The image with the `modal` user, the workspace directory, `git`, and the build tools is picked when the sandbox is created, and kaxa cannot change it later. Create a new sandbox with `--sync`. E2B follows the same rule, although its template is the same for every sandbox.
+- Every sandbox has a workspace, so one created without `--sync` accepts sync too. Modal is the exception: a Modal sandbox only has a workspace when it was created with `--sync`, because the image with the `modal` user, `git`, and the build tools is picked when the sandbox is created and kaxa cannot change it later. A Modal sandbox without it is rejected: `sandbox <name> was not created with sync`. Create a new one with `--sync`.
 - `sync` never replaces a directory. If `<repo>` already exists in the sandbox, it stops before copying with `<repo> already exists in sandbox <name>`. Two local repositories with the same directory name collide; rename one, or remove the old copy with `kaxa exec <name> -- rm -rf <path>`.
 - A failed copy or install keeps the sandbox, because it holds other work. `create --sync` deletes a sandbox it just made; `sync` does not. After a failed install the files are already in the sandbox. Fix the cause and run the install there with `kaxa exec`, or remove the directory and sync again.
 - `sync` copies the repository once. It does not update a copy that is already there.

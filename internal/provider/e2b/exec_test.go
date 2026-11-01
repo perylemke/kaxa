@@ -34,7 +34,7 @@ func TestExecRunsArgvWithoutShell(t *testing.T) {
 		t.Fatalf("starts = %+v", envd.starts)
 	}
 	req := envd.starts[0]
-	if req.Cmd != "echo" || !slices.Equal(req.Args, []string{"a; rm -rf /", "$HOME"}) || req.Cwd != "" || req.User != testUser || req.PTY || req.Stdin {
+	if req.Cmd != "env" || !slices.Equal(req.Args[len(req.Args)-3:], []string{"echo", "a; rm -rf /", "$HOME"}) || req.Cwd != "" || req.User != testUser || req.PTY || req.Stdin {
 		t.Fatalf("request = %+v", req)
 	}
 	if len(api.connect) != 1 || api.connect[0].reboot {

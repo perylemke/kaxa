@@ -19,6 +19,8 @@ type syncFake struct {
 	exists bool
 }
 
+func (syncFake) SyncRequiresCreate() bool { return true }
+
 func (s *syncFake) RepoExists(context.Context, sandbox.ID, string) (bool, error) {
 	return s.exists, nil
 }
@@ -54,9 +56,8 @@ func TestSyncRepositoryCopiesIntoExistingSandbox(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sync: %v", err)
 	}
-	want := syncOut{ID: testBox, Provider: testSprites, WorkDir: "/home/box/ws/" + filepath.Base(repo)}
-	if out != want {
-		t.Fatalf("out = %+v, want %+v", out, want)
+	if out.ID != testBox || out.Provider != testSprites || out.WorkDir != "/home/box/ws/"+filepath.Base(repo) || len(out.SkippedCommands) != 0 {
+		t.Fatalf("out = %+v", out)
 	}
 	if !fp.synced || len(fp.created) != 0 || len(fp.destroyed) != 0 {
 		t.Fatalf("synced=%v created=%v destroyed=%v", fp.synced, fp.created, fp.destroyed)
@@ -183,5 +184,27 @@ func TestSyncRepositoryRequiresName(t *testing.T) {
 	wantErr(t, err, "name is required")
 	if fp.synced {
 		t.Fatal("repository was copied")
+	}
+}
+
+func TestSyncRepositoryNoInstallSkipsCommands(t *testing.T) {
+	t.Parallel()
+
+	repo := gitRepo(t)
+	if err := os.WriteFile(filepath.Join(repo, "go.mod"), []byte("module example.com/demo\n\ngo 1.27\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	fp := newSyncFake(withSyncLabel()...)
+	svc := newTestService(t, repo, testSprites, fp)
+
+	out, err := svc.syncRepository(context.Background(), syncIn{Name: testBox, NoInstall: true})
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	if len(fp.setupSteps) != 1 || len(fp.setupSteps[0].Commands) != 0 {
+		t.Fatalf("steps = %#v", fp.setupSteps)
+	}
+	if len(out.SkippedCommands) != 1 || out.SkippedCommands[0][0] != "go" {
+		t.Fatalf("skipped = %v", out.SkippedCommands)
 	}
 }

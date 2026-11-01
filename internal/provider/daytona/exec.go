@@ -84,12 +84,15 @@ func (p *Provider) Exec(ctx context.Context, id sandbox.ID, opts sandbox.ExecOpt
 	spec := runSpec{
 		argv: opts.Command, stdin: opts.Stdin, stdout: opts.Stdout, stderr: opts.Stderr,
 		tty: opts.TTY, size: opts.Size, resize: opts.Resize,
+		// The toolchains are on PATH in every sandbox. A sandbox created with
+		// --sync also starts in the workspace.
+		env: daytonaLayout.Env(),
 	}
 	if !opts.TTY {
 		spec.stdin = pipedInput(opts.Stdin)
 	}
 	if s.synced() {
-		spec.dir, spec.env = workspaceDir, daytonaLayout.Env()
+		spec.dir = workspaceDir
 	}
 	return s.run(ctx, spec)
 }

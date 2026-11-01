@@ -38,6 +38,9 @@ type Request struct {
 	// Root and Repo locate the Git repository to copy. Both are set when Sync is true.
 	Root string
 	Repo string
+	// NoInstall copies the repository and installs the toolchains but skips the
+	// dependency commands. It only applies with Sync.
+	NoInstall bool
 }
 
 // Labels returns the provider labels for the sandbox.
@@ -54,6 +57,9 @@ type Result struct {
 	ID sandbox.ID
 	// WorkDir is the synced repository directory inside the sandbox. It is empty without Sync.
 	WorkDir string
+	// Skipped are the dependency commands that were not run because the caller
+	// asked for no install, one command per entry.
+	Skipped [][]string
 }
 
 // Runner runs one slow step. Adapters use it to report progress, for example
@@ -145,6 +151,7 @@ func Create(ctx context.Context, p sandbox.Provider, req Request, run Runner) (R
 	}
 	res := Result{ID: id}
 	if req.Sync {
+		res.Skipped = skippedOf(detectedSteps(req), req.NoInstall)
 		if layout, ok := p.(sandbox.WorkspaceLayout); ok {
 			if res.WorkDir, err = layout.RepoDir(req.Repo); err != nil {
 				return res, err
@@ -166,7 +173,10 @@ func createSandbox(ctx context.Context, p sandbox.Provider, req Request, run Run
 			APIPort:   apiPortOf(req),
 			Template:  req.Template,
 		})
-		return createErr
+		if createErr != nil {
+			return createErr
+		}
+		return prepareWorkspace(ctx, p, id)
 	})
 	return id, err
 }
@@ -209,12 +219,61 @@ func installProjects(ctx context.Context, p sandbox.Provider, id sandbox.ID, req
 		return destroyAfterFailure(ctx, p, id, Unsupported(p, sandbox.FeatureDependencyInstall), "install dependencies")
 	}
 	err = run(ctx, "installing "+req.Repo+"…", func(ctx context.Context) error {
-		return setup.SetupProjects(ctx, id, req.Repo, steps)
+		return setup.SetupProjects(ctx, id, req.Repo, stepsFor(steps, req.NoInstall))
 	})
 	if err != nil {
 		return destroyAfterFailure(ctx, p, id, err, "install dependencies")
 	}
 	return nil
+}
+
+// stepsFor drops the dependency commands when noInstall is set, keeping the
+// toolchain install that SetupProjects runs for each step.
+func stepsFor(steps []project.Step, noInstall bool) []project.Step {
+	if !noInstall {
+		return steps
+	}
+	out := make([]project.Step, len(steps))
+	for i, step := range steps {
+		out[i] = project.Step{Kind: step.Kind}
+	}
+	return out
+}
+
+// skippedOf lists the commands that were not run.
+func skippedOf(steps []project.Step, noInstall bool) [][]string {
+	if !noInstall {
+		return nil
+	}
+	var out [][]string
+	for _, step := range steps {
+		out = append(out, step.Commands...)
+	}
+	return out
+}
+
+// detectedSteps reads the project steps, ignoring an error. Create already
+// reported that error inside installProjects.
+func detectedSteps(req Request) []project.Step {
+	steps, err := project.Detect(req.Root)
+	if err != nil {
+		return nil
+	}
+	return steps
+}
+
+// prepareWorkspace creates the workspace directory, so sync works on a sandbox that
+// was created without --sync. A provider that chooses its image at create time
+// already has the directory only when it was created with sync.
+func prepareWorkspace(ctx context.Context, p sandbox.Provider, id sandbox.ID) error {
+	if _, limited := p.(sandbox.SyncRequiresCreate); limited {
+		return nil
+	}
+	layout, ok := p.(sandbox.WorkspaceLayout)
+	if !ok {
+		return nil
+	}
+	return p.Exec(ctx, id, sandbox.ExecOptions{Command: []string{"mkdir", "-p", layout.HomeDir() + "/workspace"}})
 }
 
 func copyWorkspace(ctx context.Context, syncer sandbox.WorkspaceSyncer, id sandbox.ID, root, repoName string) error {

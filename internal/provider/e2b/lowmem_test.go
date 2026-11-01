@@ -17,7 +17,7 @@ func TestDownloadOnly(t *testing.T) {
 		step project.Step
 		want [][]string
 	}{
-		{"go", project.Step{Kind: project.KindGo, Commands: [][]string{{"go", "build", "./..."}}}, [][]string{{"go", "mod", "download"}}},
+		{"go", project.Step{Kind: project.KindGo, Commands: [][]string{{"go", "mod", "download"}}}, [][]string{{"go", "mod", "download"}}},
 		{"rust", project.Step{Kind: project.KindRust, Commands: [][]string{{cargo, "build"}}}, [][]string{{cargo, "fetch"}}},
 		{"rust locked", project.Step{Kind: project.KindRust, Commands: [][]string{{cargo, "build", "--locked"}}}, [][]string{{cargo, "fetch", "--locked"}}},
 		{"node", project.Step{Kind: project.KindNode, Commands: [][]string{{"npm", "ci"}}}, [][]string{{"npm", "ci"}}},

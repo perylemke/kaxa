@@ -56,7 +56,7 @@ func TestExecStreamsOutputAndStdin(t *testing.T) {
 		t.Fatalf("stdout = %q, stderr = %q", stdout.String(), stderr.String())
 	}
 	spec := proc.lastSpec(t)
-	if !slices.Equal(spec.Argv, []string{cmdCat}) || spec.User != agentUser || spec.TTY {
+	if spec.Argv[0] != "env" || spec.Argv[len(spec.Argv)-1] != cmdCat || spec.User != agentUser || spec.TTY {
 		t.Fatalf("spec = %+v", spec)
 	}
 	if proc.tokens[0] != testToken || proc.eps[0].URI == "" {

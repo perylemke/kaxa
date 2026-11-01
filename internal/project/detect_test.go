@@ -43,7 +43,7 @@ var detectCases = []struct {
 		files: []string{detectGoMod},
 		want: []project.Step{{
 			Kind:     project.KindGo,
-			Commands: [][]string{{"go", detectBuild, "./..."}},
+			Commands: [][]string{{"go", "mod", "download"}},
 		}},
 	},
 	{
@@ -141,7 +141,8 @@ var detectCases = []struct {
 		name:  "all",
 		files: []string{detectPackageJSON, detectRequirements, detectCargoToml, detectGoMod, detectGemfile, detectDepsEdn},
 		want: []project.Step{
-			{Kind: project.KindGo, Commands: [][]string{{"go", detectBuild, "./..."}}},
+			{Kind: project.KindGo, Commands: [][]string{{"go", "mod", "download"}}},
+
 			{Kind: project.KindRust, Commands: [][]string{{"cargo", detectBuild}}},
 			{Kind: project.KindPython, Commands: [][]string{
 				{"uv", "venv", ".venv"},

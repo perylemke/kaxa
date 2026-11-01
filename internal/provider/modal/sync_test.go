@@ -152,7 +152,7 @@ func TestSetupProjectsRunsAsModalInRepo(t *testing.T) {
 	f := syncedFake(t)
 	err := newProvider(t, f).SetupProjects(context.Background(), testName, "api", []project.Step{{
 		Kind:     project.KindGo,
-		Commands: [][]string{{"go", "build", "./..."}},
+		Commands: [][]string{{"go", "mod", "download"}},
 	}})
 	if err != nil {
 		t.Fatalf("setup: %v", err)
@@ -170,7 +170,7 @@ func TestSetupProjectsRunsAsModalInRepo(t *testing.T) {
 		t.Fatalf("build dir = %q", build.dir)
 	}
 	line := strings.Join(build.argv, " ")
-	for _, want := range []string{testHomeEnv, testUserEnv, "go build ./..."} {
+	for _, want := range []string{testHomeEnv, testUserEnv, "go mod download"} {
 		if !strings.Contains(line, want) {
 			t.Fatalf("build command %q missing %q", line, want)
 		}

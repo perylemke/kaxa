@@ -150,7 +150,7 @@ func (s *service) create(ctx context.Context, in createIn) (createOut, error) {
 		}
 		return createOut{}, err
 	}
-	out := createOut{ID: string(res.ID), Provider: p.Name(), WorkDir: res.WorkDir}
+	out := createOut{ID: string(res.ID), Provider: p.Name(), WorkDir: res.WorkDir, SkippedCommands: res.Skipped}
 	detail, err := p.Inspect(ctx, res.ID)
 	if err != nil {
 		s.log.Warn("inspect after create failed", "sandbox", res.ID, "error", err)
@@ -161,13 +161,16 @@ func (s *service) create(ctx context.Context, in createIn) (createOut, error) {
 }
 
 func (s *service) createRequest(name string, in createIn) (lifecycle.Request, error) {
-	req := lifecycle.Request{Name: name, Running: in.Running, Sync: in.Sync, Public: in.Public, Template: in.Template}
+	req := lifecycle.Request{Name: name, Running: in.Running, Sync: in.Sync, Public: in.Public, Template: in.Template, NoInstall: in.NoInstall}
 	if err := s.applyAPI(&req, in); err != nil {
 		return lifecycle.Request{}, err
 	}
 	if !in.Sync {
 		if in.Dir != "" {
 			return lifecycle.Request{}, usererr.New("dir requires sync", "set sync to copy that repository")
+		}
+		if in.NoInstall {
+			return lifecycle.Request{}, usererr.New("no_install requires sync", "set sync to copy the repository without installing its dependencies")
 		}
 		return req, nil
 	}
@@ -208,11 +211,11 @@ func (s *service) syncRepository(ctx context.Context, in syncIn) (syncOut, error
 	if err != nil {
 		return syncOut{}, err
 	}
-	res, err := lifecycle.Sync(ctx, p, lifecycle.SyncRequest{Name: string(name), Root: root, Repo: repo}, s.progress)
+	res, err := lifecycle.Sync(ctx, p, lifecycle.SyncRequest{Name: string(name), Root: root, Repo: repo, NoInstall: in.NoInstall}, s.progress)
 	if err != nil {
 		return syncOut{}, err
 	}
-	return syncOut{ID: string(res.ID), Provider: p.Name(), WorkDir: res.WorkDir}, nil
+	return syncOut{ID: string(res.ID), Provider: p.Name(), WorkDir: res.WorkDir, SkippedCommands: res.Skipped}, nil
 }
 
 func (s *service) applyAPI(req *lifecycle.Request, in createIn) error {

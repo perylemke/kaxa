@@ -176,7 +176,7 @@ func TestSetupProjectsRunsInRepoAsUser(t *testing.T) {
 	p, api, envd := newProvider([]string{testKaxa, sandbox.SyncLabel}, 0)
 
 	err := p.SetupProjects(context.Background(), testBox, "api", []project.Step{{
-		Kind: project.KindGo, Commands: [][]string{{"go", "build", "./..."}},
+		Kind: project.KindGo, Commands: [][]string{{"go", "mod", "download"}},
 	}})
 	if err != nil {
 		t.Fatalf("setup: %v", err)
@@ -201,27 +201,24 @@ func TestSetupProjectsRunsInRepoAsUser(t *testing.T) {
 	}
 }
 
-func TestSetupProjectsBuildsOnCustomTemplate(t *testing.T) {
+func TestSetupProjectsKeepsCommandsOnCustomTemplate(t *testing.T) {
 	t.Parallel()
 
 	p, api, envd := newProvider([]string{testKaxa, sandbox.SyncLabel}, 0)
 	api.boxes[testBox].Template = testBig
 
 	err := p.SetupProjects(context.Background(), testBox, "api", []project.Step{{
-		Kind: project.KindGo, Commands: [][]string{{"go", "build", "./..."}},
+		Kind: project.KindGo, Commands: [][]string{{"go", "mod", "download"}},
 	}})
 	if err != nil {
 		t.Fatalf("setup: %v", err)
 	}
-	var built bool
+	var ran bool
 	for _, s := range envd.starts {
-		if slices.Contains(s.Args, "download") {
-			t.Fatalf("a custom template was limited to downloads: %v", envd.argvs())
-		}
-		built = built || slices.Contains(s.Args, "build")
+		ran = ran || slices.Contains(s.Args, "download")
 	}
-	if !built {
-		t.Fatalf("go build did not run: %v", envd.argvs())
+	if !ran {
+		t.Fatalf("go mod download did not run: %v", envd.argvs())
 	}
 }
 

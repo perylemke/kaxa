@@ -15,6 +15,12 @@ func withRepo(req createRequest, flags createFlags) (createRequest, error) {
 				"pass --sync to copy that repository",
 			)
 		}
+		if flags.NoInstall {
+			return createRequest{}, usererr.New(
+				"--no-install requires --sync",
+				"pass --sync to copy the repository without installing its dependencies",
+			)
+		}
 		return req, nil
 	}
 	root, name, err := lifecycle.ResolveRepo(flags.Dir, flags.DirSet)

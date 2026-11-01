@@ -116,7 +116,8 @@ kaxa exec my-sprite -- ls -la    # run a command; remote exit code is propagated
 kaxa console my-sprite           # interactive bash (requires a terminal)
 kaxa ssh my-sprite               # alias of console
 
-kaxa sync my-sprite              # copy this git repository into a sandbox created with --sync
+kaxa sync my-sprite              # copy this git repository into a sandbox
+kaxa sync --no-install my-sprite # copy it and skip the dependency commands
 kaxa sync --dir ~/projects/api-python my-sprite
 
 kaxa restart                     # pick a sandbox when no name is given
@@ -150,14 +151,14 @@ You can pass `--provider sprites` instead of `KAXA_DEFAULT_PROVIDER`.
 `create` labels the sandbox `kaxa`.
 
 - `--running` keeps the sandbox up for one hour, serves tmux on its URL, and opens that URL.
-- `--sync` copies the Git repository, including `.git` and excluding ignored files, into `/home/sprite/workspace/<repo>` (Sprites) `/home/modal/workspace/<repo>` (Modal, as the `modal` user), `/home/user/workspace/<repo>` (E2B, as `user`), `/home/agent/workspace/<repo>` (Docker, as `agent`), or `/home/daytona/workspace/<repo>` (Daytona, as `daytona`). `--dir` selects another repository. A subdirectory still copies the whole repository. Credentials in `.git/config` are removed, and untracked secret files such as `.env` or `*.pem` stop the copy; see [sync](docs/sync.md). The root selects Go, Rust, Python, Node, Ruby (`Gemfile`), and Clojure (`deps.edn`); missing tools are installed, then project dependencies. A failed copy or install deletes the sandbox.
+- `--sync` copies the Git repository, including `.git` and excluding ignored files, into `/home/sprite/workspace/<repo>` (Sprites) `/home/modal/workspace/<repo>` (Modal, as the `modal` user), `/home/user/workspace/<repo>` (E2B, as `user`), `/home/agent/workspace/<repo>` (Docker, as `agent`), or `/home/daytona/workspace/<repo>` (Daytona, as `daytona`). `--dir` selects another repository. A subdirectory still copies the whole repository. Credentials in `.git/config` are removed, and untracked secret files such as `.env` or `*.pem` stop the copy; see [sync](docs/sync.md). The root selects Go (`go mod download`), Rust, Python, Node, Ruby (`Gemfile`), and Clojure (`deps.edn`); missing tools are installed, then project dependencies. `--no-install` installs the tools and skips the dependency commands. A failed copy or install deletes the sandbox.
 - `--api` publishes one HTTP service on the Sprites URL, on `https://<port>-<id>.e2b.app` on E2B, where `--api` is what makes that port public, on the URL that Docker gives the published port on Docker, or on the public preview URL of the API port on Daytona. `--api-cmd` is comma-separated argv, and the process must listen on `0.0.0.0` and on `--api-port` (8000 by default). With `--sync`, the repository must be an HTTP API; a CLI project is rejected before create. Create waits until the service is running, for up to 90 seconds, and deletes the sandbox if it does not. With `--running`, port `8080` stays with tmux and the URL forwards to the API. `--api-env KEY=VALUE` or `--api-env KEY` (value copied from your shell) sets service variables; see [create](docs/create.md). Names starting with `KAXA_`, `MODAL_TOKEN_`, `FLY_`, or `SPRITES_` are rejected.
 - `--template` (E2B, Docker, and Daytona) starts the sandbox from a template. On E2B it is one you built with the E2B CLI or SDK and must keep the `base` layout (user `user`); `KAXA_E2B_TEMPLATE` sets a default. On Docker it is an image reference that keeps the agent layout (user `agent`); `KAXA_DOCKER_TEMPLATE` sets a default. On Daytona it is a snapshot name that keeps the `daytona` user layout; `KAXA_DAYTONA_TEMPLATE` sets a default. See [docs/create.md](docs/create.md#templates-on-e2b).
 - `--public` makes that URL reachable without a Sprites account. A failed auth change leaves the sandbox in place. Change it later with `kaxa url <name> public` or `kaxa url <name> sprite`. Only the sprites provider accepts `url`. `--public` is refused with `--running` and no `--api`, because that URL serves a tmux terminal with no login.
 
 ### exec and console
 
-On a sandbox created with `--sync`, `exec` and `console` start in `/home/sprite/workspace` (Sprites) run as `modal` in `/home/modal/workspace` (Modal), run as `user` in `/home/user/workspace` (E2B), run as `agent` in `/home/agent/workspace` (Docker), or run as `daytona` in `/home/daytona/workspace` (Daytona).
+On a sandbox created with `--sync`, `exec` and `console` start in `/home/sprite/workspace` (Sprites) run as `modal` in `/home/modal/workspace` (Modal), run as `user` in `/home/user/workspace` (E2B), run as `agent` in `/home/agent/workspace` (Docker), or run as `daytona` in `/home/daytona/workspace` (Daytona). Without `--sync` they start in the home directory with the toolchain `PATH` set. Every sandbox has a workspace, so `sync` works on one created without `--sync`, except on Modal.
 
 ### sync
 
