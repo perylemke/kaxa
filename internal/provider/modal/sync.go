@@ -37,6 +37,11 @@ func (p *Provider) RepoDir(repo string) (string, error) {
 	return workspaceDir + "/" + repo, nil
 }
 
+// PrepareWorkspace does nothing. The tools image already contains the workspace,
+// and only a sandbox created with sync uses that image. Lifecycle skips this
+// method because Modal implements SyncRequiresCreate.
+func (p *Provider) PrepareWorkspace(context.Context, sandbox.ID) error { return nil }
+
 // SyncWorkspace extracts a gzip tar from archive into /home/modal/workspace.
 // The sandbox must have been created with the sync label, which gives it the
 // modal user and the workspace directory.

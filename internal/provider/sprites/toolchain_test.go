@@ -28,6 +28,19 @@ func (r *recordingClient) RunIn(_ context.Context, _, dir string, env, argv []st
 	return nil
 }
 
+func TestPrepareWorkspaceCreatesDirectory(t *testing.T) {
+	t.Parallel()
+
+	client := &recordingClient{}
+	p := NewWithClient(client, "token")
+	if err := p.PrepareWorkspace(context.Background(), "box"); err != nil {
+		t.Fatalf("PrepareWorkspace: %v", err)
+	}
+	if len(client.calls) != 1 || !slices.Equal(client.calls[0].argv, []string{"mkdir", "-p", workspaceDir}) {
+		t.Fatalf("calls = %#v", client.calls)
+	}
+}
+
 func TestSetupProjectsRunsStepsInWorkspaceRepo(t *testing.T) {
 	t.Parallel()
 

@@ -144,6 +144,12 @@ func (s *sdkClient) get(ctx context.Context, id string) (*sdk.Sandbox, error) {
 		return nil, notFound(convertErr(err))
 	}
 	s.handles.Store(sb.ID, sb)
+	// The name is stable and is how kaxa addresses the sandbox. Caching it too
+	// lets the next command reuse this handle instead of reading the sandbox
+	// again, which can miss a sandbox whose labels are not visible yet.
+	if sb.Name != "" {
+		s.handles.Store(sb.Name, sb)
+	}
 	return sb, nil
 }
 
@@ -276,6 +282,7 @@ func (s *sdkClient) Delete(ctx context.Context, id string) error {
 		return err
 	}
 	s.handles.Delete(sb.ID)
+	s.handles.Delete(sb.Name)
 	return notFound(convertErr(sb.DeleteAndWait(ctx, deleteTimeout)))
 }
 

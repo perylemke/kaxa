@@ -103,6 +103,8 @@ func (f *fakeProvider) Destroy(_ context.Context, id sandbox.ID) error {
 	return nil
 }
 
+func (f *fakeProvider) PrepareWorkspace(context.Context, sandbox.ID) error { return nil }
+
 func (f *fakeProvider) SyncWorkspace(_ context.Context, _ sandbox.ID, archive io.Reader) error {
 	if archive != nil {
 		if _, err := io.Copy(io.Discard, archive); err != nil {

@@ -302,6 +302,8 @@ type syncingProvider struct {
 	setupSteps []project.Step
 }
 
+func (s *syncingProvider) PrepareWorkspace(context.Context, sandbox.ID) error { return nil }
+
 func (s *syncingProvider) SyncWorkspace(_ context.Context, _ sandbox.ID, archive io.Reader) error {
 	if archive != nil {
 		if _, err := io.Copy(io.Discard, io.LimitReader(archive, 8<<20)); err != nil {

@@ -38,6 +38,24 @@ func TestCommandOf(t *testing.T) {
 	}
 }
 
+func TestPrepareWorkspaceCreatesDirectory(t *testing.T) {
+	t.Parallel()
+	p, _, proc := newTestProvider(t)
+	createBox(t, p)
+	if err := p.PrepareWorkspace(context.Background(), testSandbox); err != nil {
+		t.Fatalf("PrepareWorkspace: %v", err)
+	}
+	var found bool
+	for _, argv := range proc.argvs() {
+		if slices.Contains(argv, "mkdir") && slices.Contains(argv, "/home/agent/workspace") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("commands = %v", proc.argvs())
+	}
+}
+
 func TestExecStreamsOutputAndStdin(t *testing.T) {
 	t.Parallel()
 	p, api, proc := newTestProvider(t)

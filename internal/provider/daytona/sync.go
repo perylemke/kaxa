@@ -38,6 +38,27 @@ func (p *Provider) RepoDir(repo string) (string, error) {
 	return workspaceDir + "/" + repo, nil
 }
 
+// PrepareWorkspace creates /home/daytona/workspace. It uses the sandbox handle
+// cached when the sandbox was created, so it does not look the sandbox up by
+// name: that lookup misses a sandbox whose labels are not visible yet.
+func (p *Provider) PrepareWorkspace(ctx context.Context, id sandbox.ID) error {
+	if err := validateName(string(id)); err != nil {
+		return err
+	}
+	_, tb, secrets, err := p.clients()
+	if err != nil {
+		return err
+	}
+	code, err := tb.Run(ctx, string(id), runSpec{argv: []string{"mkdir", "-p", workspaceDir}})
+	if err != nil {
+		return userErr(err, string(id), secrets...)
+	}
+	if code != 0 {
+		return userErr(fmt.Errorf("daytona: mkdir workspace: exit status %d", code), string(id), secrets...)
+	}
+	return nil
+}
+
 // SyncWorkspace extracts a gzip tar from archive into /home/daytona/workspace.
 // The archive is first uploaded to a temporary file, since the SDK takes a
 // whole file and not a stream of input.

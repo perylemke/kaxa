@@ -269,11 +269,13 @@ func prepareWorkspace(ctx context.Context, p sandbox.Provider, id sandbox.ID) er
 	if _, limited := p.(sandbox.SyncRequiresCreate); limited {
 		return nil
 	}
-	layout, ok := p.(sandbox.WorkspaceLayout)
+	syncer, ok := p.(sandbox.WorkspaceSyncer)
 	if !ok {
 		return nil
 	}
-	return p.Exec(ctx, id, sandbox.ExecOptions{Command: []string{"mkdir", "-p", layout.HomeDir() + "/workspace"}})
+	// The provider runs this itself. Exec would look the sandbox up by name, and
+	// a provider can still be unable to find a sandbox it just created.
+	return syncer.PrepareWorkspace(ctx, id)
 }
 
 func copyWorkspace(ctx context.Context, syncer sandbox.WorkspaceSyncer, id sandbox.ID, root, repoName string) error {

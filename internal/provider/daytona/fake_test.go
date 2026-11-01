@@ -48,6 +48,9 @@ type fakeAPI struct {
 	// imageStatus is the status a captured image starts with; it turns ready on Get.
 	imageStatus string
 	deleteErr   error
+	// blindFind makes Find miss a sandbox that exists. The Daytona API does this
+	// until the labels of a new sandbox are visible.
+	blindFind bool
 }
 
 func newFakeAPI() *fakeAPI {
@@ -83,6 +86,9 @@ func (f *fakeAPI) List(context.Context) ([]Record, error) {
 }
 
 func (f *fakeAPI) Find(ctx context.Context, name string) (Record, error) {
+	f.mu.Lock()
+	blind := f.blindFind
+	f.mu.Unlock()
 	recs, _ := f.List(ctx)
 	var best Record
 	found := false
@@ -91,7 +97,7 @@ func (f *fakeAPI) Find(ctx context.Context, name string) (Record, error) {
 			best, found = r, true
 		}
 	}
-	if !found {
+	if !found || blind {
 		return Record{}, ErrNotFound
 	}
 	return best, nil
@@ -263,6 +269,8 @@ type fakeToolbox struct {
 	startErr  error
 	// holdForResize keeps a terminal command alive until a resize arrives.
 	holdForResize bool
+	// afterRun runs at the start of Run, before the command is recorded.
+	afterRun func()
 }
 
 func newFakeToolbox(h func(runSpec, string) fakeResult) *fakeToolbox {
@@ -278,6 +286,9 @@ func (f *fakeToolbox) record(spec runSpec, stdin string) fakeResult {
 }
 
 func (f *fakeToolbox) Run(_ context.Context, _ string, spec runSpec) (int, error) {
+	if f.afterRun != nil {
+		f.afterRun()
+	}
 	if f.startErr != nil {
 		return 0, f.startErr
 	}

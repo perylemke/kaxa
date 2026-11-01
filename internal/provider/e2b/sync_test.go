@@ -12,6 +12,19 @@ import (
 	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
+func TestPrepareWorkspaceCreatesDirectory(t *testing.T) {
+	t.Parallel()
+
+	p, _, envd := newProvider([]string{testKaxa}, 0)
+	if err := p.PrepareWorkspace(context.Background(), testBox); err != nil {
+		t.Fatalf("PrepareWorkspace: %v", err)
+	}
+	joined := strings.Join(envd.argvs(), "\n")
+	if !strings.Contains(joined, "mkdir") || !strings.Contains(joined, "/home/user/workspace") {
+		t.Fatalf("commands = %v", envd.argvs())
+	}
+}
+
 func TestLayout(t *testing.T) {
 	t.Parallel()
 

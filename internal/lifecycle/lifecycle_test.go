@@ -68,6 +68,8 @@ type fullProvider struct {
 	publicErr  error
 }
 
+func (f *fullProvider) PrepareWorkspace(context.Context, sandbox.ID) error { return nil }
+
 func (f *fullProvider) SyncWorkspace(_ context.Context, _ sandbox.ID, archive io.Reader) error {
 	if archive != nil {
 		if _, err := io.Copy(io.Discard, archive); err != nil {

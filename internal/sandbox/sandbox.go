@@ -102,6 +102,9 @@ func (e *ExitError) Error() string {
 // WorkspaceSyncer copies a gzip tar into the sandbox workspace.
 // The archive's top-level directory is the repository name.
 type WorkspaceSyncer interface {
+	// PrepareWorkspace creates the workspace directory. Create calls it for every
+	// sandbox, so sync works later even when the sandbox was created without it.
+	PrepareWorkspace(ctx context.Context, id ID) error
 	SyncWorkspace(ctx context.Context, id ID, archive io.Reader) error
 }
 
