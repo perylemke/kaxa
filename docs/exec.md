@@ -1,6 +1,6 @@
 # kaxa exec
 
-Run a command in a sandbox. This works for Sprites, Modal, and E2B.
+Run a command in a sandbox. This works for Sprites, Modal, E2B, and Docker.
 
 ```bash
 kaxa exec <name> <command> [args...]
@@ -25,6 +25,16 @@ kaxa --provider e2b exec my-box -- ls -la
 ```
 
 Standard output, standard error, and standard input are passed through, and the remote exit code is the kaxa exit code. Commands run as `user`, starting in `/home/user/workspace` with `--sync` and in `/home/user` without it. The command is not run through a shell; use `sh -c` for pipes.
+
+## Docker
+
+Pick the provider with `--provider docker` or `KAXA_DEFAULT_PROVIDER=docker`. kaxa starts a stopped sandbox, extends its time to live, and runs the command through the process API of the sandbox.
+
+```bash
+kaxa --provider docker exec my-box -- ls -la
+```
+
+Standard output, standard error, and standard input are passed through, and the remote exit code is the kaxa exit code. Commands run as `agent`, starting in `/home/agent/workspace` with `--sync` and where the image starts without it. The command is not run through a shell; use `sh -c` for pipes. Cloud compute is billed to your Docker subscription while the sandbox runs.
 
 ## Modal
 

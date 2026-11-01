@@ -94,7 +94,7 @@ func CollectSnapshots(ctx context.Context, providers map[string]sandbox.Provider
 	if supported == 0 {
 		return nil, nil, usererr.New(
 			"no configured provider supports snapshots",
-			"snapshots are available for sprites and modal; check the provider credentials",
+			"snapshots are available for sprites, modal, and docker; check the provider credentials",
 		)
 	}
 	if ok == 0 {

@@ -1,12 +1,12 @@
 # CLAUDE.md
 
-Guidance for AI agents working in `kaxa` (Go CLI that unifies sandbox providers: Fly.io Sprites, Modal, and E2B).
+Guidance for AI agents working in `kaxa` (Go CLI that unifies sandbox providers: Fly.io Sprites, Modal, E2B, and Docker Sandboxes).
 Cursor users: the same rules live in `.cursor/rules/*.mdc`; Claude Code reads `.claude/rules/*.md`. Keep both in sync.
 
 ## Stack
 
 - Go 1.27+ (see `go.mod`), Cobra CLI, `CGO_ENABLED=0` builds.
-- Providers: Sprites, Modal, and E2B (stdlib REST and Connect-JSON client, no SDK), registered in `internal/registry`.
+- Providers: Sprites, Modal, and E2B (stdlib REST and Connect-JSON client, no SDK), and Docker (`docker`, stdlib REST plus a WebSocket for processes, with a Docker ID and personal access token; `--api` publishes one port), registered in `internal/registry`.
 - `kaxa mcp` serves sandboxes to AI agents over the Model Context Protocol.
 - Releases: semtag tags (`make release`, `make prerelease`), GoReleaser (`.goreleaser.yml`), and the Homebrew cask in `perylemke/homebrew-tap`. Only final `vX.Y.Z` tags reach Homebrew; `-alpha/-beta/-rc` tags are GitHub pre-releases.
 
@@ -39,7 +39,7 @@ Run `make test` at minimum, and `make lint` after Go changes, before saying work
 - `internal/cli` — Cobra commands.
 - `internal/config` — environment and flag configuration.
 - `internal/sandbox` — provider contracts; `internal/registry` — provider registration.
-- `internal/provider/{sprites,modal,e2b}` — one package per provider.
+- `internal/provider/{sprites,modal,e2b,docker}` — one package per provider.
 - `internal/{mcp,lifecycle,reposync,project,toolchain,usererr,version}` — MCP server, sandbox lifecycle, repo sync, project detection, toolchain install, user errors, version info.
 - `install.sh`, `install.ps1` — one-line installers, attached to every release by GoReleaser (`release.extra_files`); keep in sync with `docs/install.md`.
 - `CHANGELOG.md` — Keep a Changelog; `internal/changelog` and `tools/changelog` edit it at release time; `scripts/release.sh` wraps semtag.

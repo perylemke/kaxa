@@ -44,6 +44,9 @@ func TestLoadFromEnv(t *testing.T) {
 	t.Setenv("KAXA_MODAL_TOKEN_SECRET", "modal-secret")
 	t.Setenv("KAXA_E2B_API_KEY", "e2b-key")
 	t.Setenv("KAXA_E2B_TEMPLATE", "big")
+	t.Setenv("KAXA_DOCKER_ID", "docker-user")
+	t.Setenv("KAXA_DOCKER_PAT", "dckr_pat_fixture")
+	t.Setenv("KAXA_DOCKER_TEMPLATE", "ubuntu:24.04")
 
 	cfg, err := config.Load(config.LoadOptions{}, reg)
 	if err != nil {
@@ -60,6 +63,9 @@ func TestLoadFromEnv(t *testing.T) {
 	}
 	if cfg.E2B.Template != "big" {
 		t.Fatalf("e2b template = %q", cfg.E2B.Template)
+	}
+	if cfg.Docker.ID != "docker-user" || cfg.Docker.PAT != "dckr_pat_fixture" || cfg.Docker.Template != "ubuntu:24.04" {
+		t.Fatalf("docker config = %+v", cfg.Docker)
 	}
 	if cfg.E2B.APIKey != "e2b-key" {
 		t.Fatalf("e2b api key not loaded from env")

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/perylemke/kaxa/internal/lifecycle"
+	"github.com/perylemke/kaxa/internal/sandbox"
 	"github.com/perylemke/kaxa/internal/usererr"
 )
 
@@ -83,7 +84,8 @@ func parseAPICommand(raw string) ([]string, error) {
 	return argv, nil
 }
 
-func createdMessage(ref, url string, req createRequest) string {
+func createdMessage(ref, provider string, detail sandbox.Detail, req createRequest) string {
+	url := detail.URL
 	if !req.API && !req.Public {
 		return fmt.Sprintf("sandbox %s is ready and will stay running for 1 hour\n%s", ref, url)
 	}
@@ -96,11 +98,21 @@ func createdMessage(ref, url string, req createRequest) string {
 	if req.API {
 		fmt.Fprintf(&b, " forwards to port %d", req.APIPort)
 	}
-	switch {
-	case req.Public:
-		b.WriteString("\naccess is public")
-	case req.API:
-		b.WriteString("\nrequires a Sprites account")
+	if access := urlAccess(provider, detail.Auth, req.Public); access != "" {
+		b.WriteString("\n" + access)
 	}
 	return b.String()
+}
+
+// urlAccess says who can open the URL, or nothing when the provider does not
+// report it. Only a Sprites URL asks for a Sprites account by default; Docker
+// chooses its own URLs and kaxa cannot tell who may open them.
+func urlAccess(provider, auth string, madePublic bool) string {
+	switch {
+	case madePublic || auth == sandbox.URLAuthPublic:
+		return "access is public"
+	case provider == spritesProviderName:
+		return "requires a Sprites account"
+	}
+	return ""
 }

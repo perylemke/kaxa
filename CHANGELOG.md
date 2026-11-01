@@ -12,6 +12,7 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 
 - Sandbox providers: Fly.io Sprites, Modal, and E2B, behind one CLI. E2B supports create (with `--sync` and `--api`), list, exec, console, restart, sync, and destroy, and reads `KAXA_E2B_API_KEY`.
   - E2B sandboxes can start from your own template with `create --template`, `KAXA_E2B_TEMPLATE`, or `template` in the MCP `create_sandbox`.
+- Docker Sandboxes in Docker's cloud as the `docker` provider, through the experimental Docker Sandboxes API and a Docker ID with a personal access token (`KAXA_DOCKER_ID`, `KAXA_DOCKER_PAT`). It supports create (with `--sync`, `--template`, and `--api`), list, exec, console, restart, sync, snapshot, and destroy, starts from `KAXA_DOCKER_TEMPLATE` or `--template`, and needs a Docker Agentic Platform subscription. `create --api` starts an HTTP service and publishes its port on a Docker URL. `snapshot` saves the disk of a sandbox and restores it into a new sandbox with `--to`; Docker keeps the snapshots until `snapshot delete`, and kaxa lists only its own. A restored sandbox is recorded in `docker-restored.json` in the kaxa config directory, because Docker gives it no labels, so it is visible only on the machine that restored it.
 - `kaxa mcp`, which serves sandboxes to AI agents over the Model Context Protocol.
 - Toolchain installation in Sprites sandboxes.
 - Sandbox snapshots: create, list, restore, and delete.
@@ -27,8 +28,9 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 ### Changed
 
 - Configuration is read from environment variables only; Viper was removed.
-- `kaxa --help` lists the commands every provider has under `Commands:`, then one section per provider (Sprites, Modal, E2B) with the commands it supports. Command help splits `Flags:` from `Provider flags:`, and `--provider` names the registered providers.
+- `kaxa --help` lists every command in one `Commands:` list, whichever providers implement it. Command help splits `Flags:` from `Provider flags:`, and `--provider` names the registered providers.
 - The project was renamed from `sbox` to `kaxa`.
+- `kaxa create --api` names who can open the URL by provider: Sprites asks for a Sprites account, E2B is public, and Docker says nothing, instead of always saying "requires a Sprites account".
 - `--api-env` and `api_env` reject names starting with `MODAL_TOKEN_`, `FLY_`, or `SPRITES_` as well as `KAXA_`.
 - GitHub Actions are pinned to commit SHAs, the release job runs in the `release` environment with a read-only default token, and the Homebrew token reaches only the step that needs it.
 - The Modal base image is pinned by digest.

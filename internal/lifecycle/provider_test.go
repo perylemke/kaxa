@@ -164,3 +164,63 @@ func TestResolveProviderModalWithoutConfigurer(t *testing.T) {
 		t.Fatal("modal provider without ConfigureCredentials accepted")
 	}
 }
+
+type dockerProvider struct {
+	basicProvider
+	id, pat     string
+	template    string
+	configErr   error
+	templateErr error
+}
+
+func (c *dockerProvider) Name() string { return "docker" }
+
+func (c *dockerProvider) ConfigureCredentials(id, pat string) error {
+	c.id, c.pat = id, pat
+	return c.configErr
+}
+
+func (c *dockerProvider) SetDefaultTemplate(name string) error {
+	c.template = name
+	return c.templateErr
+}
+
+func TestResolveProviderConfiguresDocker(t *testing.T) {
+	t.Parallel()
+
+	p := &dockerProvider{}
+	cfg := config.Config{Docker: config.DockerConfig{ID: "me", PAT: "dckr_pat_x", Template: "ubuntu:24.04"}}
+
+	if _, err := lifecycle.ResolveProvider(registryWith(t, p), cfg, "docker"); err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if p.id != "me" || p.pat != "dckr_pat_x" || p.template != "ubuntu:24.04" {
+		t.Fatalf("id = %q pat = %q template = %q", p.id, p.pat, p.template)
+	}
+}
+
+func TestResolveProviderDockerErrors(t *testing.T) {
+	t.Parallel()
+
+	want := errors.New("failure")
+	tests := []struct {
+		name string
+		p    sandbox.Provider
+	}{
+		{"credentials", &dockerProvider{configErr: want}},
+		{"template", &dockerProvider{templateErr: want}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if _, err := lifecycle.ResolveProvider(registryWith(t, tt.p), config.Config{}, "docker"); !errors.Is(err, want) {
+				t.Fatalf("err = %v, want %v", err, want)
+			}
+		})
+	}
+
+	reg := registryWith(t, &namedProvider{name: "docker"})
+	if _, err := lifecycle.ResolveProvider(reg, config.Config{}, "docker"); err == nil {
+		t.Fatal("docker provider without ConfigureCredentials accepted")
+	}
+}

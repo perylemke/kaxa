@@ -16,9 +16,6 @@ import (
 
 const (
 	sectionCommands = "Commands"
-	sectionSprites  = "Sprites"
-	sectionModal    = "Modal"
-	sectionE2B      = "E2B"
 	flagsProvider   = "Provider flags"
 	cmdSnapshot     = "snapshot"
 	cmdVersion      = "version"
@@ -79,24 +76,20 @@ func helpBlock(help, title string) string {
 	return block
 }
 
-func TestRootHelpGroupsCommandsByProvider(t *testing.T) {
+func TestRootHelpListsEveryCommandInOneList(t *testing.T) {
 	t.Parallel()
 
 	help := helpOutput(t, allProvidersRegistry(t))
 	sections := helpSections(help)
 
-	want := map[string][]string{
-		sectionCommands: {"completion", testCmdConsole, testCmdCreate, testCmdDestroy, testCmdExec, testCmdList, "mcp", "sync", cmdVersion},
-		sectionSprites:  {testCmdRestart, cmdSnapshot, testCmdUpgrade, testCmdURL},
-		sectionModal:    {cmdSnapshot},
-		sectionE2B:      {testCmdRestart},
+	want := []string{
+		"completion", testCmdConsole, testCmdCreate, testCmdDestroy, testCmdExec, testCmdList, "mcp",
+		testCmdRestart, cmdSnapshot, "sync", testCmdUpgrade, testCmdURL, cmdVersion,
 	}
-	for title, names := range want {
-		if got := sections[title]; !slices.Equal(got, names) {
-			t.Errorf("section %q = %v, want %v\n%s", title, got, names, help)
-		}
+	if got := sections[sectionCommands]; !slices.Equal(got, want) {
+		t.Errorf("Commands = %v, want %v\n%s", got, want, help)
 	}
-	for _, unwanted := range []string{"Available Commands:", "Additional Commands:", "Provider commands:"} {
+	for _, unwanted := range []string{"Available Commands:", "Additional Commands:", "Provider commands:", "Sprites:", "Modal:", "E2B:"} {
 		if strings.Contains(help, unwanted) {
 			t.Errorf("help should not contain %q:\n%s", unwanted, help)
 		}
@@ -116,59 +109,18 @@ func TestRootHelpIntroDoesNotNameProviders(t *testing.T) {
 	}
 }
 
-func TestRootHelpProviderSectionsFollowRegistryOrder(t *testing.T) {
-	t.Parallel()
-
-	help := helpOutput(t, allProvidersRegistry(t))
-	e2bAt := strings.Index(help, "\nE2B:\n")
-	modalAt := strings.Index(help, "\nModal:\n")
-	spritesAt := strings.Index(help, "\nSprites:\n")
-	if e2bAt < 0 || modalAt < e2bAt || spritesAt < modalAt {
-		t.Fatalf("sections should follow registry order (e2b, modal, sprites):\n%s", help)
-	}
-	if commandsAt := strings.Index(help, "\nCommands:\n"); commandsAt < 0 || commandsAt > e2bAt {
-		t.Fatalf("Commands should come before the provider sections:\n%s", help)
-	}
-}
-
-func TestRootHelpOmitsProvidersThatAreNotRegistered(t *testing.T) {
+func TestRootHelpListsEveryCommandForASingleProvider(t *testing.T) {
 	t.Parallel()
 
 	reg := registry.New()
 	if err := reg.Register(modal.New()); err != nil {
 		t.Fatalf("register: %v", err)
 	}
-	help := helpOutput(t, reg)
-	sections := helpSections(help)
-
-	if got := sections[sectionModal]; !slices.Equal(got, []string{cmdSnapshot}) {
-		t.Errorf("modal section = %v, want [snapshot]\n%s", got, help)
-	}
-	for _, title := range []string{sectionSprites, sectionE2B} {
-		if _, ok := sections[title]; ok {
-			t.Errorf("section %q should not appear:\n%s", title, help)
+	got := helpSections(helpOutput(t, reg))[sectionCommands]
+	for _, name := range []string{testCmdRestart, testCmdURL, cmdSnapshot} {
+		if !slices.Contains(got, name) {
+			t.Errorf("Commands = %v, want %q listed", got, name)
 		}
-	}
-}
-
-func TestRootHelpTitlesAnUnknownProviderByName(t *testing.T) {
-	t.Parallel()
-
-	reg := spritesRegistry(t, &fakeProvider{name: "acme"})
-	sections := helpSections(helpOutput(t, reg))
-
-	if got := sections["acme"]; !slices.Equal(got, []string{testCmdRestart, testCmdUpgrade}) {
-		t.Fatalf("acme section = %v, want [restart upgrade]", got)
-	}
-}
-
-func TestRootHelpListsProviderCommandsWithoutCredentials(t *testing.T) {
-	t.Setenv("KAXA_SPRITES_TOKEN", "")
-	t.Setenv("KAXA_E2B_API_KEY", "")
-
-	sections := helpSections(helpOutput(t, allProvidersRegistry(t)))
-	if got := sections[sectionSprites]; !slices.Contains(got, testCmdURL) {
-		t.Fatalf("sprites section = %v, want url listed without a token", got)
 	}
 }
 

@@ -11,20 +11,21 @@
 [![Lint](https://github.com/perylemke/kaxa/actions/workflows/lint.yml/badge.svg)](https://github.com/perylemke/kaxa/actions/workflows/lint.yml)
 [![Sec](https://github.com/perylemke/kaxa/actions/workflows/sec.yml/badge.svg)](https://github.com/perylemke/kaxa/actions/workflows/sec.yml)
 
-Unified CLI for sandbox providers. **kaxa** aggregates isolated execution environments behind one command-line interface, starting with [Fly.io Sprites](https://docs.fly.io/sprites), [Modal Sandboxes](https://modal.com/docs/guide/sdk-javascript-go), and [E2B](https://e2b.dev).
+Wrapper CLI for sandbox providers. **kaxa** puts isolated execution environments behind one command-line interface. Sprites and Modal go through their official Go SDKs, E2B through kaxa's own HTTP client, and Docker Sandboxes through the Docker Sandboxes API. Providers: [Fly.io Sprites](https://docs.fly.io/sprites), [Modal Sandboxes](https://modal.com/docs/guide/sdk-javascript-go), [E2B](https://e2b.dev), and [Docker Sandboxes](https://docs.docker.com/ai/sandboxes/).
 
 Provider support:
 
 - **Sprites** (`--provider sprites`): `create`, `list`, `exec`, `console`, `restart`, `upgrade`, `snapshot`, `destroy`.
 - **Modal** (`--provider modal`): `create`, `list`, `exec`, `console`, `snapshot`, `destroy`. Set it up with [Modal account and token](docs/modal-account.md).
 - **E2B** (`--provider e2b`): `create` (with `--sync` and `--api`), `list`, `exec`, `console`, `restart`, `sync`, `destroy`. Set it up with [E2B account and API key](docs/e2b-account.md).
+- **Docker** (`--provider docker`): `create` (with `--sync`, `--template`, and `--api`), `list`, `exec`, `console`, `restart`, `sync`, `snapshot`, `destroy`, on Docker's cloud through the Docker Sandboxes API (experimental; needs a Docker Agentic Platform subscription). Set it up with [Docker Sandboxes](docs/docker-account.md).
 
-Features that only exist for Sprites (`restart`, `upgrade`, `url`, `--running`, `--public`) print that they are not available for Modal or E2B and name the providers that have them (`restart` also works on E2B). `--sync` works on Modal and E2B too, with the workspace in `/home/modal/workspace` and `/home/user/workspace`.
+Features that only exist for Sprites (`restart`, `upgrade`, `url`, `--running`, `--public`) print that they are not available for Modal, E2B, or Docker and name the providers that have them (`restart` also works on E2B and Docker). `--sync` works on Modal, E2B, and Docker too, with the workspace in `/home/modal/workspace`, `/home/user/workspace`, and `/home/agent/workspace`.
 
 ## Requirements
 
 - Go 1.27+ (only to build from source)
-- Accounts and API tokens for Sprites, Modal, and/or E2B when you start using provider commands
+- Accounts and API tokens for Sprites, Modal, and/or E2B, or a Docker ID and personal access token for Docker, when you start using provider commands
 
 ## Install
 
@@ -73,12 +74,15 @@ Never commit real tokens.
 
 | Variable | Description |
 | --- | --- |
-| `KAXA_DEFAULT_PROVIDER` | Default provider (`sprites`, `modal`, or `e2b`) |
+| `KAXA_DEFAULT_PROVIDER` | Default provider (`sprites`, `modal`, `e2b`, or `docker`) |
 | `KAXA_SPRITES_TOKEN` | Sprites API token |
 | `KAXA_MODAL_TOKEN_ID` | Modal token ID |
 | `KAXA_MODAL_TOKEN_SECRET` | Modal token secret |
 | `KAXA_E2B_API_KEY` | E2B API key |
 | `KAXA_E2B_TEMPLATE` | E2B template for new sandboxes (optional; default `base`). `create --template` overrides it |
+| `KAXA_DOCKER_ID` | Docker ID |
+| `KAXA_DOCKER_PAT` | Docker personal access token (created with Allow Cloud Sandboxes access) |
+| `KAXA_DOCKER_TEMPLATE` | Docker image for new sandboxes (optional; default the shell agent image). `create --template` overrides it |
 
 ## Usage
 
@@ -96,6 +100,7 @@ kaxa create --sync my-sprite     # copy this git repository into /home/sprite/wo
 kaxa create --provider modal --sync my-box   # same, into /home/modal/workspace/<repo>
 kaxa create --provider e2b --sync my-box     # same, into /home/user/workspace/<repo>
 kaxa create --provider e2b --template big --sync my-box   # E2B: start from your own template
+kaxa create --provider docker --sync my-box   # same, on Docker's cloud, into /home/agent/workspace/<repo>
 kaxa create --sync --dir ~/projects/api-python my-sprite
 kaxa create --sync --api --public --api-cmd .venv/bin/uvicorn,app.main:app,--host,0.0.0.0,--port,8000 my-sprite
 kaxa new my-sprite               # alias of create
@@ -119,6 +124,7 @@ kaxa snapshot list                                       # every snapshot, with 
 kaxa snapshot list my-sprite
 kaxa snapshot restore my-sprite v7                       # Sprites: restores in place
 kaxa snapshot restore my-box im-abc123 --to my-box-copy --provider modal   # Modal: new sandbox
+kaxa snapshot restore my-box 0abc123 --to my-box-copy --provider docker    # Docker: new sandbox
 kaxa snapshot delete my-sprite v7
 
 kaxa url my-sprite public          # open the Sprites URL without an account
@@ -140,14 +146,14 @@ You can pass `--provider sprites` instead of `KAXA_DEFAULT_PROVIDER`.
 `create` labels the sandbox `kaxa`.
 
 - `--running` keeps the sandbox up for one hour, serves tmux on its URL, and opens that URL.
-- `--sync` copies the Git repository, including `.git` and excluding ignored files, into `/home/sprite/workspace/<repo>` (Sprites) `/home/modal/workspace/<repo>` (Modal, as the `modal` user), or `/home/user/workspace/<repo>` (E2B, as `user`). `--dir` selects another repository. A subdirectory still copies the whole repository. Credentials in `.git/config` are removed, and untracked secret files such as `.env` or `*.pem` stop the copy; see [sync](docs/sync.md). The root selects Go, Rust, Python, Node, Ruby (`Gemfile`), and Clojure (`deps.edn`); missing tools are installed, then project dependencies. A failed copy or install deletes the sandbox.
-- `--api` publishes one HTTP service on the Sprites URL, or on `https://<port>-<id>.e2b.app` on E2B, where `--api` is what makes that port public. `--api-cmd` is comma-separated argv, and the process must listen on `0.0.0.0` and on `--api-port` (8000 by default). With `--sync`, the repository must be an HTTP API; a CLI project is rejected before create. Create waits until the service is running, for up to 90 seconds, and deletes the sandbox if it does not. With `--running`, port `8080` stays with tmux and the URL forwards to the API. `--api-env KEY=VALUE` or `--api-env KEY` (value copied from your shell) sets service variables; see [create](docs/create.md). Names starting with `KAXA_`, `MODAL_TOKEN_`, `FLY_`, or `SPRITES_` are rejected.
-- `--template` (E2B only) starts the sandbox from a template you built with the E2B CLI or SDK. It must keep the `base` layout (user `user`). `KAXA_E2B_TEMPLATE` sets a default. See [docs/create.md](docs/create.md#templates-on-e2b).
+- `--sync` copies the Git repository, including `.git` and excluding ignored files, into `/home/sprite/workspace/<repo>` (Sprites) `/home/modal/workspace/<repo>` (Modal, as the `modal` user), `/home/user/workspace/<repo>` (E2B, as `user`), or `/home/agent/workspace/<repo>` (Docker, as `agent`). `--dir` selects another repository. A subdirectory still copies the whole repository. Credentials in `.git/config` are removed, and untracked secret files such as `.env` or `*.pem` stop the copy; see [sync](docs/sync.md). The root selects Go, Rust, Python, Node, Ruby (`Gemfile`), and Clojure (`deps.edn`); missing tools are installed, then project dependencies. A failed copy or install deletes the sandbox.
+- `--api` publishes one HTTP service on the Sprites URL, on `https://<port>-<id>.e2b.app` on E2B, where `--api` is what makes that port public, or on the URL that Docker gives the published port on Docker. `--api-cmd` is comma-separated argv, and the process must listen on `0.0.0.0` and on `--api-port` (8000 by default). With `--sync`, the repository must be an HTTP API; a CLI project is rejected before create. Create waits until the service is running, for up to 90 seconds, and deletes the sandbox if it does not. With `--running`, port `8080` stays with tmux and the URL forwards to the API. `--api-env KEY=VALUE` or `--api-env KEY` (value copied from your shell) sets service variables; see [create](docs/create.md). Names starting with `KAXA_`, `MODAL_TOKEN_`, `FLY_`, or `SPRITES_` are rejected.
+- `--template` (E2B and Docker) starts the sandbox from a template. On E2B it is one you built with the E2B CLI or SDK and must keep the `base` layout (user `user`); `KAXA_E2B_TEMPLATE` sets a default. On Docker it is an image reference that keeps the agent layout (user `agent`); `KAXA_DOCKER_TEMPLATE` sets a default. See [docs/create.md](docs/create.md#templates-on-e2b).
 - `--public` makes that URL reachable without a Sprites account. A failed auth change leaves the sandbox in place. Change it later with `kaxa url <name> public` or `kaxa url <name> sprite`. Only the sprites provider accepts `url`. `--public` is refused with `--running` and no `--api`, because that URL serves a tmux terminal with no login.
 
 ### exec and console
 
-On a sandbox created with `--sync`, `exec` and `console` start in `/home/sprite/workspace` (Sprites) run as `modal` in `/home/modal/workspace` (Modal), or run as `user` in `/home/user/workspace` (E2B).
+On a sandbox created with `--sync`, `exec` and `console` start in `/home/sprite/workspace` (Sprites) run as `modal` in `/home/modal/workspace` (Modal), run as `user` in `/home/user/workspace` (E2B), or run as `agent` in `/home/agent/workspace` (Docker).
 
 ### sync
 
@@ -159,11 +165,11 @@ With no sandboxes, `list` prints `no sandboxes created` and exits. In a terminal
 
 ### restart, upgrade, and destroy
 
-`restart` and `upgrade` without a name open a picker. `restart` works on Sprites and E2B (on E2B it reboots the sandbox from its disk and stops running processes); `upgrade` is Sprites only. `destroy` without a name opens a form with the sandboxes of every configured provider (name, status, provider), where you can select one or more. When stdin is not a terminal, enter numbers to toggle and `0` to confirm. A named sandbox asks for `[y/N]`. `destroy --all` removes every sandbox of every provider and asks twice; `--provider` narrows it to one provider and one question. `--force` or `-f` skips the questions.
+`restart` and `upgrade` without a name open a picker. `restart` works on Sprites, E2B, and Docker (on E2B and Docker it reboots the sandbox from its disk and stops running processes); `upgrade` is Sprites only. `destroy` without a name opens a form with the sandboxes of every configured provider (name, status, provider), where you can select one or more. When stdin is not a terminal, enter numbers to toggle and `0` to confirm. A named sandbox asks for `[y/N]`. `destroy --all` removes every sandbox of every provider and asks twice; `--provider` narrows it to one provider and one question. `--force` or `-f` skips the questions.
 
 ### snapshot
 
-`snapshot create|list|restore|delete` saves the filesystem of a sandbox and brings it back. Sprites restores the same sandbox in place (after a `[y/N]` question). Modal creates a new sandbox named by `--to` and keeps the source; its snapshots are images that Modal keeps for 30 days, listed from an index on this machine. `snapshot list` without a name shows every snapshot of every provider with its sandbox, ID, and creation time; `--provider` or a name narrows it. `destroy` does not delete snapshots. A snapshot holds everything in the sandbox, including secrets written there. A provider without snapshots prints that they are not available and names the providers that have them. See [snapshot](docs/snapshot.md).
+`snapshot create|list|restore|delete` saves the filesystem of a sandbox and brings it back. Sprites restores the same sandbox in place (after a `[y/N]` question). Modal and Docker create a new sandbox named by `--to` and keep the source; Modal's snapshots are images that Modal keeps for 30 days, listed from an index on this machine, while Docker keeps its snapshots until you delete them and lists them from any machine. `snapshot list` without a name shows every snapshot of every provider with its sandbox, ID, and creation time; `--provider` or a name narrows it. `destroy` does not delete snapshots. A snapshot holds everything in the sandbox, including secrets written there. A provider without snapshots prints that they are not available and names the providers that have them. See [snapshot](docs/snapshot.md).
 
 ### AI agents
 
@@ -215,7 +221,7 @@ make coverage
 # plus coverage.html, with the uncovered lines marked
 make coverage-html
 
-# Live tests against the real Sprites, Modal, and E2B APIs (needs KAXA_* credentials; BILLS compute)
+# Live tests against the real Sprites, Modal, E2B, and Docker APIs (needs KAXA_* credentials; BILLS compute)
 make test-live
 
 # End-to-end tests (builds binary)
