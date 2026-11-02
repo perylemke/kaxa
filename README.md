@@ -178,9 +178,9 @@ With no sandboxes, `list` prints `no sandboxes created` and exits. In a terminal
 
 ### AI agents
 
-`kaxa mcp` serves sandboxes to an AI agent over the Model Context Protocol. Cursor, Claude Code, Claude Desktop, and Gemini CLI each start that binary on stdin and stdout. The agent stays in the client and calls tools to create a sandbox from your Git repository, add more repositories to it, run commands in it, and destroy it.
+`kaxa mcp` and `kaxa mcp start` serve sandboxes to an AI agent over the Model Context Protocol. `kaxa mcp init` writes the client entry for Claude Desktop, Claude Code, Cursor, Gemini CLI, or Windsurf. `kaxa mcp config` prints that entry. The entry runs `kaxa mcp start` and does not include tokens or a working directory. The agent stays in the client and calls tools to create a sandbox from your Git repository, add more repositories to it, run commands in it, and destroy it.
 
-Point `command` at the installed binary. `go install` puts it on `$(go env GOPATH)/bin`, and Homebrew links it at `$(brew --prefix)/bin/kaxa`. A desktop app needs that absolute path. The token stays in the client's environment, not in a committed file. Client files, `cwd`, and the tool list are in [docs/agent.md](docs/agent.md).
+Point `command` at the installed binary when you edit the entry by hand. `go install` puts it on `$(go env GOPATH)/bin`, and Homebrew links it at `$(brew --prefix)/bin/kaxa`. A desktop app needs that absolute path. The token stays in the client's environment, not in a committed file. Client files, `cwd`, and the tool list are in [docs/agent.md](docs/agent.md).
 
 ## Documentation
 
@@ -199,7 +199,7 @@ Point `command` at the installed binary. `go install` puts it on `$(go env GOPAT
 | [snapshot](docs/snapshot.md) | `kaxa snapshot` (create, list, restore, delete) |
 | [url](docs/url.md) | `kaxa url` |
 | [destroy](docs/destroy.md) | `kaxa destroy` (`rm`) |
-| [mcp](docs/agent.md) | `kaxa mcp`, sandboxes for AI agents |
+| [mcp](docs/agent.md) | `kaxa mcp` (`start`, `init`, `config`), sandboxes for AI agents |
 
 The same index, plus configuration, is in [docs/README.md](docs/README.md).
 

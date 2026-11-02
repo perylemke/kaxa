@@ -3,16 +3,46 @@
 Serve sandboxes to AI agents over the [Model Context Protocol](https://modelcontextprotocol.io).
 
 ```bash
-kaxa mcp
+kaxa mcp start
 ```
 
-The server talks JSON-RPC on stdin and stdout. An MCP client starts it as a child process. Stdout carries only the protocol. Progress lines and logs go to stderr. Run it by hand only to see that it starts; it waits for a client.
+The server talks JSON-RPC on stdin and stdout. An MCP client starts it as a child process. `kaxa mcp` with no subcommand serves the same way, so a client already configured with that command keeps working. Stdout carries only the protocol. Progress lines and logs go to stderr. Run it by hand only to see that it starts; it waits for a client.
 
 The agent keeps running in your client, such as Cursor. It calls kaxa tools, and the work happens in the sandbox. The tools use sandbox terms, and the provider is an argument. A workflow written for one provider works with another that supports the same features.
 
+## Install into an agent
+
+```bash
+kaxa mcp init cursor
+kaxa mcp init claude
+kaxa mcp init gemini
+kaxa mcp init windsurf
+kaxa mcp config
+```
+
+`init` writes the kaxa entry into the agent's user config and prints each file it updated. `claude` writes the same entry to Claude Desktop and to Claude Code (`~/.claude.json`). `cursor` writes `~/.cursor/mcp.json`. `gemini` writes `~/.gemini/settings.json`. `windsurf` writes `~/.codeium/windsurf/mcp_config.json`. On Windows, Claude Desktop and Windsurf use `%APPDATA%`. An existing file keeps its other keys and its other MCP servers. `init` replaces only the `kaxa` server, and it reformats the file with two-space indentation. `config` prints the entry and does not write a file. Nest that object under `mcpServers` when the client is not one of these four.
+
+```json
+{
+  "kaxa": {
+    "args": ["mcp", "start"],
+    "command": "kaxa",
+    "env": {
+      "HOME": "/Users/you",
+      "PATH": "/Users/you:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin"
+    },
+    "logFile": "/Users/you/.kaxa/kaxa-mcp.log"
+  }
+}
+```
+
+The entry does not include a token or a working directory. Add the `KAXA_*` variables of the providers you use to `env`. For `sync` from a desktop app, add `cwd`, or the `cd` in the Cursor example below. Without that, a server that starts in your home directory refuses to copy a repository. `command` is `kaxa`, resolved on the `PATH` in `env` (your home directory, then the usual bins, including Homebrew). A binary that lives only in `~/go/bin` needs that directory on `PATH`, or an absolute `command`.
+
+`logFile` is where a client that honors the field writes stderr. kaxa does not open that file. Cursor ignores `logFile` and shows the same stderr in Output, under MCP Logs. On Linux the path is `~/.kaxa/kaxa-mcp.log`. On Windows it is `%APPDATA%\.kaxa\kaxa-mcp.log`, and `env` also sets `APPDATA`.
+
 ## Connect a client
 
-Any MCP client that can start a local program can use `kaxa mcp`. The client runs the binary and speaks JSON-RPC on its stdin and stdout. Cursor, Claude, and Gemini each store that command in their own file. The tools are the same.
+Any MCP client that can start a local program can use `kaxa mcp start`. The client runs the binary and speaks JSON-RPC on its stdin and stdout. Cursor, Claude, Gemini, and Windsurf each store that command in their own file. The tools are the same. `kaxa mcp init` writes the user file for each of them.
 
 Install the binary wherever you keep commands:
 
@@ -55,7 +85,7 @@ User config is `~/.cursor/mcp.json`. Project config is `.cursor/mcp.json`. Prefe
   "mcpServers": {
     "kaxa": {
       "command": "sh",
-      "args": ["-c", "cd /Users/you/workspace && exec /Users/you/go/bin/kaxa mcp"],
+      "args": ["-c", "cd /Users/you/workspace && exec /Users/you/go/bin/kaxa mcp start"],
       "env": {
         "KAXA_DEFAULT_PROVIDER": "sprites",
         "KAXA_SPRITES_TOKEN": "paste-the-dashboard-value",
@@ -64,13 +94,14 @@ User config is `~/.cursor/mcp.json`. Project config is `.cursor/mcp.json`. Prefe
         "KAXA_E2B_API_KEY": "e2b_paste-the-key",
         "KAXA_DOCKER_ID": "your-docker-id",
         "KAXA_DOCKER_PAT": "dckr_pat_paste-the-token"
-      }
+      },
+      "logFile": "/Users/you/.kaxa/kaxa-mcp.log"
     }
   }
 }
 ```
 
-The command changes to the folder that bounds `sync` and then replaces the shell with `kaxa mcp` (`exec`), so no extra process is left. Use the absolute path of the binary, because Cursor started from the desktop does not inherit your `PATH`. Without the `cd`, a server started from the desktop can run in your home directory, and `create_sandbox` with `sync` and `sync_repository` fail with `the server working directory /Users/you is too broad to bound which repositories sync may copy`. Tools that do not copy a repository, such as `exec` and the snapshot tools, work either way.
+The command changes to the folder that bounds `sync` and then replaces the shell with `kaxa mcp start` (`exec`), so no extra process is left. Cursor does not write `logFile`; that field is there for a client that does. Use the absolute path of the binary, because Cursor started from the desktop does not inherit your `PATH`. Without the `cd`, a server started from the desktop can run in your home directory, and `create_sandbox` with `sync` and `sync_repository` fail with `the server working directory /Users/you is too broad to bound which repositories sync may copy`. Tools that do not copy a repository, such as `exec` and the snapshot tools, work either way.
 
 Open Cursor Settings, MCP, and enable the kaxa tools. The server reads its working directory when it starts, so turn the kaxa server off and on, or restart Cursor, after changing the file. If you start Cursor from a terminal inside the project, the server inherits that folder and the `cd` is not needed.
 
@@ -84,7 +115,7 @@ Project config is `.mcp.json` at the repository root. Claude Code asks you to ap
     "kaxa": {
       "type": "stdio",
       "command": "/Users/you/go/bin/kaxa",
-      "args": ["mcp"],
+      "args": ["mcp", "start"],
       "env": {
         "KAXA_DEFAULT_PROVIDER": "sprites",
         "KAXA_SPRITES_TOKEN": "paste-the-dashboard-value",
@@ -93,7 +124,8 @@ Project config is `.mcp.json` at the repository root. Claude Code asks you to ap
         "KAXA_E2B_API_KEY": "e2b_paste-the-key",
         "KAXA_DOCKER_ID": "your-docker-id",
         "KAXA_DOCKER_PAT": "dckr_pat_paste-the-token"
-      }
+      },
+      "logFile": "/Users/you/.kaxa/kaxa-mcp.log"
     }
   }
 }
@@ -112,14 +144,14 @@ claude mcp add --transport stdio \
   --env KAXA_E2B_API_KEY=e2b_paste-the-key \
   --env KAXA_DOCKER_ID=your-docker-id \
   --env KAXA_DOCKER_PAT=dckr_pat_paste-the-token \
-  kaxa -- /Users/you/go/bin/kaxa mcp
+  kaxa -- /Users/you/go/bin/kaxa mcp start
 ```
 
 Check with `claude mcp list` or `/mcp`.
 
 ### Claude Desktop
 
-On macOS the file is `~/Library/Application Support/Claude/claude_desktop_config.json`. On Windows it is `%APPDATA%\Claude\claude_desktop_config.json`. Use the same `mcpServers` object as Cursor, including the `sh -c "cd ... && exec ..."` command: a desktop app does not start the server in your project, and without the `cd` the `sync` tools are refused when it lands in your home directory. Quit and reopen Claude Desktop after saving.
+On macOS the file is `~/Library/Application Support/Claude/claude_desktop_config.json`. On Linux it is `~/.config/Claude/claude_desktop_config.json`. On Windows it is `%APPDATA%\Claude\claude_desktop_config.json`. `kaxa mcp init claude` writes this file and `~/.claude.json`. Use the same `mcpServers` object as Cursor, including the `sh -c "cd ... && exec ..."` command: a desktop app does not start the server in your project, and without the `cd` the `sync` tools are refused when it lands in your home directory. Quit and reopen Claude Desktop after saving.
 
 ### Gemini CLI
 
@@ -130,8 +162,9 @@ User config is `~/.gemini/settings.json`. Project config is `.gemini/settings.js
   "mcpServers": {
     "kaxa": {
       "command": "/Users/you/go/bin/kaxa",
-      "args": ["mcp"],
+      "args": ["mcp", "start"],
       "cwd": "/Users/you/projects/your-repo",
+      "logFile": "/Users/you/.kaxa/kaxa-mcp.log",
       "env": {
         "KAXA_DEFAULT_PROVIDER": "sprites",
         "KAXA_SPRITES_TOKEN": "${KAXA_SPRITES_TOKEN}",
@@ -148,7 +181,7 @@ User config is `~/.gemini/settings.json`. Project config is `.gemini/settings.js
 
 ### Another client
 
-Use the stdio entry your client documents: a command, the argument `mcp`, and the `KAXA_` variables of the providers you use. If the client has no `cwd` field, or may start the server in your home directory, wrap the command as in the Cursor example (`sh -c "cd <folder> && exec <kaxa> mcp"`) so that `sync` has a working directory it accepts. An HTTP URL is a different transport. `kaxa mcp` does not listen on a port.
+Use the stdio entry your client documents: a command, the arguments `mcp` and `start`, and the `KAXA_` variables of the providers you use. `kaxa mcp config` prints that entry without tokens. If the client has no `cwd` field, or may start the server in your home directory, wrap the command as in the Cursor example (`sh -c "cd <folder> && exec <kaxa> mcp start"`) so that `sync` has a working directory it accepts. An HTTP URL is a different transport. `kaxa mcp` does not listen on a port.
 
 ## Tools
 

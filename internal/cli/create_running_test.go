@@ -67,7 +67,7 @@ func TestCreateRunningOpensBrowserURL(t *testing.T) {
 	out := new(bytes.Buffer)
 	cmd.SetOut(out)
 	cmd.SetErr(new(bytes.Buffer))
-	cmd.SetArgs([]string{"--provider", spritesProviderName, "create", fixtureDemo, "--running"})
+	cmd.SetArgs([]string{flagProvider, spritesProviderName, "create", fixtureDemo, "--running"})
 	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {
@@ -95,7 +95,7 @@ func TestCreateWithoutRunningDoesNotOpenBrowser(t *testing.T) {
 	cmd := NewRootCmd(reg)
 	cmd.SetOut(new(bytes.Buffer))
 	cmd.SetErr(new(bytes.Buffer))
-	cmd.SetArgs([]string{"--provider", spritesProviderName, "create", fixtureDemo})
+	cmd.SetArgs([]string{flagProvider, spritesProviderName, "create", fixtureDemo})
 	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 
 	if err := cmd.Execute(); err != nil {

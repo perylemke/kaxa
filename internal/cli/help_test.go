@@ -124,6 +124,17 @@ func TestRootHelpListsEveryCommandForASingleProvider(t *testing.T) {
 	}
 }
 
+func TestMCPHelpListsSubcommands(t *testing.T) {
+	t.Parallel()
+
+	help := helpOutput(t, allProvidersRegistry(t), "mcp")
+	got := helpSections(help)["Available Commands"]
+	want := []string{"config", "init", "start"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("mcp commands = %v, want %v\n%s", got, want, help)
+	}
+}
+
 func TestSubcommandKeepsPlainCommandList(t *testing.T) {
 	t.Parallel()
 

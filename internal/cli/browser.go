@@ -10,6 +10,12 @@ import (
 	"unicode"
 )
 
+const (
+	goosDarwin  = "darwin"
+	goosLinux   = "linux"
+	goosWindows = "windows"
+)
+
 var openBrowserFn = openBrowserURL
 
 var errUnsafeURL = errors.New("refusing to open a URL that is not a plain https address")
@@ -37,9 +43,9 @@ func browserCommand(goos, rawURL string) (string, []string, error) {
 		return "", nil, err
 	}
 	switch goos {
-	case "darwin":
+	case goosDarwin:
 		return "open", []string{rawURL}, nil
-	case "windows":
+	case goosWindows:
 		return "rundll32", []string{"url.dll,FileProtocolHandler", rawURL}, nil
 	default:
 		return "xdg-open", []string{rawURL}, nil
