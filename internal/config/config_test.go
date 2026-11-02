@@ -79,6 +79,7 @@ func TestLoadFromEnv(t *testing.T) {
 
 func TestLoadBlaxelFromEnv(t *testing.T) {
 	reg := testRegistry(t)
+	t.Setenv("KAXA_DEFAULT_PROVIDER", "")
 	t.Setenv("KAXA_BLAXEL_API_KEY", "bl-key")
 	t.Setenv("KAXA_BLAXEL_WORKSPACE", "kaxa")
 	t.Setenv("KAXA_BLAXEL_TEMPLATE", "blaxel/py-app:latest")
