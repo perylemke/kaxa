@@ -40,6 +40,10 @@ type Provider struct {
 	apiKey string
 	api    apiClient
 	tb     toolboxClient
+	// recent holds sandboxes this process created until they are deleted. Find
+	// can miss one whose labels are not visible yet; sync and destroy then use
+	// the Daytona id from here.
+	recent sync.Map
 
 	template string
 	// startTimeout and pollInterval bound the waits for a sandbox or an image.
@@ -161,9 +165,12 @@ func (p *Provider) Create(ctx context.Context, spec sandbox.Spec) (sandbox.ID, e
 	if err != nil {
 		return "", userErr(err, spec.Name, secrets...)
 	}
-	if _, err := p.waitRunning(ctx, c, rec); err != nil {
-		return "", errors.Join(userErr(err, spec.Name, secrets...), removeBest(ctx, c, rec.ID))
+	created := rec
+	rec, err = p.waitRunning(ctx, c, rec)
+	if err != nil {
+		return "", errors.Join(userErr(err, spec.Name, secrets...), removeBest(ctx, c, created.ID))
 	}
+	p.rememberRecord(spec.Name, rec)
 	return sandbox.ID(spec.Name), nil
 }
 
@@ -205,7 +212,7 @@ func (p *Provider) Inspect(ctx context.Context, id sandbox.ID) (sandbox.Detail, 
 	if err != nil {
 		return sandbox.Detail{}, err
 	}
-	rec, err := c.Find(ctx, string(id))
+	rec, err := p.resolveRecord(ctx, c, string(id))
 	if err != nil {
 		return sandbox.Detail{}, userErr(err, string(id), secrets...)
 	}
@@ -233,11 +240,41 @@ func (p *Provider) Destroy(ctx context.Context, id sandbox.ID) error {
 	if err != nil {
 		return err
 	}
-	rec, err := c.Find(ctx, string(id))
+	rec, err := p.resolveRecord(ctx, c, string(id))
 	if err != nil {
 		return userErr(err, string(id), secrets...)
 	}
-	return userErr(c.Delete(ctx, rec.ID), string(id), secrets...)
+	if err := c.Delete(ctx, rec.ID); err != nil {
+		return userErr(err, string(id), secrets...)
+	}
+	p.forgetRecord(string(id))
+	return nil
+}
+
+func (p *Provider) rememberRecord(name string, rec Record) {
+	p.recent.Store(name, rec)
+}
+
+func (p *Provider) forgetRecord(name string) {
+	p.recent.Delete(name)
+}
+
+// resolveRecord finds a sandbox by kaxa name. When the API read misses labels
+// that are not visible yet, it falls back to the record from Create in this process.
+func (p *Provider) resolveRecord(ctx context.Context, c apiClient, name string) (Record, error) {
+	rec, err := c.Find(ctx, name)
+	if err == nil {
+		return rec, nil
+	}
+	if !errors.Is(err, ErrNotFound) {
+		return Record{}, err
+	}
+	if v, ok := p.recent.Load(name); ok {
+		if stored, ok := v.(Record); ok {
+			return stored, nil
+		}
+	}
+	return Record{}, ErrNotFound
 }
 
 // clients returns the configured clients and the secrets to keep out of errors.

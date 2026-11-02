@@ -33,7 +33,7 @@ func (p *Provider) open(ctx context.Context, id sandbox.ID) (*session, error) {
 	if err != nil {
 		return nil, err
 	}
-	rec, err := c.Find(ctx, string(id))
+	rec, err := p.resolveRecord(ctx, c, string(id))
 	if err != nil {
 		return nil, userErr(err, string(id), secrets...)
 	}

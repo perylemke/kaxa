@@ -13,6 +13,10 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 - `--no-install` on `kaxa sync` and `kaxa create --sync` (and `no_install` on the MCP `sync_repository` and `create_sandbox`): the repository is copied and the toolchains are installed, and the dependency commands are printed for you to run.
 - Every sandbox has a `$HOME/workspace` directory, so `kaxa sync` works on a sandbox created without `--sync`. A Modal sandbox still needs `--sync`, because its tools image is chosen at create time.
 
+### Fixed
+
+- A failed `create --sync` on Daytona deletes the sandbox even when the API still cannot read it by name.
+
 ### Changed
 
 - The Go setup step downloads dependencies with `go mod download` instead of compiling with `go build`.
