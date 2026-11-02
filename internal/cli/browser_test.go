@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-const goosLinux = "linux"
-
 func TestBrowserCommand(t *testing.T) {
 	t.Parallel()
 
@@ -20,14 +18,14 @@ func TestBrowserCommand(t *testing.T) {
 		wantArgs []string
 		wantErr  bool
 	}{
-		{name: "darwin", goos: "darwin", url: good, wantName: "open", wantArgs: []string{good}},
-		{name: "linux", goos: goosLinux, url: good, wantName: "xdg-open", wantArgs: []string{good}},
-		{name: "windows avoids cmd", goos: "windows", url: good, wantName: "rundll32", wantArgs: []string{"url.dll,FileProtocolHandler", good}},
+		{name: goosDarwin, goos: goosDarwin, url: good, wantName: "open", wantArgs: []string{good}},
+		{name: goosLinux, goos: goosLinux, url: good, wantName: "xdg-open", wantArgs: []string{good}},
+		{name: "windows avoids cmd", goos: goosWindows, url: good, wantName: "rundll32", wantArgs: []string{"url.dll,FileProtocolHandler", good}},
 		{name: "http refused", goos: goosLinux, url: "http://demo.sprites.app/", wantErr: true},
-		{name: "file scheme", goos: "darwin", url: "file:///etc/passwd", wantErr: true},
+		{name: "file scheme", goos: goosDarwin, url: "file:///etc/passwd", wantErr: true},
 		{name: "javascript scheme", goos: goosLinux, url: "javascript:alert(1)", wantErr: true},
-		{name: "windows command separator", goos: "windows", url: "https://x.sprites.app/ & calc.exe", wantErr: true},
-		{name: "windows pipe", goos: "windows", url: "https://x.sprites.app/|calc.exe", wantErr: true},
+		{name: "windows command separator", goos: goosWindows, url: "https://x.sprites.app/ & calc.exe", wantErr: true},
+		{name: "windows pipe", goos: goosWindows, url: "https://x.sprites.app/|calc.exe", wantErr: true},
 		{name: "option injection", goos: goosLinux, url: "--help", wantErr: true},
 		{name: "userinfo", goos: goosLinux, url: "https://user:pw@x.sprites.app/", wantErr: true}, //gosec:disable G101 -- fixture: a URL with userinfo must be refused
 		{name: "newline", goos: goosLinux, url: "https://x.sprites.app/\nfoo", wantErr: true},

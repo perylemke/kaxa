@@ -42,4 +42,4 @@ Every command except `version` and `--help` loads configuration before it runs.
 | `kaxa upgrade` | [upgrade](upgrade.md) |
 | `kaxa snapshot` | [snapshot](snapshot.md) |
 | `kaxa url` | [url](url.md) |
-| `kaxa mcp` | [mcp](agent.md) |
+| `kaxa mcp` (`start`, `init`, `config`) | [mcp](agent.md) |

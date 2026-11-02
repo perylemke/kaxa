@@ -8,6 +8,10 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 
 ## [Unreleased]
 
+### Added
+
+- `kaxa mcp start` serves the MCP server, `kaxa mcp init` writes it into claude, cursor, gemini, or windsurf, and `kaxa mcp config` prints that client entry. `kaxa mcp` still serves the server.
+
 ## [0.1.0] - 2026-11-02
 
 ### Added

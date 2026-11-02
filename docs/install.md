@@ -18,7 +18,7 @@ brew uninstall --cask kaxa
 
 The cask downloads the darwin archive of the release (arm64 or amd64) and checks its SHA-256 before it installs anything. The hash comes from the same GoReleaser run that publishes `checksums.txt`. Homebrew stops when the download does not match.
 
-Homebrew links the binary at `$(brew --prefix)/bin/kaxa`, for example `/opt/homebrew/bin/kaxa` on Apple Silicon and `/usr/local/bin/kaxa` on Intel. Use that absolute path as `command` in a desktop MCP client; see [mcp](agent.md).
+Homebrew links the binary at `$(brew --prefix)/bin/kaxa`, for example `/opt/homebrew/bin/kaxa` on Apple Silicon and `/usr/local/bin/kaxa` on Intel. `kaxa mcp init` and `kaxa mcp config` run the command `kaxa` and put that Homebrew directory on `PATH`. A desktop client that does not use that entry needs the absolute path as `command`. See [mcp](agent.md).
 
 Only final versions (`vX.Y.Z`) update the cask. Test versions (`vX.Y.Z-alpha.N`, `-beta.N`, `-rc.N`) never reach Homebrew, so `brew install` and `brew upgrade` always give you a final release. To try a test version, install it remotely as described in [Test versions](#test-versions).
 
