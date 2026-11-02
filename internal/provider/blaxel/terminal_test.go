@@ -91,10 +91,15 @@ func TestTerminalBridgeExchangesFrames(t *testing.T) {
 
 	resize := make(chan sandbox.TermSize, 1)
 	resize <- sandbox.TermSize{Rows: 40, Cols: 120}
+	// Leave stdin open. EOF sends a close frame, and that frame can arrive
+	// before the resize, which makes the server exit with no output.
+	pr, pw := io.Pipe()
+	t.Cleanup(func() { _ = pw.Close() })
+	go func() { _, _ = pw.Write([]byte("id\n")) }()
 	s := &sdkClient{apiKey: key, workspace: "kaxa", termDial: got.dial(srv, key)}
 	var stdout strings.Builder
 	err := s.attachTerminal(t.Context(), "https://"+sandboxHost, termSpec{
-		dir: blaxelHome, stdin: strings.NewReader("id\n"), stdout: &stdout, resize: resize,
+		dir: blaxelHome, stdin: pr, stdout: &stdout, resize: resize,
 	})
 	if err != nil {
 		t.Fatal(err)
