@@ -80,6 +80,21 @@ func (p *Provider) RepoExists(ctx context.Context, id sandbox.ID, repo string) (
 	return false, mapped
 }
 
+// PrepareWorkspace creates /home/sprite/workspace.
+func (p *Provider) PrepareWorkspace(ctx context.Context, id sandbox.ID) error {
+	if err := validateName(string(id)); err != nil {
+		return err
+	}
+	c, token, err := p.clientAndToken()
+	if err != nil {
+		return err
+	}
+	if _, err := runRemote(ctx, c, string(id), token, []string{argvMkdir, "-p", workspaceDir}); err != nil {
+		return fmt.Errorf("create workspace: %w", err)
+	}
+	return nil
+}
+
 // SyncWorkspace extracts a gzip tar from archive into /home/sprite/workspace.
 func (p *Provider) SyncWorkspace(ctx context.Context, id sandbox.ID, archive io.Reader) error {
 	if err := validateName(string(id)); err != nil {

@@ -39,6 +39,7 @@ A snapshot ID is one segment of letters, digits, dots, underscores, and hyphens.
 | Sprites | In place: the same sandbox returns to the snapshot state and what changed after it is lost | Rejected | A checkpoint, such as `v7` |
 | Modal | New sandbox: kaxa creates the sandbox named by `--to` and keeps the source | Required | A filesystem image, such as `im-...` |
 | Docker | New sandbox: kaxa creates the sandbox named by `--to` and keeps the source | Required | A disk snapshot, such as `0abc...` |
+| Daytona | New sandbox: kaxa creates the sandbox named by `--to` and keeps the source | Required | A disk image, such as `kaxa-my-box-20261101T183005Z` |
 
 `kaxa mcp` reports this as `snapshot_restore` (`in_place` or `new_sandbox`) in `list_providers`, so a new provider only has to declare its mode.
 
@@ -53,7 +54,7 @@ kaxa snapshot restore my-sprite v7 --provider sprites
 kaxa snapshot delete my-sprite v7 --provider sprites
 ```
 
-A Sprites checkpoint does not include `/tmp`, which is in memory. Keep what you want to save under `/home/sprite`, `/opt`, or `/var`. Modal and Docker snapshots hold the whole filesystem. E2B has no snapshots in kaxa yet: `snapshot` prints that they are not available and names the providers that have them.
+A Sprites checkpoint does not include `/tmp`, which is in memory. Keep what you want to save under `/home/sprite`, `/opt`, or `/var`. Modal, Docker, and Daytona snapshots hold the whole filesystem. E2B has no snapshots in kaxa yet: `snapshot` prints that they are not available and names the providers that have them.
 
 Deleting a checkpoint uses `DELETE /v1/sprites/{name}/checkpoints/{id}`. That route is not in the public Sprites API reference, so a failure names the status code. `create` finds the new checkpoint by listing before and after, because the create stream does not return its ID.
 
@@ -94,13 +95,30 @@ Docker does not restore in place. `restore` forks a new sandbox from the snapsho
 - Docker refuses to delete a snapshot while a sandbox restored from it is still running, or while the snapshot is still being created. `snapshot delete` then says so; destroy the restored sandbox first.
 - Snapshots count against your Docker storage until you run `snapshot delete`.
 
+### Daytona
+
+```bash
+kaxa snapshot create my-box --comment "before the upgrade" --provider daytona
+kaxa snapshot list my-box --provider daytona
+kaxa snapshot restore my-box kaxa-my-box-20261101T183005Z --to my-box-copy --provider daytona
+kaxa snapshot delete my-box kaxa-my-box-20261101T183005Z --provider daytona
+```
+
+Daytona does not restore in place. `restore` forks a new sandbox from the snapshot, so `--to` is required and must differ from the source. The source and the snapshot stay.
+
+- `create` captures the disk as an image; running processes and memory are not captured. It waits until the image is ready, and removes one that failed.
+- The image is named `kaxa-<sandbox>-<timestamp>`. That name is how kaxa tells its images, and the sandbox they belong to, from yours: `list`, `restore`, and `delete` ignore any other image in the account.
+- Daytona keeps the images server side, so `list` shows those taken from any machine and works after the sandbox was destroyed. The comment and the labels of the source sandbox live in `daytona-snapshots.json` under your user config directory, so they show only on the machine that took the snapshot; without them the snapshot still restores.
+- Daytona refuses to delete an image that a sandbox still uses; `snapshot delete` then says so, and you destroy that sandbox first.
+- Images count against your Daytona storage until you run `snapshot delete`.
+
 ## destroy keeps snapshots
 
-`kaxa destroy` does not delete snapshots. On Modal and Docker a snapshot is the way to recover a sandbox that has finished, so it stays until you run `snapshot delete`, or on Modal until Modal expires it. Sprites checkpoints belong to the sprite and go with it when you destroy it.
+`kaxa destroy` does not delete snapshots. On Modal, Docker, and Daytona a snapshot is the way to recover a sandbox that has finished, so it stays until you run `snapshot delete`, or on Modal until Modal expires it. Sprites checkpoints belong to the sprite and go with it when you destroy it.
 
 ## Security
 
-A snapshot copies the whole filesystem. Secrets written inside the sandbox, such as tokens in a file or in shell history, are stored in the snapshot and come back on restore. Do not put secrets in the comment. kaxa never prints Sprites, Modal, or Docker tokens in messages or errors.
+A snapshot copies the whole filesystem. Secrets written inside the sandbox, such as tokens in a file or in shell history, are stored in the snapshot and come back on restore. Do not put secrets in the comment. kaxa never prints Sprites, Modal, Docker, or Daytona tokens in messages or errors.
 
 ## Agents
 

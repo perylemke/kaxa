@@ -75,19 +75,60 @@ func TestSyncWithoutProjectFilesSkipsInstall(t *testing.T) {
 	}
 }
 
-func TestSyncRequiresSyncLabel(t *testing.T) {
+// gatedProvider only has a workspace when the sandbox was created with sync.
+type gatedProvider struct{ *syncProvider }
+
+func (gatedProvider) SyncRequiresCreate() bool { return true }
+
+func TestSyncAcceptsSandboxCreatedWithoutSync(t *testing.T) {
 	t.Parallel()
 
 	p, rec := newSyncProvider()
 	p.labels = []string{"kaxa"}
 	root, name := gitRepo(t)
 
-	_, err := lifecycle.Sync(context.Background(), p, lifecycle.SyncRequest{Name: boxName, Root: root, Repo: name}, nil)
+	res, err := lifecycle.Sync(context.Background(), p, lifecycle.SyncRequest{Name: boxName, Root: root, Repo: name}, nil)
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	if !rec.synced || res.WorkDir == "" {
+		t.Fatalf("synced = %v result = %+v", rec.synced, res)
+	}
+}
+
+func TestSyncRequiresSyncLabel(t *testing.T) {
+	t.Parallel()
+
+	p, rec := newSyncProvider()
+	gated := gatedProvider{p}
+	p.labels = []string{"kaxa"}
+	root, name := gitRepo(t)
+
+	_, err := lifecycle.Sync(context.Background(), gated, lifecycle.SyncRequest{Name: boxName, Root: root, Repo: name}, nil)
 	if err == nil || !strings.Contains(err.Error(), "was not created with sync") {
 		t.Fatalf("err = %v", err)
 	}
-	if rec.synced || len(rec.destroyed) != 0 {
-		t.Fatalf("synced = %v destroyed = %v", rec.synced, rec.destroyed)
+	if rec.synced {
+		t.Fatal("archive was copied into a sandbox without a workspace")
+	}
+}
+
+func TestSyncNoInstallSkipsCommands(t *testing.T) {
+	t.Parallel()
+
+	p, rec := newSyncProvider()
+	root, name := gitRepo(t)
+	writeFile(t, root, "go.mod", "module example.com/demo\n\ngo 1.27\n")
+
+	res, err := lifecycle.Sync(context.Background(), p, lifecycle.SyncRequest{Name: boxName, Root: root, Repo: name, NoInstall: true}, nil)
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	if len(rec.setupSteps) != 1 || len(rec.setupSteps[0].Commands) != 0 {
+		t.Fatalf("setup steps = %+v", rec.setupSteps)
+	}
+	if len(res.Skipped) != 1 || !slices.Equal(res.Skipped[0], []string{"go", "mod", "download"}) {
+		t.Fatalf("skipped = %v", res.Skipped)
 	}
 }
 

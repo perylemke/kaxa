@@ -30,6 +30,10 @@ func isProbe(req e2b.StartRequest) bool {
 func serviceScript(probes *int, ready int, service *fakeProc) func(e2b.StartRequest) *fakeProc {
 	return func(req e2b.StartRequest) *fakeProc {
 		if !isProbe(req) {
+			// The workspace directory is created before the service starts.
+			if slices.Contains(req.Args, "mkdir") {
+				return exited(0)
+			}
 			return service
 		}
 		*probes++

@@ -26,23 +26,25 @@ A client started from a terminal inherits your `PATH`, so `command` can be `kaxa
 
 `sync` uses the working directory of the `kaxa mcp` process, not the directory that contains the binary. The repository must contain that working directory or sit below it, and kaxa refuses a working directory that is the filesystem root or your home directory, because either would allow every repository you have. A client started from the desktop may start the server in your home directory, so fix the directory yourself: set `cwd` when the client has that field, or `cd` in the command as the Cursor example below does. Pick a folder that holds the repositories you want to copy, such as `/Users/you/workspace`, and pass `dir` to name the repository.
 
-The tokens stay in the environment of that process. Put `KAXA_DEFAULT_PROVIDER` and the token of each provider you use in the client's `env` block: `KAXA_SPRITES_TOKEN` for Sprites, `KAXA_MODAL_TOKEN_ID` with `KAXA_MODAL_TOKEN_SECRET` for Modal, `KAXA_E2B_API_KEY` for E2B, and `KAXA_DOCKER_ID` with `KAXA_DOCKER_PAT` for Docker. Do not commit a file that contains a token, and do not paste a token into a prompt. See [Sprites account and token](sprites-account.md), [Modal account and token](modal-account.md), [E2B account and API key](e2b-account.md), and [Docker Sandboxes](docker-account.md). `--provider` on the command also sets the default.
+The tokens stay in the environment of that process. Put `KAXA_DEFAULT_PROVIDER` and the token of each provider you use in the client's `env` block: `KAXA_SPRITES_TOKEN` for Sprites, `KAXA_MODAL_TOKEN_ID` with `KAXA_MODAL_TOKEN_SECRET` for Modal, `KAXA_E2B_API_KEY` for E2B, `KAXA_DOCKER_ID` with `KAXA_DOCKER_PAT` for Docker, and `KAXA_DAYTONA_API_KEY` for Daytona. Do not commit a file that contains a token, and do not paste a token into a prompt. See [Sprites account and token](sprites-account.md), [Modal account and token](modal-account.md), [E2B account and API key](e2b-account.md), [Docker Sandboxes](docker-account.md), and [Daytona](daytona-account.md). `--provider` on the command also sets the default.
 
 A bare `KEY` in `api_env` copies a variable from the `kaxa mcp` environment, so an agent could ask for any secret that environment holds. kaxa refuses it unless the name is in `KAXA_MCP_API_ENV`, a comma-separated list that you set in the same `env` block, for example `"KAXA_MCP_API_ENV": "DATABASE_URL,REDIS_URL"`. Without it, the agent can only pass `KEY=VALUE`.
 
-After the server is connected, ask the agent to call `list_providers`. Sprites, Modal, E2B, and Docker are available. Each provider reports the features it supports as `capabilities`; any feature not listed below is false.
+After the server is connected, ask the agent to call `list_providers`. Sprites, Modal, E2B, Docker, and Daytona are available. Each provider reports the features it supports as `capabilities`; any feature not listed below is false.
 
 | Provider | Supports | `capabilities` true |
 | --- | --- | --- |
 | Modal | create (with `sync`), list, inspect, exec, snapshots, destroy | `sync`, `setup`, `workspace_layout`, `snapshot` |
 | E2B | create (with `sync` and `api`), list, inspect, exec, restart, destroy | `sync`, `setup`, `api`, `workspace_layout`, `restart` |
 | Docker | create (with `sync`, `template`, and `api`), list, inspect, exec, restart, snapshots, destroy | `sync`, `setup`, `api`, `workspace_layout`, `restart`, `template`, `snapshot` |
+| Daytona | create (with `sync`, `template`, and `api`), list, inspect, exec, restart, snapshots, destroy | `sync`, `setup`, `api`, `workspace_layout`, `restart`, `template`, `snapshot` |
 
 What to expect from `exec` and the other tools on each provider:
 
 - **Modal:** commands start in the image root. A sandbox created with `sync` runs them as the `modal` user in `/home/modal/workspace`.
-- **E2B:** commands run as `user`, starting in `/home/user`, or in `/home/user/workspace` when the sandbox was created with `sync`.
-- **Docker:** it works through the Docker Sandboxes API. Set `KAXA_DOCKER_ID` and `KAXA_DOCKER_PAT` in the environment of `kaxa mcp`, and `KAXA_DOCKER_TEMPLATE` for a default template. Commands run as `agent`, starting where the image starts, or in `/home/agent/workspace` when the sandbox was created with `sync`. `api` publishes one HTTP service on a URL that Docker chooses, and anyone with the URL can call it. A Docker sandbox is billed to your Docker subscription while it runs.
+- **E2B:** commands run as `user`, starting in `/home/user`, or in `/home/user/workspace` when the sandbox was created with `sync`. The toolchain `PATH` is set either way, and every sandbox has a workspace, so `sync_repository` works without `sync` at create time.
+- **Daytona:** it works through the Daytona API. Set `KAXA_DAYTONA_API_KEY` in the environment of `kaxa mcp`, and `KAXA_DAYTONA_TEMPLATE` for a default template. Commands run as `daytona`, starting where the image starts, or in `/home/daytona/workspace` when the sandbox was created with `sync`. The toolchain `PATH` is set either way, and every sandbox has a workspace. `api` makes one port public on a preview URL, and anyone with the URL can call it. A Daytona sandbox is billed to your Daytona account while it runs.
+- **Docker:** it works through the Docker Sandboxes API. Set `KAXA_DOCKER_ID` and `KAXA_DOCKER_PAT` in the environment of `kaxa mcp`, and `KAXA_DOCKER_TEMPLATE` for a default template. Commands run as `agent`, starting where the image starts, or in `/home/agent/workspace` when the sandbox was created with `sync`. The toolchain `PATH` is set either way, and every sandbox has a workspace. `api` publishes one HTTP service on a URL that Docker chooses, and anyone with the URL can call it. A Docker sandbox is billed to your Docker subscription while it runs.
 
 ### Cursor
 
@@ -121,7 +123,7 @@ On macOS the file is `~/Library/Application Support/Claude/claude_desktop_config
 
 ### Gemini CLI
 
-User config is `~/.gemini/settings.json`. Project config is `.gemini/settings.json`. `env` values expand `$KAXA_SPRITES_TOKEN` and `${KAXA_SPRITES_TOKEN}`, and the Modal, E2B, and Docker variables the same way, from the environment that launches Gemini. Set `cwd` to the project, or to a folder that holds the repositories you want to copy, so `sync` can see them. It cannot be your home directory or `/`.
+User config is `~/.gemini/settings.json`. Project config is `.gemini/settings.json`. `env` values expand `$KAXA_SPRITES_TOKEN` and `${KAXA_SPRITES_TOKEN}`, and the Modal, E2B, Docker, and Daytona variables the same way, from the environment that launches Gemini. Set `cwd` to the project, or to a folder that holds the repositories you want to copy, so `sync` can see them. It cannot be your home directory or `/`.
 
 ```json
 {
@@ -263,7 +265,7 @@ On a sandbox created with `sync`, the command starts in the provider workspace d
 | `snapshot_restore` | Provider | `target` | Effect |
 | --- | --- | --- | --- |
 | `in_place` | Sprites | Rejected | Overwrites the sandbox and discards what changed after the snapshot |
-| `new_sandbox` | Modal, Docker | Required, and different from `name` | Creates `target` from the snapshot and keeps the source |
+| `new_sandbox` | Modal, Docker, Daytona | Required, and different from `name` | Creates `target` from the snapshot and keeps the source |
 
 The result has `sandbox` (the one that holds the restored state), `snapshot`, `provider`, and `status`. `restore_snapshot` and `delete_snapshot` are marked destructive so a client can ask first; call them only when the user asks. A snapshot holds everything in the sandbox, including secrets written there. Modal snapshots are kept for 30 days and are listed only on the machine that took them. Docker snapshots are kept until deleted and are listed from any machine. See [snapshot](snapshot.md).
 
@@ -273,7 +275,7 @@ The result has `sandbox` (the one that holds the restored state), `snapshot`, `p
 - `sync_repository` adds a repository but never refreshes one. To send new local changes, create a new sandbox or move the code with `git` inside `exec`.
 - `sync` and `sync_repository` copy only a repository that contains the server working directory or sits below it. This keeps a prompt from sending an unrelated repository to a remote provider. Start `kaxa mcp` from the project, or pass a `dir` inside it. A symlink that leaves the working directory is rejected. The server refuses to start sync when its working directory is the filesystem root or your home directory, because that would allow every repository under it; set `cwd` to the project.
 - Network policy and connectors are not exposed. Use the provider's own tools for them. Memory snapshots are not supported.
-- `destroy` is permanent, and its tool is marked destructive so a client can ask first. On Modal and Docker it does not delete snapshots, which outlive the sandbox; on Sprites the checkpoints are destroyed with the sprite.
+- `destroy` is permanent, and its tool is marked destructive so a client can ask first. On Modal, Docker, and Daytona it does not delete snapshots, which outlive the sandbox; on Sprites the checkpoints are destroyed with the sprite.
 
 ## Errors
 

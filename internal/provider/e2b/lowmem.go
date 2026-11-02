@@ -34,9 +34,6 @@ func downloadArgv(kind project.Kind, argv []string) []string {
 	if len(argv) < 2 || argv[1] != "build" {
 		return append([]string(nil), argv...)
 	}
-	if kind == project.KindGo {
-		return []string{argv[0], "mod", "download"}
-	}
 	if kind == project.KindRust {
 		return append([]string{argv[0], "fetch"}, argv[2:]...)
 	}

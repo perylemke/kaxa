@@ -116,6 +116,8 @@ func TestSyncRequiresOneSandboxName(t *testing.T) {
 	}
 }
 
+func (repoSyncProvider) SyncRequiresCreate() bool { return true }
+
 func TestSyncRejectsSandboxWithoutWorkspace(t *testing.T) {
 	initGitRepo(t)
 
@@ -232,5 +234,23 @@ func TestRootHelpListsSync(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), testCmdSync) {
 		t.Fatalf("help should list sync: %s", out.String())
+	}
+}
+
+func TestSyncNoInstallSkipsCommandsAndPrintsThem(t *testing.T) {
+	repo := initGitRepo(t)
+	writeGoMod(t)
+
+	fp := newRepoSyncProvider("kaxa", sandbox.SyncLabel)
+	_, out, err := runSync(t, fp, testNoInstallFlag, testBoxName)
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if len(fp.setupSteps) != 1 || len(fp.setupSteps[0].Commands) != 0 {
+		t.Fatalf("steps = %#v, want the toolchain step without commands", fp.setupSteps)
+	}
+	text := out.String()
+	if !strings.Contains(text, "dependencies were not installed") || !strings.Contains(text, "go mod download") || !strings.Contains(text, filepath.Base(repo)) {
+		t.Fatalf("output = %q", text)
 	}
 }

@@ -34,6 +34,18 @@ func (p *Provider) RepoDir(repo string) (string, error) {
 	return workspaceDir + "/" + repo, nil
 }
 
+// PrepareWorkspace creates /home/agent/workspace.
+func (p *Provider) PrepareWorkspace(ctx context.Context, id sandbox.ID) error {
+	s, err := p.open(ctx, id)
+	if err != nil {
+		return err
+	}
+	if _, err := s.capture(ctx, "", nil, []string{"mkdir", "-p", workspaceDir}, nil); err != nil {
+		return fmt.Errorf("create workspace: %w", err)
+	}
+	return nil
+}
+
 // SyncWorkspace extracts a gzip tar from archive into /home/agent/workspace.
 // The archive is streamed to tar on standard input of a process in the
 // sandbox; nothing is mounted from the host.

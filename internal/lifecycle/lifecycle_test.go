@@ -23,16 +23,17 @@ const (
 )
 
 type recorder struct {
-	created   sandbox.Spec
-	destroyed []sandbox.ID
-	synced    bool
-	setups    int
-	published bool
-	workDir   string
-	port      int
-	env       []string
-	publicSet bool
-	steps     []string
+	created    sandbox.Spec
+	destroyed  []sandbox.ID
+	synced     bool
+	setups     int
+	published  bool
+	workDir    string
+	port       int
+	env        []string
+	publicSet  bool
+	steps      []string
+	setupSteps []project.Step
 }
 
 type basicProvider struct{ rec *recorder }
@@ -67,6 +68,8 @@ type fullProvider struct {
 	publicErr  error
 }
 
+func (f *fullProvider) PrepareWorkspace(context.Context, sandbox.ID) error { return nil }
+
 func (f *fullProvider) SyncWorkspace(_ context.Context, _ sandbox.ID, archive io.Reader) error {
 	if archive != nil {
 		if _, err := io.Copy(io.Discard, archive); err != nil {
@@ -78,9 +81,10 @@ func (f *fullProvider) SyncWorkspace(_ context.Context, _ sandbox.ID, archive io
 	return f.syncErr
 }
 
-func (f *fullProvider) SetupProjects(context.Context, sandbox.ID, string, []project.Step) error {
+func (f *fullProvider) SetupProjects(_ context.Context, _ sandbox.ID, _ string, steps []project.Step) error {
 	f.rec.setups++
 	f.rec.steps = append(f.rec.steps, "setup")
+	f.rec.setupSteps = append([]project.Step(nil), steps...)
 	return f.setupErr
 }
 

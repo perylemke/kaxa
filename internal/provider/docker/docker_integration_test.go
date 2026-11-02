@@ -323,7 +323,7 @@ func TestCreateWithAPIPublishesThePort(t *testing.T) {
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if len(f.cmds) < 2 || !slices.Contains(f.cmds[0], "uvicorn") || f.cmds[1][0] != "bash" {
+	if len(f.cmds) < 3 || !slices.Contains(f.cmds[0], "mkdir") || !slices.Contains(f.cmds[1], "uvicorn") || f.cmds[2][0] != "bash" {
 		t.Fatalf("commands = %v, want the service and then the probe", f.cmds)
 	}
 }

@@ -22,9 +22,9 @@ import (
 
 const instructions = `Run work in an isolated sandbox instead of on the host.
 1. Call list_providers and pick a provider that is available.
-2. create_sandbox with sync=true copies the local Git repository and installs its dependencies. The response work_dir is where the code lives inside the sandbox.
+2. create_sandbox with sync=true copies the local Git repository and installs its dependencies. no_install skips the dependency commands and lists them in skipped_commands. The response work_dir is where the code lives inside the sandbox.
 3. Run builds, tests and edits with exec (argv, no shell). exec starts above the repository, so run project commands from work_dir, for example ["bash", "-c", "cd <work_dir> && go test ./..."]. Files you change with local editor tools are not in the sandbox, and files changed in the sandbox are not copied back.
-4. To add another Git repository to a sandbox that was created with sync, call sync_repository. It never replaces a directory.
+4. To add another Git repository, call sync_repository. It works on any sandbox except a Modal sandbox that was not created with sync, and it never replaces a directory. no_install copies the repository and installs the toolchains without running the dependency commands.
 5. To save a sandbox state, call create_snapshot; list_snapshots shows the ids, the sandbox and the provider of each snapshot. restore_snapshot either overwrites the sandbox (snapshot_restore in_place) or creates a new one named by target (new_sandbox).
 6. Call destroy, delete_snapshot, or restore_snapshot on an in_place provider only when the user asks for it.`
 

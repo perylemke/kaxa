@@ -40,6 +40,18 @@ func (p *Provider) RepoDir(repo string) (string, error) {
 	return workspaceDir + "/" + repo, nil
 }
 
+// PrepareWorkspace creates /home/user/workspace.
+func (p *Provider) PrepareWorkspace(ctx context.Context, id sandbox.ID) error {
+	s, err := p.open(ctx, id)
+	if err != nil {
+		return err
+	}
+	if _, err := s.capture(ctx, "", nil, []string{"mkdir", "-p", workspaceDir}, nil); err != nil {
+		return fmt.Errorf("create workspace: %w", err)
+	}
+	return nil
+}
+
 // SyncWorkspace extracts a gzip tar from archive into /home/user/workspace.
 // The archive is first uploaded to a temporary file, since the daemon takes a
 // whole file and not a stream of input.

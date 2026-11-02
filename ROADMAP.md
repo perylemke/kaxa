@@ -7,7 +7,7 @@ Tracked work for **kaxa**. Each item links to a GitHub issue.
 - [X] [#5 — Implement the Modal provider](https://github.com/perylemke/kaxa/issues/5)
 - [X] [#9 — Add gosec to CI](https://github.com/perylemke/kaxa/issues/9)
 - [X] [#15 — Implement the Docker Sandboxes provider](https://github.com/perylemke/kaxa/issues/15)
-- [ ] [#16 — Implement the Daytona provider](https://github.com/perylemke/kaxa/issues/16)
+- [X] [#16 — Implement the Daytona provider](https://github.com/perylemke/kaxa/issues/16)
 - [X] [#17 — Implement the E2B provider](https://github.com/perylemke/kaxa/issues/17)
 - [ ] [#18 — Add the ui command to manage sandboxes in the browser](https://github.com/perylemke/kaxa/issues/18)
 - [X] [#19 — Distribute the CLI as a Homebrew cask](https://github.com/perylemke/kaxa/issues/19)

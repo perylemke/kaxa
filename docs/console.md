@@ -16,7 +16,7 @@ kaxa ssh my-sprite
 
 The remote exit code is the kaxa exit code, from 0 through 255.
 
-On a sandbox created with `--sync`, the shell starts in `/home/sprite/workspace`. Other sandboxes start in the sprite home. On Modal, a sandbox created with `--sync` opens the shell as the `modal` user in `/home/modal/workspace`.
+On a sandbox created with `--sync`, the shell starts in `/home/sprite/workspace`. Other sandboxes start in the sprite home. The toolchain `PATH` is set either way. On Modal, a sandbox created with `--sync` opens the shell as the `modal` user in `/home/modal/workspace`.
 
 ## E2B
 
@@ -48,3 +48,10 @@ Pick the provider with `--provider docker`. kaxa opens a process with a terminal
 kaxa --provider docker console my-box
 ```
 
+## Daytona
+
+Pick the provider with `--provider daytona`. kaxa opens a process with a terminal in the sandbox in the sandbox, sizes it from your window and follows resizing. The shell runs as `daytona`, and the first line you see may be the echo of the command kaxa sends to start it. A stopped sandbox is started first.
+
+```bash
+kaxa --provider daytona console my-box
+```

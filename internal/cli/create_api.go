@@ -27,6 +27,8 @@ type createFlags struct {
 	Public  bool
 	// Template is the template to start from (E2B). Empty means the default.
 	Template string
+	// NoInstall copies the repository without running the dependency commands.
+	NoInstall bool
 }
 
 func applyAPIFlags(req *createRequest, flags createFlags, portSet bool) error {

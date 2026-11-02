@@ -22,6 +22,7 @@ const testPlain = "plain"
 
 // fakeProvider implements every optional interface.
 type fakeProvider struct {
+	setupSteps  []project.Step
 	name        string
 	unavailable bool
 
@@ -102,6 +103,8 @@ func (f *fakeProvider) Destroy(_ context.Context, id sandbox.ID) error {
 	return nil
 }
 
+func (f *fakeProvider) PrepareWorkspace(context.Context, sandbox.ID) error { return nil }
+
 func (f *fakeProvider) SyncWorkspace(_ context.Context, _ sandbox.ID, archive io.Reader) error {
 	if archive != nil {
 		if _, err := io.Copy(io.Discard, archive); err != nil {
@@ -112,7 +115,8 @@ func (f *fakeProvider) SyncWorkspace(_ context.Context, _ sandbox.ID, archive io
 	return f.syncErr
 }
 
-func (f *fakeProvider) SetupProjects(context.Context, sandbox.ID, string, []project.Step) error {
+func (f *fakeProvider) SetupProjects(_ context.Context, _ sandbox.ID, _ string, steps []project.Step) error {
+	f.setupSteps = steps
 	return nil
 }
 

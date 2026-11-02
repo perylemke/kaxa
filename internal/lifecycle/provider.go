@@ -14,6 +14,7 @@ const (
 	modalProvider   = "modal"
 	e2bProvider     = "e2b"
 	dockerProvider  = "docker"
+	daytonaProvider = "daytona"
 )
 
 type tokenConfigurer interface {
@@ -79,8 +80,26 @@ func configureProvider(p sandbox.Provider, name string, cfg config.Config) error
 		if err := configureDocker(p, cfg.Docker); err != nil {
 			return err
 		}
+	case daytonaProvider:
+		if err := configureDaytona(p, cfg.Daytona); err != nil {
+			return err
+		}
 	}
 
+	return nil
+}
+
+func configureDaytona(p sandbox.Provider, cfg config.DaytonaConfig) error {
+	c, ok := p.(tokenConfigurer)
+	if !ok {
+		return fmt.Errorf("daytona provider %T does not support Configure", p)
+	}
+	if err := c.Configure(cfg.APIKey); err != nil {
+		return err
+	}
+	if d, ok := p.(templateDefaulter); ok {
+		return d.SetDefaultTemplate(cfg.Template)
+	}
 	return nil
 }
 

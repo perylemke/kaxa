@@ -40,6 +40,14 @@ func (e *UnsupportedError) Unwrap() error {
 	return ErrUnsupported
 }
 
+// SyncRequiresCreate marks a provider whose sandbox only has a workspace when it
+// was created with sync. Modal is the one: its tools image, which holds the
+// workspace, is chosen at create time. Other providers prepare the workspace
+// for every sandbox, so sync works on them either way.
+type SyncRequiresCreate interface {
+	SyncRequiresCreate() bool
+}
+
 // WorkspaceLayout reports where a provider keeps files inside a sandbox.
 type WorkspaceLayout interface {
 	// HomeDir is the default working directory of a sandbox.

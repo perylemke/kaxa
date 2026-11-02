@@ -10,9 +10,24 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 
 ### Added
 
+- `--no-install` on `kaxa sync` and `kaxa create --sync` (and `no_install` on the MCP `sync_repository` and `create_sandbox`): the repository is copied and the toolchains are installed, and the dependency commands are printed for you to run.
+- Every sandbox has a `$HOME/workspace` directory, so `kaxa sync` works on a sandbox created without `--sync`. A Modal sandbox still needs `--sync`, because its tools image is chosen at create time.
+
+### Fixed
+
+- A failed `create --sync` on Daytona deletes the sandbox even when the API still cannot read it by name.
+
+### Changed
+
+- The Go setup step downloads dependencies with `go mod download` instead of compiling with `go build`.
+- `exec` and `console` set the toolchain `PATH` in every sandbox, not only in one created with `--sync`.
+
+### Added
+
 - Sandbox providers: Fly.io Sprites, Modal, and E2B, behind one CLI. E2B supports create (with `--sync` and `--api`), list, exec, console, restart, sync, and destroy, and reads `KAXA_E2B_API_KEY`.
   - E2B sandboxes can start from your own template with `create --template`, `KAXA_E2B_TEMPLATE`, or `template` in the MCP `create_sandbox`.
 - Docker Sandboxes in Docker's cloud as the `docker` provider, through the experimental Docker Sandboxes API and a Docker ID with a personal access token (`KAXA_DOCKER_ID`, `KAXA_DOCKER_PAT`). It supports create (with `--sync`, `--template`, and `--api`), list, exec, console, restart, sync, snapshot, and destroy, starts from `KAXA_DOCKER_TEMPLATE` or `--template`, and needs a Docker Agentic Platform subscription. `create --api` starts an HTTP service and publishes its port on a Docker URL. `snapshot` saves the disk of a sandbox and restores it into a new sandbox with `--to`; Docker keeps the snapshots until `snapshot delete`, and kaxa lists only its own. A restored sandbox is recorded in `docker-restored.json` in the kaxa config directory, because Docker gives it no labels, so it is visible only on the machine that restored it.
+- Daytona sandboxes as the `daytona` provider, through the official Daytona Go SDK, with an API key (`KAXA_DAYTONA_API_KEY`). It supports create (with `--sync`, `--template`, and `--api`), list, exec, console, restart, sync, snapshot, and destroy, and starts from `KAXA_DAYTONA_TEMPLATE` or `--template`. Sandboxes are persistent, so files survive a stop. `create --api` starts an HTTP service and makes its port public on a Daytona preview URL. `snapshot` captures the disk as an image and restores it into a new sandbox with `--to`; kaxa lists only its own images, and keeps the comments in `daytona-snapshots.json` in the kaxa config directory. A template is the name of a Daytona snapshot. The live tests pass against the real service.
 - `kaxa mcp`, which serves sandboxes to AI agents over the Model Context Protocol.
 - Toolchain installation in Sprites sandboxes.
 - Sandbox snapshots: create, list, restore, and delete.
@@ -30,7 +45,7 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 - Configuration is read from environment variables only; Viper was removed.
 - `kaxa --help` lists every command in one `Commands:` list, whichever providers implement it. Command help splits `Flags:` from `Provider flags:`, and `--provider` names the registered providers.
 - The project was renamed from `sbox` to `kaxa`.
-- `kaxa create --api` names who can open the URL by provider: Sprites asks for a Sprites account, E2B is public, and Docker says nothing, instead of always saying "requires a Sprites account".
+- `kaxa create --api` names who can open the URL by provider: Sprites asks for a Sprites account, E2B and Daytona are public, and Docker says nothing, instead of always saying "requires a Sprites account".
 - `--api-env` and `api_env` reject names starting with `MODAL_TOKEN_`, `FLY_`, or `SPRITES_` as well as `KAXA_`.
 - GitHub Actions are pinned to commit SHAs, the release job runs in the `release` environment with a read-only default token, and the Homebrew token reaches only the step that needs it.
 - The Modal base image is pinned by digest.

@@ -20,6 +20,8 @@ const (
 	envDockerID         = "KAXA_DOCKER_ID"
 	envDockerPAT        = "KAXA_DOCKER_PAT" // #nosec G101 -- env var name, not a credential value
 	envDockerTpl        = "KAXA_DOCKER_TEMPLATE"
+	envDaytonaAPIKey    = "KAXA_DAYTONA_API_KEY" // #nosec G101 -- env var name, not a credential value
+	envDaytonaTemplate  = "KAXA_DAYTONA_TEMPLATE"
 )
 
 // Config holds resolved CLI settings (secrets are never logged via String).
@@ -30,6 +32,15 @@ type Config struct {
 	E2B      E2BConfig
 	// Docker configures the docker provider.
 	Docker DockerConfig
+	// Daytona configures the daytona provider.
+	Daytona DaytonaConfig
+}
+
+// DaytonaConfig holds the Daytona API key and the image new daytona sandboxes
+// start from.
+type DaytonaConfig struct {
+	APIKey   string
+	Template string
 }
 
 // DockerConfig holds the Docker credentials and the image new docker
@@ -83,6 +94,7 @@ func Load(opts LoadOptions, reg *registry.Registry) (Config, error) {
 			PAT:      os.Getenv(envDockerPAT),
 			Template: os.Getenv(envDockerTpl),
 		},
+		Daytona: DaytonaConfig{APIKey: os.Getenv(envDaytonaAPIKey), Template: os.Getenv(envDaytonaTemplate)},
 	}
 
 	if opts.Provider != "" {

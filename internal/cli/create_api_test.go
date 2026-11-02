@@ -257,6 +257,8 @@ type publishingProvider struct {
 	env        []string
 }
 
+func (p *publishingProvider) PrepareWorkspace(context.Context, sandbox.ID) error { return nil }
+
 func (p *publishingProvider) SyncWorkspace(_ context.Context, _ sandbox.ID, archive io.Reader) error {
 	if archive == nil {
 		return nil

@@ -36,6 +36,7 @@ func (fullProvider) SupportsTemplate()                         {}
 func (fullProvider) Restart(context.Context, sandbox.ID) error { return nil }
 func (fullProvider) Upgrade(context.Context, sandbox.ID) error { return nil }
 
+func (fullProvider) PrepareWorkspace(context.Context, sandbox.ID) error         { return nil }
 func (fullProvider) SyncWorkspace(context.Context, sandbox.ID, io.Reader) error { return nil }
 func (fullProvider) SetupProjects(context.Context, sandbox.ID, string, []project.Step) error {
 	return nil

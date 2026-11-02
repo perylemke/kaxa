@@ -12,6 +12,9 @@ import (
 	"github.com/perylemke/kaxa/internal/usererr"
 )
 
+// keyFixture is a placeholder API key.
+const keyFixture = "key"
+
 type namedProvider struct {
 	basicProvider
 	name        string
@@ -64,14 +67,41 @@ func TestResolveProviderConfiguresE2B(t *testing.T) {
 
 	p := &namedProvider{name: e2bName}
 	reg := registryWith(t, p)
-	cfg := config.Config{E2B: config.E2BConfig{APIKey: "key", Template: bigTpl}}
+	cfg := config.Config{E2B: config.E2BConfig{APIKey: keyFixture, Template: bigTpl}}
 
 	got, err := lifecycle.ResolveProvider(reg, cfg, e2bName)
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
-	if got != sandbox.Provider(p) || p.token != "key" || p.template != "big" {
+	if got != sandbox.Provider(p) || p.token != keyFixture || p.template != "big" {
 		t.Fatalf("provider = %v key = %q template = %q", got, p.token, p.template)
+	}
+}
+
+func TestResolveProviderConfiguresDaytona(t *testing.T) {
+	t.Parallel()
+
+	p := &namedProvider{name: "daytona"}
+	cfg := config.Config{Daytona: config.DaytonaConfig{APIKey: keyFixture, Template: "team-image"}}
+
+	got, err := lifecycle.ResolveProvider(registryWith(t, p), cfg, "daytona")
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if got != sandbox.Provider(p) || p.token != keyFixture || p.template != "team-image" {
+		t.Fatalf("provider = %v key = %q template = %q", got, p.token, p.template)
+	}
+}
+
+func TestResolveProviderRejectsBadDaytonaTemplate(t *testing.T) {
+	t.Parallel()
+
+	want := errors.New("bad template")
+	reg := registryWith(t, &namedProvider{name: "daytona", templateErr: want})
+	cfg := config.Config{Daytona: config.DaytonaConfig{APIKey: keyFixture, Template: "x y"}}
+
+	if _, err := lifecycle.ResolveProvider(reg, cfg, "daytona"); !errors.Is(err, want) {
+		t.Fatalf("err = %v, want %v", err, want)
 	}
 }
 
@@ -80,7 +110,7 @@ func TestResolveProviderRejectsBadE2BTemplate(t *testing.T) {
 
 	want := errors.New("bad template")
 	reg := registryWith(t, &namedProvider{name: e2bName, templateErr: want})
-	cfg := config.Config{E2B: config.E2BConfig{APIKey: "key", Template: "x y"}}
+	cfg := config.Config{E2B: config.E2BConfig{APIKey: keyFixture, Template: "x y"}}
 
 	if _, err := lifecycle.ResolveProvider(reg, cfg, e2bName); !errors.Is(err, want) {
 		t.Fatalf("err = %v, want %v", err, want)

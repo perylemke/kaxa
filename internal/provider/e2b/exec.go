@@ -88,8 +88,11 @@ func (p *Provider) Exec(ctx context.Context, id sandbox.ID, opts sandbox.ExecOpt
 		argv: opts.Command, stdin: opts.Stdin, stdout: opts.Stdout, stderr: opts.Stderr,
 		tty: opts.TTY, size: opts.Size, resize: opts.Resize,
 	}
+	// The toolchains are on PATH in every sandbox. A sandbox created with
+	// --sync also starts in the workspace.
+	spec.env = e2bLayout.Env()
 	if s.synced() {
-		spec.dir, spec.env = workspaceDir, e2bLayout.Env()
+		spec.dir = workspaceDir
 	}
 	return s.run(ctx, spec)
 }

@@ -17,6 +17,9 @@ type SyncRequest struct {
 	// Root and Repo locate the Git repository to copy. See ResolveRepo.
 	Root string
 	Repo string
+	// NoInstall copies the repository and installs the toolchains but skips the
+	// dependency commands, which the caller runs later.
+	NoInstall bool
 }
 
 // Sync copies another Git repository into a sandbox that was created with
@@ -37,16 +40,20 @@ func Sync(ctx context.Context, p sandbox.Provider, req SyncRequest, run Runner) 
 	if err := checkSyncTarget(ctx, p, checker, id, req); err != nil {
 		return Result{}, err
 	}
+	steps, err := project.Detect(req.Root)
+	if err != nil {
+		return Result{}, fmt.Errorf("install dependencies: %w", err)
+	}
 	err = run(ctx, "syncing "+req.Repo+"…", func(ctx context.Context) error {
 		return copyWorkspace(ctx, syncer, id, req.Root, req.Repo)
 	})
 	if err != nil {
 		return Result{}, fmt.Errorf("sync workspace: %w", err)
 	}
-	if err := installSynced(ctx, p, id, req, run); err != nil {
+	if err := installSynced(ctx, p, id, req, steps, run); err != nil {
 		return Result{}, err
 	}
-	res := Result{ID: id}
+	res := Result{ID: id, Skipped: skippedOf(steps, req.NoInstall)}
 	if layout, ok := p.(sandbox.WorkspaceLayout); ok {
 		if res.WorkDir, err = layout.RepoDir(req.Repo); err != nil {
 			return res, err
@@ -74,7 +81,7 @@ func checkSyncTarget(ctx context.Context, p sandbox.Provider, checker sandbox.Re
 	if err != nil {
 		return err
 	}
-	if !slices.Contains(detail.Labels, sandbox.SyncLabel) {
+	if _, limited := p.(sandbox.SyncRequiresCreate); limited && !slices.Contains(detail.Labels, sandbox.SyncLabel) {
 		return usererr.New(
 			fmt.Sprintf("sandbox %s was not created with sync", req.Name),
 			"only a sandbox created with sync has a workspace; create a new one",
@@ -93,11 +100,7 @@ func checkSyncTarget(ctx context.Context, p sandbox.Provider, checker sandbox.Re
 	return nil
 }
 
-func installSynced(ctx context.Context, p sandbox.Provider, id sandbox.ID, req SyncRequest, run Runner) error {
-	steps, err := project.Detect(req.Root)
-	if err != nil {
-		return fmt.Errorf("install dependencies: %w", err)
-	}
+func installSynced(ctx context.Context, p sandbox.Provider, id sandbox.ID, req SyncRequest, steps []project.Step, run Runner) error {
 	if len(steps) == 0 {
 		return nil
 	}
@@ -105,8 +108,8 @@ func installSynced(ctx context.Context, p sandbox.Provider, id sandbox.ID, req S
 	if !ok {
 		return fmt.Errorf("install dependencies: %w", Unsupported(p, sandbox.FeatureDependencyInstall))
 	}
-	err = run(ctx, "installing "+req.Repo+"…", func(ctx context.Context) error {
-		return setup.SetupProjects(ctx, id, req.Repo, steps)
+	err := run(ctx, "installing "+req.Repo+"…", func(ctx context.Context) error {
+		return setup.SetupProjects(ctx, id, req.Repo, stepsFor(steps, req.NoInstall))
 	})
 	if err != nil {
 		return fmt.Errorf("install dependencies: %w", err)

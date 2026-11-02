@@ -38,6 +38,24 @@ func TestCommandOf(t *testing.T) {
 	}
 }
 
+func TestPrepareWorkspaceCreatesDirectory(t *testing.T) {
+	t.Parallel()
+	p, _, proc := newTestProvider(t)
+	createBox(t, p)
+	if err := p.PrepareWorkspace(context.Background(), testSandbox); err != nil {
+		t.Fatalf("PrepareWorkspace: %v", err)
+	}
+	var found bool
+	for _, argv := range proc.argvs() {
+		if slices.Contains(argv, "mkdir") && slices.Contains(argv, "/home/agent/workspace") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("commands = %v", proc.argvs())
+	}
+}
+
 func TestExecStreamsOutputAndStdin(t *testing.T) {
 	t.Parallel()
 	p, api, proc := newTestProvider(t)
@@ -56,7 +74,7 @@ func TestExecStreamsOutputAndStdin(t *testing.T) {
 		t.Fatalf("stdout = %q, stderr = %q", stdout.String(), stderr.String())
 	}
 	spec := proc.lastSpec(t)
-	if !slices.Equal(spec.Argv, []string{cmdCat}) || spec.User != agentUser || spec.TTY {
+	if spec.Argv[0] != "env" || spec.Argv[len(spec.Argv)-1] != cmdCat || spec.User != agentUser || spec.TTY {
 		t.Fatalf("spec = %+v", spec)
 	}
 	if proc.tokens[0] != testToken || proc.eps[0].URI == "" {
