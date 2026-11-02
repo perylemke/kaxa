@@ -10,6 +10,8 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 
 ### Added
 
+- Blaxel sandboxes as the `blaxel` provider, through the official Blaxel Go SDK, with `KAXA_BLAXEL_API_KEY` and `KAXA_BLAXEL_WORKSPACE`. It supports create (with `--sync`, `--template`, and `--api`), list, exec, console, sync, and destroy. The default image is `blaxel/base-image:latest` (user `root`, workspace `/root/workspace/<repo>`), the default region is `us-pdx-1`, and the default memory is 4096 MB. `create --api` starts an HTTP service and publishes a public preview named `kaxa-api`. `console` attaches to the terminal the sandbox starts, follows window resizing, and ends after 15 minutes without input. Restart, upgrade, snapshots, and `--running` are not available.
+- The manuals are published at [kaxa.io](https://kaxa.io).
 - `kaxa mcp start` serves the MCP server, `kaxa mcp init` writes it into claude, cursor, gemini, or windsurf, and `kaxa mcp config` prints that client entry. `kaxa mcp` still serves the server.
 
 ## [0.1.0] - 2026-11-02

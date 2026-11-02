@@ -12,8 +12,12 @@ import (
 	"github.com/perylemke/kaxa/internal/usererr"
 )
 
-// keyFixture is a placeholder API key.
-const keyFixture = "key"
+const (
+	// keyFixture is a placeholder API key.
+	keyFixture = "key"
+	// labelKaxa is the kaxa label and the Blaxel workspace name used in tests.
+	labelKaxa = "kaxa"
+)
 
 type namedProvider struct {
 	basicProvider
@@ -252,5 +256,79 @@ func TestResolveProviderDockerErrors(t *testing.T) {
 	reg := registryWith(t, &namedProvider{name: "docker"})
 	if _, err := lifecycle.ResolveProvider(reg, config.Config{}, "docker"); err == nil {
 		t.Fatal("docker provider without ConfigureCredentials accepted")
+	}
+}
+
+type blaxelProvider struct {
+	basicProvider
+	apiKey, workspace, template, region string
+	memory                              int
+	configErr, regionErr, memoryErr     error
+	templateErr                         error
+}
+
+func (b *blaxelProvider) Name() string { return "blaxel" }
+
+func (b *blaxelProvider) Configure(apiKey, workspace string) error {
+	b.apiKey, b.workspace = apiKey, workspace
+	return b.configErr
+}
+
+func (b *blaxelProvider) SetDefaultTemplate(name string) error {
+	b.template = name
+	return b.templateErr
+}
+
+func (b *blaxelProvider) SetRegion(region string) error {
+	b.region = region
+	return b.regionErr
+}
+
+func (b *blaxelProvider) SetMemory(mb int) error {
+	b.memory = mb
+	return b.memoryErr
+}
+
+func TestResolveProviderConfiguresBlaxel(t *testing.T) {
+	t.Parallel()
+
+	p := &blaxelProvider{}
+	cfg := config.Config{Blaxel: config.BlaxelConfig{
+		APIKey: keyFixture, Workspace: labelKaxa, Template: "blaxel/py-app:latest", Region: "eu-lon-1", MemoryMB: 8192,
+	}}
+
+	if _, err := lifecycle.ResolveProvider(registryWith(t, p), cfg, "blaxel"); err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if p.apiKey != keyFixture || p.workspace != labelKaxa || p.template != "blaxel/py-app:latest" || p.region != "eu-lon-1" || p.memory != 8192 {
+		t.Fatalf("blaxel = %+v", p)
+	}
+}
+
+func TestResolveProviderBlaxelErrors(t *testing.T) {
+	t.Parallel()
+
+	want := errors.New("failure")
+	tests := []struct {
+		name string
+		p    sandbox.Provider
+	}{
+		{"credentials", &blaxelProvider{configErr: want}},
+		{"region", &blaxelProvider{regionErr: want}},
+		{"memory", &blaxelProvider{memoryErr: want}},
+		{"default template", &blaxelProvider{templateErr: want}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if _, err := lifecycle.ResolveProvider(registryWith(t, tt.p), config.Config{}, "blaxel"); !errors.Is(err, want) {
+				t.Fatalf("err = %v, want %v", err, want)
+			}
+		})
+	}
+
+	reg := registryWith(t, &namedProvider{name: "blaxel"})
+	if _, err := lifecycle.ResolveProvider(reg, config.Config{}, "blaxel"); err == nil {
+		t.Fatal("blaxel provider without Configure accepted")
 	}
 }

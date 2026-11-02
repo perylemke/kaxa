@@ -1,6 +1,6 @@
 # kaxa sync
 
-Copy another Git repository into a sandbox that already exists. This works for Sprites, Modal, E2B, Docker, and Daytona.
+Copy another Git repository into a sandbox that already exists. This works for Sprites, Modal, E2B, Docker, Daytona, and Blaxel.
 
 ```bash
 kaxa sync <name> [--dir <path>]
@@ -15,7 +15,7 @@ kaxa --provider modal sync my-box
 kaxa --provider e2b sync my-box
 ```
 
-The repository lands in `/home/sprite/workspace/<repo>` on Sprites, `/home/modal/workspace/<repo>` on Modal, owned by `modal`, `/home/user/workspace/<repo>` on E2B, owned by `user`, `/home/agent/workspace/<repo>` on Docker, owned by `agent`, and `/home/daytona/workspace/<repo>` on Daytona, owned by `daytona`. `<repo>` is the name of the local directory. After the copy, kaxa installs the toolchain and dependencies it detects at the repository root, the same way as `create --sync`. A toolchain that is already installed is reused. On success kaxa prints the directory inside the sandbox.
+The repository lands in `/home/sprite/workspace/<repo>` on Sprites, `/home/modal/workspace/<repo>` on Modal, owned by `modal`, `/home/user/workspace/<repo>` on E2B, owned by `user`, `/home/agent/workspace/<repo>` on Docker, owned by `agent`, `/home/daytona/workspace/<repo>` on Daytona, owned by `daytona`, and `/root/workspace/<repo>` on Blaxel, owned by `root`. On Blaxel the writable layer is memory, so a large repository may need a higher `KAXA_BLAXEL_MEMORY`. `<repo>` is the name of the local directory. After the copy, kaxa installs the toolchain and dependencies it detects at the repository root, the same way as `create --sync`. A toolchain that is already installed is reused. On success kaxa prints the directory inside the sandbox.
 
 `--no-install` still installs the toolchains and skips the dependency commands, then prints the commands to run them by hand, for example `kaxa exec <name> -- sh -c 'cd <dir> && go mod download'`. Use it when the sandbox is too small to install everything at once. `create --sync --no-install` does the same at create time.
 

@@ -55,3 +55,13 @@ Pick the provider with `--provider daytona`. kaxa opens a process with a termina
 ```bash
 kaxa --provider daytona console my-box
 ```
+
+## Blaxel
+
+Pick the provider with `--provider blaxel`. kaxa attaches to the terminal the sandbox starts. It does not type `bash`, so the shell is the one in the Blaxel dashboard. The window size is applied when the session opens, and resizing the window is forwarded. With `--sync` the shell starts in `/root/workspace`. Without it, the shell starts in `/root`. The shell runs as `root`.
+
+Fifteen minutes without input closes the terminal, and the sandbox can return to standby. Files and processes remain. Open the console again to continue. The image must include the Blaxel sandbox API. The default image does.
+
+```bash
+kaxa --provider blaxel console my-box
+```

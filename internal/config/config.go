@@ -4,6 +4,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/perylemke/kaxa/internal/registry"
@@ -22,6 +23,11 @@ const (
 	envDockerTpl        = "KAXA_DOCKER_TEMPLATE"
 	envDaytonaAPIKey    = "KAXA_DAYTONA_API_KEY" // #nosec G101 -- env var name, not a credential value
 	envDaytonaTemplate  = "KAXA_DAYTONA_TEMPLATE"
+	envBlaxelAPIKey     = "KAXA_BLAXEL_API_KEY" // #nosec G101 -- env var name, not a credential value
+	envBlaxelWorkspace  = "KAXA_BLAXEL_WORKSPACE"
+	envBlaxelTemplate   = "KAXA_BLAXEL_TEMPLATE"
+	envBlaxelRegion     = "KAXA_BLAXEL_REGION"
+	envBlaxelMemory     = "KAXA_BLAXEL_MEMORY"
 )
 
 // Config holds resolved CLI settings (secrets are never logged via String).
@@ -34,6 +40,20 @@ type Config struct {
 	Docker DockerConfig
 	// Daytona configures the daytona provider.
 	Daytona DaytonaConfig
+	// Blaxel configures the blaxel provider.
+	Blaxel BlaxelConfig
+}
+
+// BlaxelConfig holds the Blaxel API key, workspace, and the defaults for a new sandbox.
+type BlaxelConfig struct {
+	APIKey    string
+	Workspace string
+	// Template is the image new sandboxes start from. Empty means blaxel/base-image:latest.
+	Template string
+	// Region is the deployment region. Empty means us-pdx-1.
+	Region string
+	// MemoryMB is the memory of a new sandbox, in megabytes. Zero means 4096.
+	MemoryMB int
 }
 
 // DaytonaConfig holds the Daytona API key and the image new daytona sandboxes
@@ -95,7 +115,13 @@ func Load(opts LoadOptions, reg *registry.Registry) (Config, error) {
 			Template: os.Getenv(envDockerTpl),
 		},
 		Daytona: DaytonaConfig{APIKey: os.Getenv(envDaytonaAPIKey), Template: os.Getenv(envDaytonaTemplate)},
+		Blaxel:  BlaxelConfig{APIKey: os.Getenv(envBlaxelAPIKey), Workspace: os.Getenv(envBlaxelWorkspace), Template: os.Getenv(envBlaxelTemplate), Region: os.Getenv(envBlaxelRegion)},
 	}
+	memory, err := blaxelMemory(os.Getenv(envBlaxelMemory))
+	if err != nil {
+		return Config{}, err
+	}
+	cfg.Blaxel.MemoryMB = memory
 
 	if opts.Provider != "" {
 		cfg.Provider = opts.Provider
@@ -106,6 +132,21 @@ func Load(opts LoadOptions, reg *registry.Registry) (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// blaxelMemory parses KAXA_BLAXEL_MEMORY. An empty value means the provider default.
+func blaxelMemory(raw string) (int, error) {
+	if raw == "" {
+		return 0, nil
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 1 {
+		return 0, usererr.New(
+			fmt.Sprintf("invalid Blaxel memory %q", raw),
+			"set KAXA_BLAXEL_MEMORY to a whole number of megabytes, such as 4096",
+		)
+	}
+	return n, nil
 }
 
 // Validate checks provider names against the registry.

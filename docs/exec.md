@@ -1,6 +1,6 @@
 # kaxa exec
 
-Run a command in a sandbox. This works for Sprites, Modal, E2B, Docker, and Daytona.
+Run a command in a sandbox. This works for Sprites, Modal, E2B, Docker, Daytona, and Blaxel.
 
 ```bash
 kaxa exec <name> <command> [args...]
@@ -45,6 +45,16 @@ kaxa --provider daytona exec my-box -- ls -la
 ```
 
 Standard output, standard error, and standard input are passed through, and the remote exit code is the kaxa exit code. Commands run as `daytona`, starting in `/home/daytona/workspace` with `--sync` and where the image starts without it. The toolchain `PATH` is set either way. The command is not run through a shell; use `sh -c` for pipes. Daytona bills the account while the sandbox runs.
+
+## Blaxel
+
+Pick the provider with `--provider blaxel` or `KAXA_DEFAULT_PROVIDER=blaxel`. A sandbox in standby wakes for the command. An archived sandbox is left archived, and the command fails.
+
+```bash
+kaxa --provider blaxel exec my-box -- ls -la
+```
+
+Standard output and standard error are streamed, and standard input is sent when it is not a terminal. The remote exit code is the kaxa exit code. Commands run as `root`, starting in `/root/workspace` with `--sync` and in `/root` without it. The toolchain `PATH` is set either way. The process API takes one command string, so kaxa quotes every argument and a space, a quote, or `$(...)` stays one argument. Use `sh -c` for pipes. For an interactive shell, use [kaxa console](console.md#blaxel). Blaxel bills the workspace while the sandbox runs.
 
 ## Modal
 

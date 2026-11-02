@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/perylemke/kaxa/internal/cli"
+	"github.com/perylemke/kaxa/internal/provider/blaxel"
 	"github.com/perylemke/kaxa/internal/provider/daytona"
 	"github.com/perylemke/kaxa/internal/provider/docker"
 	"github.com/perylemke/kaxa/internal/provider/e2b"
@@ -25,6 +26,7 @@ func main() {
 		{"e2b", func() error { return reg.Register(e2b.New()) }},
 		{"docker", func() error { return reg.Register(docker.New()) }},
 		{"daytona", func() error { return reg.Register(daytona.New()) }},
+		{"blaxel", func() error { return reg.Register(blaxel.New()) }},
 	} {
 		if err := p.reg(); err != nil {
 			_ = cli.WriteError(os.Stderr, fmt.Errorf("register %s: %w", p.name, err))
