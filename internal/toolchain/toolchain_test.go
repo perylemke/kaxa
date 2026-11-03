@@ -42,6 +42,10 @@ func TestToolAssetsPinChecksums(t *testing.T) {
 const (
 	toolBundle     = "bundle"
 	toolClojure    = "clojure"
+	toolCurl       = "curl"
+	toolAptGet     = "apt-get"
+	toolApk        = "apk"
+	toolInstall    = "install"
 	tarExtract     = "-xzf"
 	tarStrip       = "--strip-components=1"
 	rubyArchive    = "/tmp/kaxa-ruby.tar.gz"
@@ -83,7 +87,7 @@ func TestSetupProjectsInstallsMissingRuby(t *testing.T) {
 	}
 	err := Setup(context.Background(), client, testLayout, testWorkDir, []project.Step{{
 		Kind:     project.KindRuby,
-		Commands: [][]string{{toolBundle, "install", "--frozen"}},
+		Commands: [][]string{{toolBundle, toolInstall, "--frozen"}},
 	}})
 	if err != nil {
 		t.Fatalf("SetupProjects: %v", err)
@@ -93,7 +97,7 @@ func TestSetupProjectsInstallsMissingRuby(t *testing.T) {
 	for _, tool := range []string{"ruby", "gem", toolBundle} {
 		mustSee(t, client.calls, "ln", "-sfn", testLayout.rubyPrefix()+"/bin/"+tool, testLayout.localBin()+"/"+tool)
 	}
-	install := lastCallWith(client.calls, 3, 1, "install")
+	install := lastCallWith(client.calls, 3, 1, toolInstall)
 	if install.argv[0] != testLayout.bundleBin() || install.argv[2] != "--frozen" || install.dir != testWorkDir || len(install.env) == 0 {
 		t.Fatalf("install = %#v", install)
 	}
@@ -155,7 +159,7 @@ func TestSetupProjectsRejectsBadRubyChecksum(t *testing.T) {
 	}
 	err := Setup(context.Background(), client, testLayout, testWorkDir, []project.Step{{
 		Kind:     project.KindRuby,
-		Commands: [][]string{{toolBundle, "install"}},
+		Commands: [][]string{{toolBundle, toolInstall}},
 	}})
 	if err == nil || !strings.Contains(err.Error(), "checksum") {
 		t.Fatalf("err = %v", err)
@@ -237,6 +241,86 @@ func TestSetupProjectsUsesExistingGo(t *testing.T) {
 	}
 }
 
+func TestSetupSkipsCurlInstallWhenPresent(t *testing.T) {
+	t.Parallel()
+
+	client := &setupStub{missing: map[string]bool{"go": true}, apt: true, apk: true}
+	err := Setup(context.Background(), client, testLayout, testWorkDir, []project.Step{{
+		Kind:     project.KindGo,
+		Commands: [][]string{{"go", projectBuild, testAllPkgs}},
+	}})
+	if err != nil {
+		t.Fatalf("SetupProjects: %v", err)
+	}
+	if sawCommand(client.calls, toolAptGet) || sawCommand(client.calls, toolApk) {
+		t.Fatalf("installed curl that was already there: %#v", argvOf(client.calls))
+	}
+	if countArgv(client.calls, toolCurl, argvVersion) != 1 {
+		t.Fatalf("curl probes = %#v", argvOf(client.calls))
+	}
+}
+
+func TestSetupInstallsCurlWithApt(t *testing.T) {
+	t.Parallel()
+
+	client := &setupStub{missing: map[string]bool{"go": true, toolCurl: true}, apt: true}
+	err := Setup(context.Background(), client, testLayout, testWorkDir, []project.Step{{
+		Kind:     project.KindGo,
+		Commands: [][]string{{"go", projectBuild, testAllPkgs}},
+	}})
+	if err != nil {
+		t.Fatalf("SetupProjects: %v", err)
+	}
+	mustSee(t, client.calls, toolAptGet, "update")
+	mustSee(t, client.calls, toolAptGet, toolInstall, "-y", "--no-install-recommends", pkgCA, toolCurl)
+	mustSee(t, client.calls, toolCurl, "-fsSL", "-o", goAsset(testAMD64).archive, goAsset(testAMD64).url)
+	if countArgv(client.calls, toolCurl, argvVersion) != 2 {
+		t.Fatalf("curl probes = %#v", argvOf(client.calls))
+	}
+	for _, call := range client.calls {
+		if call.argv[0] != toolAptGet || (len(call.argv) == 2 && call.argv[1] == argvVersion) {
+			continue
+		}
+		if len(call.env) != 1 || call.env[0] != envDebian {
+			t.Fatalf("apt env = %#v", call.env)
+		}
+	}
+}
+
+func TestSetupInstallsCurlWithApk(t *testing.T) {
+	t.Parallel()
+
+	client := &setupStub{missing: map[string]bool{"go": true, toolCurl: true}, apk: true}
+	err := Setup(context.Background(), client, testLayout, testWorkDir, []project.Step{{
+		Kind:     project.KindGo,
+		Commands: [][]string{{"go", projectBuild, testAllPkgs}},
+	}})
+	if err != nil {
+		t.Fatalf("SetupProjects: %v", err)
+	}
+	mustSee(t, client.calls, toolApk, "add", "--no-cache", pkgCA, toolCurl)
+	if sawArgv(client.calls, []string{toolAptGet, "update"}) || sawArgv(client.calls, []string{toolAptGet, toolInstall, "-y", "--no-install-recommends", pkgCA, toolCurl}) {
+		t.Fatal("installed packages with apt-get on an apk image")
+	}
+	mustSee(t, client.calls, toolCurl, "-fsSL", "-o", goAsset(testAMD64).archive, goAsset(testAMD64).url)
+}
+
+func TestSetupReportsImageWithoutCurl(t *testing.T) {
+	t.Parallel()
+
+	client := &setupStub{missing: map[string]bool{"go": true, toolCurl: true}}
+	err := Setup(context.Background(), client, testLayout, testWorkDir, []project.Step{{
+		Kind:     project.KindGo,
+		Commands: [][]string{{"go", projectBuild, testAllPkgs}},
+	}})
+	if err == nil || !strings.Contains(err.Error(), toolCurl) || !strings.Contains(err.Error(), toolAptGet) || !strings.Contains(err.Error(), toolApk) {
+		t.Fatalf("err = %v", err)
+	}
+	if sawArgv(client.calls, []string{toolCurl, "-fsSL", "-o", goAsset(testAMD64).archive, goAsset(testAMD64).url}) {
+		t.Fatal("downloaded without curl")
+	}
+}
+
 func TestSetupProjectsRejectsBadChecksum(t *testing.T) {
 	t.Parallel()
 
@@ -265,38 +349,87 @@ type setupStub struct {
 	missing map[string]bool
 	badSum  bool
 	sums    map[string]string
+	// apt and apk report that package manager. Curl stays missing until its install runs.
+	apt bool
+	apk bool
 }
 
 func (s *setupStub) Run(_ context.Context, dir string, env, argv []string, stdin io.Reader) (string, error) {
-	var stdout strings.Builder
-	body := ""
-	if stdin != nil {
-		buf, err := io.ReadAll(stdin)
-		if err != nil {
-			return "", err
-		}
-		body = string(buf)
+	body, err := readStdin(stdin)
+	if err != nil {
+		return "", err
 	}
-	call := remoteCall{dir: dir, env: append([]string(nil), env...), argv: append([]string(nil), argv...), stdin: body}
-	s.calls = append(s.calls, call)
-	switch {
-	case len(argv) > 0 && s.missing[argv[0]] && !strings.HasPrefix(argv[0], "/"):
+	s.calls = append(s.calls, remoteCall{
+		dir: dir, env: append([]string(nil), env...), argv: append([]string(nil), argv...), stdin: body,
+	})
+	return s.output(argv)
+}
+
+func readStdin(stdin io.Reader) (string, error) {
+	if stdin == nil {
+		return "", nil
+	}
+	buf, err := io.ReadAll(stdin)
+	if err != nil {
+		return "", err
+	}
+	return string(buf), nil
+}
+
+func (s *setupStub) output(argv []string) (string, error) {
+	if len(argv) == 0 {
+		return "", errors.New("empty command")
+	}
+	if ok, err := s.packageResult(argv); ok {
+		return "", err
+	}
+	if s.missing[argv[0]] && !strings.HasPrefix(argv[0], "/") {
 		return "", errors.New("missing tool")
-	case argv[0] == "uname":
-		stdout.WriteString("x86_64\n")
-	case argv[0] == "sha256sum":
-		sum := goAMD64SHA
-		if pinned, ok := s.sums[argv[len(argv)-1]]; ok {
-			sum = pinned
-		}
-		if s.badSum {
-			sum = "0000000000000000000000000000000000000000000000000000000000000000"
-		}
-		stdout.WriteString(sum + "  " + argv[len(argv)-1] + "\n")
-	case argv[0] == "grep":
-		return "", errors.New("exit status 1")
 	}
-	return stdout.String(), nil
+	switch argv[0] {
+	case "uname":
+		return "x86_64\n", nil
+	case "sha256sum":
+		return s.checksum(argv[len(argv)-1]), nil
+	case "grep":
+		return "", errors.New("exit status 1")
+	default:
+		return "", nil
+	}
+}
+
+func (s *setupStub) packageResult(argv []string) (bool, error) {
+	switch argv[0] {
+	case toolAptGet:
+		if !s.apt {
+			return true, errors.New("missing tool")
+		}
+		if len(argv) > 1 && argv[1] == toolInstall {
+			delete(s.missing, toolCurl)
+		}
+		return true, nil
+	case toolApk:
+		if !s.apk {
+			return true, errors.New("missing tool")
+		}
+		if len(argv) > 1 && argv[1] == "add" {
+			delete(s.missing, toolCurl)
+		}
+		return true, nil
+	default:
+		return false, nil
+	}
+}
+
+func (s *setupStub) checksum(file string) string {
+	sum := goAMD64SHA
+	if pinned, ok := s.sums[file]; ok {
+		sum = pinned
+	}
+	if s.badSum {
+		sum = "0000000000000000000000000000000000000000000000000000000000000000"
+	}
+	return sum + "  " + file + "\n"
 }
 
 func sawArgv(calls []remoteCall, want []string) bool {
@@ -316,6 +449,28 @@ func sawArgv(calls []remoteCall, want []string) bool {
 		}
 	}
 	return false
+}
+
+func countArgv(calls []remoteCall, argv ...string) int {
+	n := 0
+	for _, call := range calls {
+		if sawOne(call.argv, argv) {
+			n++
+		}
+	}
+	return n
+}
+
+func sawOne(got, want []string) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func sawCommand(calls []remoteCall, name string) bool {

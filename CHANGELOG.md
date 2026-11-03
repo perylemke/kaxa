@@ -14,6 +14,7 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 
 ### Fixed
 
+- Toolchain downloads install `curl` when the sandbox image does not have it, using `apt-get` or `apk`. An image that already has `curl` skips that step.
 - `kaxa exec` on Blaxel prints the command output. A short command no longer finishes before the log stream attaches, and a streamed line keeps its newline.
 - `kaxa destroy` on Blaxel finishes when the sandbox is terminated or gone. Blaxel keeps returning that sandbox from Get, and the name can be created again.
 
