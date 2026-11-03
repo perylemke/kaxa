@@ -292,7 +292,7 @@ func checkRepoScopeIn(repoRoot, scope, home string) error {
 	if isBroadScope(base, home) {
 		return usererr.New(
 			fmt.Sprintf("the server working directory %s is too broad to bound which repositories sync may copy", scope),
-			"start kaxa mcp from the project, or set cwd to it in the client config",
+			"start kaxa mcp from the project, or set KAXA_MCP_ROOT to a folder that holds the repositories",
 		)
 	}
 	if within(repo, base) || within(base, repo) {

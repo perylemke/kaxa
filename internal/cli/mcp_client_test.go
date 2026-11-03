@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/perylemke/kaxa/internal/mcp"
 	"github.com/perylemke/kaxa/internal/registry"
 	"github.com/perylemke/kaxa/internal/usererr"
 )
@@ -18,7 +19,7 @@ func TestMCPConfigDocument(t *testing.T) {
 	t.Parallel()
 
 	const home = "/Users/you"
-	got, err := mcpConfigDocument(home, goosDarwin, "")
+	got, err := mcpConfigDocument(home, goosDarwin, "", "/Users/you/workspace")
 	if err != nil {
 		t.Fatalf("config: %v", err)
 	}
@@ -31,6 +32,7 @@ func TestMCPConfigDocument(t *testing.T) {
     "command": "kaxa",
     "env": {
       "HOME": "/Users/you",
+      "KAXA_MCP_ROOT": "/Users/you/workspace",
       "PATH": "/Users/you:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin"
     },
     "logFile": "/Users/you/.kaxa/kaxa-mcp.log"
@@ -49,7 +51,7 @@ func TestMCPConfigDocumentWindows(t *testing.T) {
 		home    = `C:\Users\you`
 		appData = `C:\Users\you\AppData\Roaming`
 	)
-	got, err := mcpConfigDocument(home, goosWindows, appData)
+	got, err := mcpConfigDocument(home, goosWindows, appData, `C:\Users\you\workspace`)
 	if err != nil {
 		t.Fatalf("config: %v", err)
 	}
@@ -61,7 +63,7 @@ func TestMCPConfigDocumentWindows(t *testing.T) {
 	if entry.Command != mcpCommandName || !slices.Equal(entry.Args, []string{commandMCP, "start"}) {
 		t.Fatalf("entry = %+v", entry)
 	}
-	if entry.Env["HOME"] != home || entry.Env["APPDATA"] != appData {
+	if entry.Env["HOME"] != home || entry.Env["APPDATA"] != appData || entry.Env[mcp.EnvRoot] != `C:\Users\you\workspace` {
 		t.Fatalf("env = %v", entry.Env)
 	}
 	if entry.Env["PATH"] != home+mcpUnixPathExtra {
@@ -75,7 +77,7 @@ func TestMCPConfigDocumentWindows(t *testing.T) {
 func TestMCPConfigDocumentRejectsUnsupportedOS(t *testing.T) {
 	t.Parallel()
 
-	_, err := mcpConfigDocument("/home/you", "freebsd", "")
+	_, err := mcpConfigDocument("/home/you", "freebsd", "", "/home/you/workspace")
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -87,7 +89,7 @@ func TestMCPConfigDocumentRejectsUnsupportedOS(t *testing.T) {
 func TestMCPConfigDocumentRequiresAppDataOnWindows(t *testing.T) {
 	t.Parallel()
 
-	_, err := mcpConfigDocument(`C:\Users\you`, goosWindows, "")
+	_, err := mcpConfigDocument(`C:\Users\you`, goosWindows, "", `C:\Users\you\workspace`)
 	if err == nil || !strings.Contains(err.Error(), "APPDATA") {
 		t.Fatalf("error = %v", err)
 	}
@@ -156,13 +158,13 @@ func TestMCPAgentConfigPathsRejectsUnknownAgent(t *testing.T) {
 
 func TestMCPConfigCommandPrintsEntry(t *testing.T) {
 	home := t.TempDir()
-	withMCPHost(t, home, goosDarwin, "")
+	project := withMCPHost(t, home, goosDarwin, "")
 
 	out := new(bytes.Buffer)
 	cmd := NewRootCmd(registry.New())
 	cmd.SetOut(out)
 	cmd.SetErr(new(bytes.Buffer))
-	cmd.SetArgs([]string{commandMCP, "config"})
+	cmd.SetArgs([]string{commandMCP, commandConfig})
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
@@ -174,8 +176,57 @@ func TestMCPConfigCommandPrintsEntry(t *testing.T) {
 		t.Fatalf("decode: %v\n%s", err, out)
 	}
 	entry := doc[mcpServerKey]
-	if entry.LogFile != home+"/.kaxa/"+mcpLogFileName || entry.Env["HOME"] != home {
+	wantRoot, err := filepath.EvalSymlinks(project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if entry.LogFile != home+"/.kaxa/"+mcpLogFileName || entry.Env["HOME"] != home || entry.Env[mcp.EnvRoot] != wantRoot {
 		t.Fatalf("entry = %+v", entry)
+	}
+}
+
+func TestMCPConfigRootFlag(t *testing.T) {
+	home := t.TempDir()
+	withMCPHost(t, home, goosDarwin, "")
+	root := filepath.Join(home, "other")
+	if err := os.Mkdir(root, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	out := new(bytes.Buffer)
+	cmd := NewRootCmd(registry.New())
+	cmd.SetOut(out)
+	cmd.SetErr(new(bytes.Buffer))
+	cmd.SetArgs([]string{commandMCP, commandConfig, "--root", root})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	var doc map[string]mcpClientEntry
+	if err := json.Unmarshal(out.Bytes(), &doc); err != nil {
+		t.Fatalf("decode: %v\n%s", err, out)
+	}
+	want, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if doc[mcpServerKey].Env[mcp.EnvRoot] != want {
+		t.Fatalf("root = %q", doc[mcpServerKey].Env[mcp.EnvRoot])
+	}
+}
+
+func TestMCPConfigRefusesHome(t *testing.T) {
+	home := t.TempDir()
+	withMCPHost(t, home, goosDarwin, "")
+	mcpCurrentWD = func() (string, error) { return home, nil }
+
+	cmd := NewRootCmd(registry.New())
+	cmd.SetOut(new(bytes.Buffer))
+	cmd.SetErr(new(bytes.Buffer))
+	cmd.SetArgs([]string{commandMCP, commandConfig})
+	err := cmd.Execute()
+	ue, ok := usererr.As(err)
+	if !ok || !strings.Contains(ue.Message, "too broad") || !strings.Contains(ue.Hint, "--root") {
+		t.Fatalf("err = %v", err)
 	}
 }
 
@@ -183,7 +234,7 @@ func TestMCPConfigSkipsProviderValidation(t *testing.T) {
 	cmd := NewRootCmd(registry.New())
 	cmd.SetOut(new(bytes.Buffer))
 	cmd.SetErr(new(bytes.Buffer))
-	cmd.SetArgs([]string{flagProvider, "nope", commandMCP, "config"})
+	cmd.SetArgs([]string{flagProvider, "nope", commandMCP, commandConfig})
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("config should not validate provider: %v", err)
 	}
@@ -349,17 +400,21 @@ func TestMCPInitRequiresAgent(t *testing.T) {
 	}
 }
 
-func withMCPHost(t *testing.T, home, goos, appData string) {
+func withMCPHost(t *testing.T, home, goos, appData string) string {
 	t.Helper()
-	prevGOOS, prevHome, prevApp := mcpCurrentGOOS, mcpCurrentHome, mcpCurrentAppData
+	project := t.TempDir()
+	prevGOOS, prevHome, prevApp, prevWD := mcpCurrentGOOS, mcpCurrentHome, mcpCurrentAppData, mcpCurrentWD
 	mcpCurrentGOOS = func() string { return goos }
 	mcpCurrentHome = func() (string, error) { return home, nil }
 	mcpCurrentAppData = func() string { return appData }
+	mcpCurrentWD = func() (string, error) { return project, nil }
 	t.Cleanup(func() {
 		mcpCurrentGOOS = prevGOOS
 		mcpCurrentHome = prevHome
 		mcpCurrentAppData = prevApp
+		mcpCurrentWD = prevWD
 	})
+	return project
 }
 
 func assertCursorMerge(t *testing.T, path string) {

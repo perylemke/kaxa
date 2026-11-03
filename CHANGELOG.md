@@ -8,8 +8,21 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 
 ## [Unreleased]
 
+### Changed
+
+- `--no-install` on `kaxa sync` and `kaxa create --sync`, and `no_install` on the MCP `sync_repository` and `create_sandbox`, copies the repository and skips the toolchain install as well as the dependency commands. The dependency commands are still printed for you to run.
+
+### Fixed
+
+- Toolchain downloads install `curl` when the sandbox image does not have it, using `apt-get` or `apk`. An image that already has `curl` skips that step.
+- `kaxa exec` on Blaxel prints the command output. A short command no longer finishes before the log stream attaches, and a streamed line keeps its newline.
+- `kaxa destroy` on Blaxel finishes when the sandbox is terminated or gone. Blaxel keeps returning that sandbox from Get, and the name can be created again.
+
 ### Added
 
+- `KAXA_MCP_ROOT` bounds which repositories `kaxa mcp` may copy. `kaxa mcp init --root` and `kaxa mcp config --root` write it into the client entry for every agent. Without `--root`, the command uses its current directory and refuses your home directory and `/`.
+- Blaxel sandboxes as the `blaxel` provider, through the official Blaxel Go SDK, with `KAXA_BLAXEL_API_KEY` and `KAXA_BLAXEL_WORKSPACE`. It supports create (with `--sync`, `--template`, and `--api`), list, exec, console, sync, and destroy. The default image is `blaxel/base-image:latest` (user `root`, workspace `/root/workspace/<repo>`), the default region is `us-pdx-1`, and the default memory is 4096 MB. `create --api` starts an HTTP service and publishes a public preview named `kaxa-api`. `console` attaches to the terminal the sandbox starts, follows window resizing, and ends after 15 minutes without input. Restart, upgrade, snapshots, and `--running` are not available.
+- The manuals are published at [kaxa.io](https://kaxa.io).
 - `kaxa mcp start` serves the MCP server, `kaxa mcp init` writes it into claude, cursor, gemini, or windsurf, and `kaxa mcp config` prints that client entry. `kaxa mcp` still serves the server.
 
 ## [0.1.0] - 2026-11-02

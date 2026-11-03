@@ -17,8 +17,8 @@ type SyncRequest struct {
 	// Root and Repo locate the Git repository to copy. See ResolveRepo.
 	Root string
 	Repo string
-	// NoInstall copies the repository and installs the toolchains but skips the
-	// dependency commands, which the caller runs later.
+	// NoInstall copies the repository and skips the toolchain and the dependency
+	// commands, which the caller runs later.
 	NoInstall bool
 }
 
@@ -101,7 +101,7 @@ func checkSyncTarget(ctx context.Context, p sandbox.Provider, checker sandbox.Re
 }
 
 func installSynced(ctx context.Context, p sandbox.Provider, id sandbox.ID, req SyncRequest, steps []project.Step, run Runner) error {
-	if len(steps) == 0 {
+	if len(steps) == 0 || req.NoInstall {
 		return nil
 	}
 	setup, ok := p.(sandbox.ProjectSetup)
@@ -109,7 +109,7 @@ func installSynced(ctx context.Context, p sandbox.Provider, id sandbox.ID, req S
 		return fmt.Errorf("install dependencies: %w", Unsupported(p, sandbox.FeatureDependencyInstall))
 	}
 	err := run(ctx, "installing "+req.Repo+"…", func(ctx context.Context) error {
-		return setup.SetupProjects(ctx, id, req.Repo, stepsFor(steps, req.NoInstall))
+		return setup.SetupProjects(ctx, id, req.Repo, steps)
 	})
 	if err != nil {
 		return fmt.Errorf("install dependencies: %w", err)

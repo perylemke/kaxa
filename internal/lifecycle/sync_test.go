@@ -35,7 +35,7 @@ func (s *syncProvider) RepoExists(_ context.Context, _ sandbox.ID, _ string) (bo
 
 func newSyncProvider() (*syncProvider, *recorder) {
 	full, rec := newFull()
-	return &syncProvider{fullProvider: full, labels: []string{"kaxa", sandbox.SyncLabel}}, rec
+	return &syncProvider{fullProvider: full, labels: []string{labelKaxa, sandbox.SyncLabel}}, rec
 }
 
 func TestSyncCopiesThenInstalls(t *testing.T) {
@@ -84,7 +84,7 @@ func TestSyncAcceptsSandboxCreatedWithoutSync(t *testing.T) {
 	t.Parallel()
 
 	p, rec := newSyncProvider()
-	p.labels = []string{"kaxa"}
+	p.labels = []string{labelKaxa}
 	root, name := gitRepo(t)
 
 	res, err := lifecycle.Sync(context.Background(), p, lifecycle.SyncRequest{Name: boxName, Root: root, Repo: name}, nil)
@@ -101,7 +101,7 @@ func TestSyncRequiresSyncLabel(t *testing.T) {
 
 	p, rec := newSyncProvider()
 	gated := gatedProvider{p}
-	p.labels = []string{"kaxa"}
+	p.labels = []string{labelKaxa}
 	root, name := gitRepo(t)
 
 	_, err := lifecycle.Sync(context.Background(), gated, lifecycle.SyncRequest{Name: boxName, Root: root, Repo: name}, nil)
@@ -124,8 +124,8 @@ func TestSyncNoInstallSkipsCommands(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sync: %v", err)
 	}
-	if len(rec.setupSteps) != 1 || len(rec.setupSteps[0].Commands) != 0 {
-		t.Fatalf("setup steps = %+v", rec.setupSteps)
+	if len(rec.setupSteps) != 0 {
+		t.Fatalf("setup steps = %+v, want no toolchain install", rec.setupSteps)
 	}
 	if len(res.Skipped) != 1 || !slices.Equal(res.Skipped[0], []string{"go", "mod", "download"}) {
 		t.Fatalf("skipped = %v", res.Skipped)

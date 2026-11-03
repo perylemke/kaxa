@@ -15,6 +15,7 @@ const (
 	e2bProvider     = "e2b"
 	dockerProvider  = "docker"
 	daytonaProvider = "daytona"
+	blaxelProvider  = "blaxel"
 )
 
 type tokenConfigurer interface {
@@ -24,6 +25,13 @@ type tokenConfigurer interface {
 // templateDefaulter is a provider that starts sandboxes from a default template.
 type templateDefaulter interface {
 	SetDefaultTemplate(name string) error
+}
+
+// blaxelAccount is a provider configured with a Blaxel API key and workspace.
+type blaxelAccount interface {
+	Configure(apiKey, workspace string) error
+	SetRegion(region string) error
+	SetMemory(mb int) error
 }
 
 type credentialsConfigurer interface {
@@ -57,21 +65,9 @@ func ResolveProvider(reg *registry.Registry, cfg config.Config, name string) (sa
 func configureProvider(p sandbox.Provider, name string, cfg config.Config) error {
 	switch name {
 	case spritesProvider:
-		c, ok := p.(tokenConfigurer)
-		if !ok {
-			return fmt.Errorf("sprites provider %T does not support Configure", p)
-		}
-		if err := c.Configure(cfg.Sprites.Token); err != nil {
-			return err
-		}
+		return configureSprites(p, cfg.Sprites)
 	case modalProvider:
-		c, ok := p.(credentialsConfigurer)
-		if !ok {
-			return fmt.Errorf("modal provider %T does not support ConfigureCredentials", p)
-		}
-		if err := c.ConfigureCredentials(cfg.Modal.TokenID, cfg.Modal.TokenSecret); err != nil {
-			return err
-		}
+		return configureModal(p, cfg.Modal)
 	case e2bProvider:
 		if err := configureE2B(p, cfg.E2B); err != nil {
 			return err
@@ -84,9 +80,29 @@ func configureProvider(p sandbox.Provider, name string, cfg config.Config) error
 		if err := configureDaytona(p, cfg.Daytona); err != nil {
 			return err
 		}
+	case blaxelProvider:
+		if err := configureBlaxel(p, cfg.Blaxel); err != nil {
+			return err
+		}
 	}
 
 	return nil
+}
+
+func configureSprites(p sandbox.Provider, cfg config.SpritesConfig) error {
+	c, ok := p.(tokenConfigurer)
+	if !ok {
+		return fmt.Errorf("sprites provider %T does not support Configure", p)
+	}
+	return c.Configure(cfg.Token)
+}
+
+func configureModal(p sandbox.Provider, cfg config.ModalConfig) error {
+	c, ok := p.(credentialsConfigurer)
+	if !ok {
+		return fmt.Errorf("modal provider %T does not support ConfigureCredentials", p)
+	}
+	return c.ConfigureCredentials(cfg.TokenID, cfg.TokenSecret)
 }
 
 func configureDaytona(p sandbox.Provider, cfg config.DaytonaConfig) error {
@@ -95,6 +111,26 @@ func configureDaytona(p sandbox.Provider, cfg config.DaytonaConfig) error {
 		return fmt.Errorf("daytona provider %T does not support Configure", p)
 	}
 	if err := c.Configure(cfg.APIKey); err != nil {
+		return err
+	}
+	if d, ok := p.(templateDefaulter); ok {
+		return d.SetDefaultTemplate(cfg.Template)
+	}
+	return nil
+}
+
+func configureBlaxel(p sandbox.Provider, cfg config.BlaxelConfig) error {
+	c, ok := p.(blaxelAccount)
+	if !ok {
+		return fmt.Errorf("blaxel provider %T does not support Configure", p)
+	}
+	if err := c.Configure(cfg.APIKey, cfg.Workspace); err != nil {
+		return err
+	}
+	if err := c.SetRegion(cfg.Region); err != nil {
+		return err
+	}
+	if err := c.SetMemory(cfg.MemoryMB); err != nil {
 		return err
 	}
 	if d, ok := p.(templateDefaulter); ok {

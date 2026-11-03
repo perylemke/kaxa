@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/perylemke/kaxa/internal/mcp"
 	"github.com/perylemke/kaxa/internal/usererr"
 )
 
@@ -20,6 +22,7 @@ const (
 	commandMCP       = "mcp"
 	flagProvider     = "--provider"
 	commandInit      = "init"
+	commandConfig    = "config"
 	agentClaude      = "claude"
 	agentCursor      = "cursor"
 	agentGemini      = "gemini"
@@ -41,19 +44,22 @@ var (
 	mcpCurrentGOOS    = func() string { return runtime.GOOS }
 	mcpCurrentHome    = os.UserHomeDir
 	mcpCurrentAppData = func() string { return os.Getenv("APPDATA") }
+	mcpCurrentWD      = os.Getwd
 )
 
 func newMCPConfigCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "config",
+	var root string
+	cmd := &cobra.Command{
+		Use:   commandConfig,
 		Short: "Print MCP client configuration",
 		Long: `Print the kaxa MCP client entry as JSON.
 
-The entry runs kaxa mcp start. It sets HOME and PATH, and a logFile path. It does not include tokens or a working directory, and kaxa does not open the log file.`,
-		Example: `  kaxa mcp config`,
-		Args:    noArgs("mcp config"),
+The entry runs kaxa mcp start. It sets HOME, PATH, and KAXA_MCP_ROOT, and a logFile path. It does not include tokens, and kaxa does not open the log file. KAXA_MCP_ROOT bounds which repositories sync may copy. --root sets it; without the flag, config uses the current directory and refuses your home directory and /.`,
+		Example: `  kaxa mcp config
+  kaxa mcp config --root ~/workspace`,
+		Args: noArgs("mcp config"),
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			doc, err := mcpConfigFromHost()
+			doc, err := mcpConfigFromHost(root)
 			if err != nil {
 				return err
 			}
@@ -61,14 +67,36 @@ The entry runs kaxa mcp start. It sets HOME and PATH, and a logFile path. It doe
 			return err
 		},
 	}
+	cmd.Flags().StringVar(&root, "root", "", "directory that bounds which repositories sync may copy")
+	return cmd
 }
 
-func mcpConfigFromHost() ([]byte, error) {
+func mcpConfigFromHost(rootFlag string) ([]byte, error) {
 	home, goos, appData, err := mcpHost()
 	if err != nil {
 		return nil, err
 	}
-	return mcpConfigDocument(home, goos, appData)
+	root, err := mcpSyncRoot(rootFlag, home)
+	if err != nil {
+		return nil, err
+	}
+	return mcpConfigDocument(home, goos, appData, root)
+}
+
+func mcpSyncRoot(flag, home string) (string, error) {
+	flag = strings.TrimSpace(flag)
+	var wd string
+	if flag == "" || !filepath.IsAbs(flag) {
+		var err error
+		wd, err = mcpCurrentWD()
+		if err != nil {
+			if flag == "" {
+				return "", usererr.Wrap(err, "working directory is unknown", "pass --root pointing at a folder that holds the repositories")
+			}
+			return "", fmt.Errorf("working directory: %w", err)
+		}
+	}
+	return mcp.ClientRoot(flag, wd, home)
 }
 
 func mcpHost() (string, string, string, error) {
@@ -82,8 +110,8 @@ func mcpHost() (string, string, string, error) {
 	return home, mcpCurrentGOOS(), mcpCurrentAppData(), nil
 }
 
-func mcpConfigDocument(home, goos, appData string) ([]byte, error) {
-	entry, err := mcpClientEntryFor(home, goos, appData)
+func mcpConfigDocument(home, goos, appData, root string) ([]byte, error) {
+	entry, err := mcpClientEntryFor(home, goos, appData, root)
 	if err != nil {
 		return nil, err
 	}
@@ -94,14 +122,15 @@ func mcpConfigDocument(home, goos, appData string) ([]byte, error) {
 	return append(out, '\n'), nil
 }
 
-func mcpClientEntryFor(home, goos, appData string) (mcpClientEntry, error) {
+func mcpClientEntryFor(home, goos, appData, root string) (mcpClientEntry, error) {
 	logFile, err := mcpLogFile(home, goos, appData)
 	if err != nil {
 		return mcpClientEntry{}, err
 	}
 	env := map[string]string{
-		"HOME": home,
-		"PATH": home + mcpUnixPathExtra,
+		"HOME":      home,
+		"PATH":      home + mcpUnixPathExtra,
+		mcp.EnvRoot: root,
 	}
 	if goos == goosWindows {
 		env["APPDATA"] = appData

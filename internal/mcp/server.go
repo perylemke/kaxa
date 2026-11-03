@@ -7,8 +7,10 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -22,9 +24,9 @@ import (
 
 const instructions = `Run work in an isolated sandbox instead of on the host.
 1. Call list_providers and pick a provider that is available.
-2. create_sandbox with sync=true copies the local Git repository and installs its dependencies. no_install skips the dependency commands and lists them in skipped_commands. The response work_dir is where the code lives inside the sandbox.
+2. create_sandbox with sync=true copies the local Git repository and installs its dependencies. no_install skips the toolchain and the dependency commands and lists the commands in skipped_commands. The response work_dir is where the code lives inside the sandbox.
 3. Run builds, tests and edits with exec (argv, no shell). exec starts above the repository, so run project commands from work_dir, for example ["bash", "-c", "cd <work_dir> && go test ./..."]. Files you change with local editor tools are not in the sandbox, and files changed in the sandbox are not copied back.
-4. To add another Git repository, call sync_repository. It works on any sandbox except a Modal sandbox that was not created with sync, and it never replaces a directory. no_install copies the repository and installs the toolchains without running the dependency commands.
+4. To add another Git repository, call sync_repository. It works on any sandbox except a Modal sandbox that was not created with sync, and it never replaces a directory. no_install copies the repository and skips the toolchain and the dependency commands.
 5. To save a sandbox state, call create_snapshot; list_snapshots shows the ids, the sandbox and the provider of each snapshot. restore_snapshot either overwrites the sandbox (snapshot_restore in_place) or creates a new one named by target (new_sandbox).
 6. Call destroy, delete_snapshot, or restore_snapshot on an in_place provider only when the user asks for it.`
 
@@ -71,11 +73,36 @@ func New(reg *registry.Registry, cfg config.Config, opts Options) (*sdk.Server, 
 
 // Serve runs the server on stdin and stdout until the client disconnects or ctx ends.
 func Serve(ctx context.Context, reg *registry.Registry, cfg config.Config, stderr io.Writer) error {
-	srv, err := New(reg, cfg, Options{Stderr: stderr, APIEnvAllow: ParseAPIEnvAllow(os.Getenv(EnvAPIEnvAllow))})
+	root, err := serverRoot()
+	if err != nil {
+		return err
+	}
+	srv, err := New(reg, cfg, Options{
+		Stderr: stderr, Root: root, APIEnvAllow: ParseAPIEnvAllow(os.Getenv(EnvAPIEnvAllow)),
+	})
 	if err != nil {
 		return err
 	}
 	return srv.Run(ctx, &sdk.StdioTransport{})
+}
+
+// serverRoot applies KAXA_MCP_ROOT before the server listens. An empty variable
+// keeps the process working directory, which sync still refuses when it is home.
+func serverRoot() (string, error) {
+	raw := strings.TrimSpace(os.Getenv(EnvRoot))
+	var wd string
+	if raw == "" || !filepath.IsAbs(raw) {
+		var err error
+		wd, err = os.Getwd()
+		if err != nil {
+			return "", fmt.Errorf("working directory: %w", err)
+		}
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = ""
+	}
+	return RootFromEnv(raw, wd, home)
 }
 
 func (s *service) register(srv *sdk.Server) {

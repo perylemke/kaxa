@@ -17,7 +17,12 @@ import (
 
 const (
 	argvVersion = "--version"
+	argvCurl    = "curl"
+	argvAptGet  = "apt-get"
+	argvApk     = "apk"
+	pkgCA       = "ca-certificates"
 	pathScript  = "export PATH=\"$HOME/.local/bin:$HOME/.local/go/bin:$HOME/.cargo/bin:$PATH\"\n"
+	envDebian   = "DEBIAN_FRONTEND=noninteractive"
 )
 
 // Runner runs a command inside a sandbox.
@@ -28,8 +33,9 @@ type Runner interface {
 }
 
 type installer struct {
-	r Runner
-	l Layout
+	r         Runner
+	l         Layout
+	curlReady bool
 }
 
 func (i *installer) run(ctx context.Context, argv []string) (string, error) {
@@ -263,7 +269,10 @@ func (i *installer) installRust(ctx context.Context, arch archInfo) error {
 }
 
 func (i *installer) downloadVerified(ctx context.Context, asset toolAsset) error {
-	if _, err := i.run(ctx, []string{"curl", "-fsSL", "-o", asset.archive, asset.url}); err != nil {
+	if err := i.ensureCurl(ctx); err != nil {
+		return fmt.Errorf("download: %w", err)
+	}
+	if _, err := i.run(ctx, []string{argvCurl, "-fsSL", "-o", asset.archive, asset.url}); err != nil {
 		return fmt.Errorf("download: %w", err)
 	}
 	sumOut, err := i.run(ctx, []string{"sha256sum", asset.archive})
@@ -276,6 +285,59 @@ func (i *installer) downloadVerified(ctx context.Context, asset toolAsset) error
 		return errors.New("checksum: archive hash does not match")
 	}
 	return nil
+}
+
+// ensureCurl installs curl once when the image does not have it. Images that
+// already have curl skip the package install.
+func (i *installer) ensureCurl(ctx context.Context) error {
+	if i.curlReady {
+		return nil
+	}
+	if _, err := i.run(ctx, []string{argvCurl, argvVersion}); err == nil {
+		i.curlReady = true
+		return nil
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := i.installCurl(ctx); err != nil {
+		return fmt.Errorf("install curl: %w", err)
+	}
+	if _, err := i.run(ctx, []string{argvCurl, argvVersion}); err != nil {
+		return fmt.Errorf("install curl: %w", err)
+	}
+	i.curlReady = true
+	return nil
+}
+
+func (i *installer) installCurl(ctx context.Context) error {
+	if _, err := i.run(ctx, []string{argvAptGet, argvVersion}); err == nil {
+		return i.installCurlApt(ctx)
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if _, err := i.run(ctx, []string{argvApk, argvVersion}); err == nil {
+		return i.installCurlApk(ctx)
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return errors.New("curl is not installed and the image has no apt-get or apk")
+}
+
+func (i *installer) installCurlApt(ctx context.Context) error {
+	env := []string{envDebian}
+	if _, err := i.runIn(ctx, "", env, []string{argvAptGet, "update"}, nil); err != nil {
+		return err
+	}
+	_, err := i.runIn(ctx, "", env, []string{argvAptGet, "install", "-y", "--no-install-recommends", pkgCA, argvCurl}, nil)
+	return err
+}
+
+func (i *installer) installCurlApk(ctx context.Context) error {
+	_, err := i.run(ctx, []string{argvApk, "add", "--no-cache", pkgCA, argvCurl})
+	return err
 }
 
 func (i *installer) extractStrip(ctx context.Context, archive, dest string) error {

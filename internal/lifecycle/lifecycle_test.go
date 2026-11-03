@@ -155,7 +155,7 @@ func TestCreateLabelsAndOrder(t *testing.T) {
 	if !slices.Equal(rec.steps, want) {
 		t.Fatalf("steps = %v, want %v", rec.steps, want)
 	}
-	if !slices.Contains(rec.created.Labels, sandbox.SyncLabel) || !slices.Contains(rec.created.Labels, "kaxa") {
+	if !slices.Contains(rec.created.Labels, sandbox.SyncLabel) || !slices.Contains(rec.created.Labels, labelKaxa) {
 		t.Fatalf("labels = %v", rec.created.Labels)
 	}
 	if res.ID != boxName || res.WorkDir != "/home/box/ws/"+name {

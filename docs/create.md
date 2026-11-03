@@ -9,13 +9,15 @@ kaxa new [name]
 
 Without a name, a form asks for the name, provider, and the same yes/no choices as the flags. When API is yes, the form asks for the command and the port. The form uses the Dracula theme. It does not ask for `--dir`; pass that flag if you need it.
 
-Sprites, Modal, E2B, Docker, and Daytona implement create. `--running` and public URLs exist only for Sprites; the others reject them with a message that names the providers that have them. API publish works on Sprites, E2B, Docker, and Daytona. `--sync` works on all five; see [Sync](#sync).
+Sprites, Modal, E2B, Docker, Daytona, and Blaxel implement create. `--running` and public URLs exist only for Sprites; the others reject them with a message that names the providers that have them. API publish works on Sprites, E2B, Docker, Daytona, and Blaxel. `--sync` works on all six; see [Sync](#sync).
 
 Modal sandboxes use a Debian image, live for up to 24 hours, and stop after one idle hour. Names are DNS labels. See [Modal account and token](modal-account.md).
 
 E2B sandboxes live for one hour after the last command and then pause, keeping their disk. Names are DNS labels. See [E2B account and API key](e2b-account.md).
 
 Daytona sandboxes are persistent sandboxes created through the Daytona API with `KAXA_DAYTONA_API_KEY`. Names are DNS labels. Create waits until the sandbox runs and deletes it if it fails to start. Daytona bills the account while a sandbox runs. See [Daytona](daytona-account.md).
+
+Blaxel sandboxes are created through the Blaxel API with `KAXA_BLAXEL_API_KEY` and `KAXA_BLAXEL_WORKSPACE`. Names are DNS labels of at most 49 characters. Create waits until the sandbox runs and deletes it if it fails to start. A deployed sandbox, including one in standby, is running: standby keeps files and processes. The writable layer is memory, so a large repository may need a higher `KAXA_BLAXEL_MEMORY`. Blaxel bills the workspace while a sandbox runs. See [Blaxel](blaxel-account.md).
 
 Docker sandboxes run in Docker's cloud, created through the Docker Sandboxes API with `KAXA_DOCKER_ID` and `KAXA_DOCKER_PAT`. Names are DNS labels. Create waits until the sandbox runs and deletes it if it fails to start. Cloud compute is billed to your Docker subscription, and Docker stops a sandbox after an hour; kaxa renews that time on every command, and `exec` starts a stopped sandbox again. See [Docker Sandboxes](docker-account.md).
 
@@ -24,14 +26,14 @@ Docker sandboxes run in Docker's cloud, created through the Docker Sandboxes API
 | Flag | Meaning |
 | --- | --- |
 | `--running` | Keep the sandbox up for one hour, serve tmux on its URL, and open that URL in a browser |
-| `--sync` | Copy the current Git repository into `/home/sprite/workspace/<repo>` (Sprites) `/home/modal/workspace/<repo>` (Modal), `/home/user/workspace/<repo>` (E2B), `/home/agent/workspace/<repo>` (Docker), or `/home/daytona/workspace/<repo>` (Daytona) |
+| `--sync` | Copy the current Git repository into `/home/sprite/workspace/<repo>` (Sprites) `/home/modal/workspace/<repo>` (Modal), `/home/user/workspace/<repo>` (E2B), `/home/agent/workspace/<repo>` (Docker), `/home/daytona/workspace/<repo>` (Daytona), or `/root/workspace/<repo>` (Blaxel) |
 | `--dir` | Git repository to copy. Requires `--sync`. Default: the current directory |
-| `--api` | Publish one HTTP service on the Sprites URL, on the E2B sandbox URL for the API port, on the Docker URL that Docker gives the published port, or on the public preview URL of the API port on Daytona. Requires `--api-cmd` |
+| `--api` | Publish one HTTP service on the Sprites URL, on the E2B sandbox URL for the API port, on the Docker URL that Docker gives the published port, on the public preview URL of the API port on Daytona, or on a public preview named `kaxa-api` on Blaxel. Requires `--api-cmd` |
 | `--api-cmd` | Comma-separated argv. The first item is the binary |
 | `--api-port` | Port the process listens on. Default `8000`. `8080` is reserved when `--running` is also set |
 | `--api-env` | Environment variable for the service: `KEY=VALUE`, or `KEY` to copy the value from your shell. Repeat for more. Requires `--api` |
 | `--public` | Make the Sprites URL reachable without an account. Refused with `--running` unless `--api` is set |
-| `--template` | E2B, Docker, and Daytona: the template to start the sandbox from. Default: `KAXA_E2B_TEMPLATE`, `KAXA_DOCKER_TEMPLATE`, or `KAXA_DAYTONA_TEMPLATE`, then the base image. See [Templates on E2B](#templates-on-e2b) and [Templates on Docker](#templates-on-docker) |
+| `--template` | E2B, Docker, Daytona, and Blaxel: the template to start the sandbox from. Default: `KAXA_E2B_TEMPLATE`, `KAXA_DOCKER_TEMPLATE`, `KAXA_DAYTONA_TEMPLATE`, or `KAXA_BLAXEL_TEMPLATE`, then the base image. See [Templates on E2B](#templates-on-e2b) and [Templates on Docker](#templates-on-docker) |
 
 `--api-cmd`, `--api-env`, and a changed `--api-port` require `--api`. `--dir` requires `--sync`.
 
@@ -50,9 +52,9 @@ kaxa create --sync --dir ~/projects/api-python my-sprite
 
 Every sandbox has a workspace directory (`$HOME/workspace`), created at create time, so `kaxa sync` works on a sandbox created without `--sync`. Modal is the exception: only a sandbox created with `--sync` has one.
 
-`--no-install`, together with `--sync`, installs the toolchains and skips the dependency commands. kaxa prints the commands to run them by hand.
+`--no-install`, together with `--sync`, copies the repository and skips the toolchain and the dependency commands. kaxa prints the dependency commands to run them by hand. The image has to provide the tools those commands need.
 
-`exec` and `console` on a sandbox created with `--sync` start in the workspace: `/home/sprite/workspace` on Sprites, `/home/modal/workspace` on Modal, `/home/user/workspace` on E2B, `/home/agent/workspace` on Docker, `/home/daytona/workspace` on Daytona. Without `--sync` they start in the home directory, with the toolchain `PATH` set.
+`exec` and `console` on a sandbox created with `--sync` start in the workspace: `/home/sprite/workspace` on Sprites, `/home/modal/workspace` on Modal, `/home/user/workspace` on E2B, `/home/agent/workspace` on Docker, `/home/daytona/workspace` on Daytona, `/root/workspace` on Blaxel. Without `--sync` they start in the home directory, with the toolchain `PATH` set.
 
 ### Sync on Modal
 
@@ -121,6 +123,14 @@ kaxa create --provider daytona --sync my-box
 
 kaxa creates the sandbox through the Daytona API and waits until it runs, then uploads the repository, as a gzip tar, and unpacks it with `tar` inside the sandbox. The repository lands in `/home/daytona/workspace/<repo>`, owned by `daytona`. The same checks as on the other providers apply: credentials in `.git/config` are removed and untracked secret files stop the copy. Toolchains are installed under `/home/daytona/.local` and `/home/daytona/.cargo` and put on the `PATH` of `exec` and `console`. Downloads are checked against pinned SHA-256 hashes. See [Daytona](daytona-account.md).
 
+### Sync on Blaxel
+
+```bash
+kaxa create --provider blaxel --sync my-box
+```
+
+kaxa creates the sandbox through the Blaxel API and waits until it runs, then uploads the repository, as a gzip tar, and unpacks it with `tar` inside the sandbox. The repository lands in `/root/workspace/<repo>`, owned by `root`. The writable layer is a tmpfs inside `KAXA_BLAXEL_MEMORY` (4096 MB unless you set it), so a large repository may need more memory. The same checks as on the other providers apply: credentials in `.git/config` are removed and untracked secret files stop the copy. Toolchains are installed under `/root/.local` and `/root/.cargo` and put on the `PATH` of `exec`. Downloads are checked against pinned SHA-256 hashes. See [Blaxel](blaxel-account.md).
+
 ### Templates on Docker
 
 ```bash
@@ -138,6 +148,15 @@ export KAXA_DAYTONA_TEMPLATE=my-image   # default for every Daytona create
 ```
 
 A template is the name of a Daytona snapshot. The `--template` flag wins over `KAXA_DAYTONA_TEMPLATE`; without either, kaxa uses the Daytona default image. kaxa expects its layout: user `daytona`, home `/home/daytona`, workspace `/home/daytona/workspace`. Another user breaks `exec`, `console`, and `--sync`, and kaxa does not detect that.
+
+### Templates on Blaxel
+
+```bash
+kaxa create --provider blaxel --template blaxel/py-app:latest --sync my-box
+export KAXA_BLAXEL_TEMPLATE=blaxel/py-app:latest   # default for every Blaxel create
+```
+
+A template is an image reference: letters, digits, and `. _ : / -`. The `--template` flag wins over `KAXA_BLAXEL_TEMPLATE`; without either, kaxa uses `blaxel/base-image:latest`. kaxa expects that image's layout: user `root`, home `/root`, workspace `/root/workspace`. Another user breaks `exec` and `--sync`, and kaxa does not detect that.
 
 ### API on E2B
 
@@ -168,6 +187,18 @@ kaxa list --provider daytona   # the detail view shows the URL
 On Daytona, `--api` runs the service as `daytona` in the repository directory (or `/home/daytona` without `--sync`), waits for the port to accept connections, for up to 90 seconds, and then makes that port public. If the process exits first, or Daytona refuses, kaxa deletes the sandbox and shows the reason. The service log is not kept.
 
 The preview URL is public, so treat anyone who has it as able to call the service. The service ends when Daytona stops the sandbox, and `restart` stops it too. `exec` starts the sandbox again but not the service, so start it again with `exec`, or create the sandbox again. `--public` and `--running` do not apply.
+
+### API on Blaxel
+
+```bash
+kaxa create --provider blaxel --sync --api \
+  --api-cmd .venv/bin/uvicorn,app.main:app,--host,0.0.0.0,--port,8000 my-box
+kaxa list --provider blaxel   # the detail view shows the URL
+```
+
+On Blaxel, `--api` runs the service as `root` in the repository directory (or `/root` without `--sync`), waits for the port to accept connections, for up to 90 seconds, and then creates a public preview named `kaxa-api`. If the process exits first, kaxa deletes the sandbox and shows the reason. The service log is not kept.
+
+Ports 80, 443, and 8080 are reserved by the sandbox. The process must listen on `0.0.0.0` and on `--api-port`. Blaxel also accepts `$HOST` or `::`. The preview URL is public, so treat anyone who has it as able to call the service. There is no private preview. Standby keeps the process. `--public` and `--running` do not apply, and there is no `restart`.
 
 ## API environment
 

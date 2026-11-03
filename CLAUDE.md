@@ -1,12 +1,12 @@
 # CLAUDE.md
 
-Guidance for AI agents working in `kaxa` (Go CLI that unifies sandbox providers: Fly.io Sprites, Modal, E2B, Docker Sandboxes, and Daytona).
+Guidance for AI agents working in `kaxa` (Go CLI that unifies sandbox providers: Fly.io Sprites, Modal, E2B, Docker Sandboxes, Daytona, and Blaxel).
 Cursor users: the same rules live in `.cursor/rules/*.mdc`; Claude Code reads `.claude/rules/*.md`. Keep both in sync.
 
 ## Stack
 
 - Go 1.27+ (see `go.mod`), Cobra CLI, `CGO_ENABLED=0` builds.
-- Providers: Sprites, Modal, and Daytona use their official Go SDKs; E2B (stdlib REST and Connect-JSON client) and Docker (`docker`, stdlib REST plus a WebSocket for processes, with a Docker ID and personal access token; `--api` publishes one port) have no official Go SDK and use internal clients. Daytona (`daytona`) uses an API key; snapshots are disk images; `--api` makes one sandbox public. Convention: a provider with an official Go SDK uses it, otherwise it uses an internal client. All are registered in `internal/registry`.
+- Providers: Sprites, Modal, Daytona, and Blaxel use their official Go SDKs; E2B (stdlib REST and Connect-JSON client) and Docker (`docker`, stdlib REST plus a WebSocket for processes, with a Docker ID and personal access token; `--api` publishes one port) have no official Go SDK and use internal clients. Daytona (`daytona`) uses an API key; snapshots are disk images; `--api` makes one sandbox public. Blaxel (`blaxel`) uses `KAXA_BLAXEL_API_KEY` and `KAXA_BLAXEL_WORKSPACE`; `--api` opens a public preview. It has no restart or snapshot. Convention: a provider with an official Go SDK uses it, otherwise it uses an internal client. All are registered in `internal/registry`.
 - `kaxa mcp` and `kaxa mcp start` serve sandboxes to AI agents over the Model Context Protocol. `kaxa mcp init` and `kaxa mcp config` install that server into claude, cursor, gemini, and windsurf.
 - Releases: semtag tags (`make release`, `make prerelease`), GoReleaser (`.goreleaser.yml`), and the Homebrew cask in `perylemke/homebrew-tap`. Only final `vX.Y.Z` tags reach Homebrew; `-alpha/-beta/-rc` tags are GitHub pre-releases.
 
@@ -39,7 +39,7 @@ Run `make test` at minimum, and `make lint` after Go changes, before saying work
 - `internal/cli` — Cobra commands.
 - `internal/config` — environment and flag configuration.
 - `internal/sandbox` — provider contracts; `internal/registry` — provider registration.
-- `internal/provider/{sprites,modal,e2b,docker,daytona}` — one package per provider.
+- `internal/provider/{sprites,modal,e2b,docker,daytona,blaxel}` — one package per provider.
 - `internal/{mcp,lifecycle,reposync,project,toolchain,usererr,version}` — MCP server, sandbox lifecycle, repo sync, project detection, toolchain install, user errors, version info.
 - `install.sh`, `install.ps1` — one-line installers, attached to every release by GoReleaser (`release.extra_files`); keep in sync with `docs/install.md`.
 - `CHANGELOG.md` — Keep a Changelog; `internal/changelog` and `tools/changelog` edit it at release time; `scripts/release.sh` wraps semtag.

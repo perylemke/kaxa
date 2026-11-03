@@ -65,7 +65,7 @@ Without a name, the form asks for the same choices. When API is yes, it asks for
 	}
 	cmd.Flags().BoolVar(&keepRunning, "running", false, "keep the sandbox running for 1 hour and open a tmux terminal in the browser")
 	cmd.Flags().BoolVar(&syncWorkspace, "sync", false, "copy the local git repository into the sandbox workspace")
-	cmd.Flags().BoolVar(&noInstall, "no-install", false, "with --sync, install the toolchains but skip the dependency commands")
+	cmd.Flags().BoolVar(&noInstall, "no-install", false, "with --sync, copy the repository and skip the toolchain and dependency installs")
 	cmd.Flags().StringVar(&syncDir, "dir", "", "git repository to copy with --sync (default: current directory)")
 	cmd.Flags().BoolVar(&exposeAPI, "api", false, "publish an HTTP service on the sandbox URL (requires --api-cmd; Sprites, E2B, Docker and Daytona)")
 	cmd.Flags().StringVar(&apiCmd, "api-cmd", "", "comma-separated argv; first item is the binary (example: .venv/bin/uvicorn,app.main:app,--host,0.0.0.0,--port,8000)")
