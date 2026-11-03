@@ -7,8 +7,10 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -71,11 +73,36 @@ func New(reg *registry.Registry, cfg config.Config, opts Options) (*sdk.Server, 
 
 // Serve runs the server on stdin and stdout until the client disconnects or ctx ends.
 func Serve(ctx context.Context, reg *registry.Registry, cfg config.Config, stderr io.Writer) error {
-	srv, err := New(reg, cfg, Options{Stderr: stderr, APIEnvAllow: ParseAPIEnvAllow(os.Getenv(EnvAPIEnvAllow))})
+	root, err := serverRoot()
+	if err != nil {
+		return err
+	}
+	srv, err := New(reg, cfg, Options{
+		Stderr: stderr, Root: root, APIEnvAllow: ParseAPIEnvAllow(os.Getenv(EnvAPIEnvAllow)),
+	})
 	if err != nil {
 		return err
 	}
 	return srv.Run(ctx, &sdk.StdioTransport{})
+}
+
+// serverRoot applies KAXA_MCP_ROOT before the server listens. An empty variable
+// keeps the process working directory, which sync still refuses when it is home.
+func serverRoot() (string, error) {
+	raw := strings.TrimSpace(os.Getenv(EnvRoot))
+	var wd string
+	if raw == "" || !filepath.IsAbs(raw) {
+		var err error
+		wd, err = os.Getwd()
+		if err != nil {
+			return "", fmt.Errorf("working directory: %w", err)
+		}
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = ""
+	}
+	return RootFromEnv(raw, wd, home)
 }
 
 func (s *service) register(srv *sdk.Server) {

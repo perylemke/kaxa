@@ -15,17 +15,20 @@ import (
 const mcpConfigFileMode os.FileMode = 0o600
 
 func newMCPInitCmd() *cobra.Command {
-	return &cobra.Command{
+	var root string
+	cmd := &cobra.Command{
 		Use:   "init <agent>",
 		Short: "Install the MCP server into an agent",
 		Long: `Write the kaxa MCP client entry into an agent's user config.
 
-Supported agents are claude, cursor, gemini, and windsurf. claude updates Claude Desktop and Claude Code with the same entry. The entry does not include tokens or a working directory. Other servers in the file are left in place.`,
-		Example: `  kaxa mcp init cursor
+Supported agents are claude, cursor, gemini, and windsurf. claude updates Claude Desktop and Claude Code with the same entry. The entry sets KAXA_MCP_ROOT and does not include tokens. --root sets that directory; without the flag, init uses the current directory and refuses your home directory and /. Other servers in the file are left in place.`,
+		Example: `  kaxa mcp init cursor --root ~/workspace
   kaxa mcp init claude`,
 		Args: mcpInitArgs,
 		RunE: runMCPInit,
 	}
+	cmd.Flags().StringVar(&root, "root", "", "directory that bounds which repositories sync may copy")
+	return cmd
 }
 
 func mcpInitArgs(_ *cobra.Command, args []string) error {
@@ -43,11 +46,15 @@ func runMCPInit(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	root, err := mcpSyncRoot(cmd.Flags().Lookup("root").Value.String(), home)
+	if err != nil {
+		return err
+	}
 	paths, err := mcpAgentConfigPaths(args[0], home, goos, appData)
 	if err != nil {
 		return err
 	}
-	entry, err := mcpClientEntryFor(home, goos, appData)
+	entry, err := mcpClientEntryFor(home, goos, appData, root)
 	if err != nil {
 		return err
 	}

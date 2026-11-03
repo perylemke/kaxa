@@ -185,9 +185,9 @@ With no sandboxes, `list` prints `no sandboxes created` and exits. In a terminal
 
 ### AI agents
 
-`kaxa mcp` and `kaxa mcp start` serve sandboxes to an AI agent over the Model Context Protocol. `kaxa mcp init` writes the client entry for Claude Desktop, Claude Code, Cursor, Gemini CLI, or Windsurf. `kaxa mcp config` prints that entry. The entry runs `kaxa mcp start` and does not include tokens or a working directory. The agent stays in the client and calls tools to create a sandbox from your Git repository, add more repositories to it, run commands in it, and destroy it.
+`kaxa mcp` and `kaxa mcp start` serve sandboxes to an AI agent over the Model Context Protocol. `kaxa mcp init` writes the client entry for Claude Desktop, Claude Code, Cursor, Gemini CLI, or Windsurf. `kaxa mcp config` prints that entry. The entry runs `kaxa mcp start`, sets `KAXA_MCP_ROOT` so sync stays inside one folder, and does not include tokens. The agent stays in the client and calls tools to create a sandbox from your Git repository, add more repositories to it, run commands in it, and destroy it.
 
-Point `command` at the installed binary when you edit the entry by hand. `go install` puts it on `$(go env GOPATH)/bin`, and Homebrew links it at `$(brew --prefix)/bin/kaxa`. A desktop app needs that absolute path. The token stays in the client's environment, not in a committed file. Client files, `cwd`, and the tool list are in [docs/agent.md](docs/agent.md).
+Point `command` at the installed binary when you edit the entry by hand. `go install` puts it on `$(go env GOPATH)/bin`, and Homebrew links it at `$(brew --prefix)/bin/kaxa`. A desktop app needs that absolute path. The token stays in the client's environment, not in a committed file. Client files and the tool list are in [docs/agent.md](docs/agent.md).
 
 ## Documentation
 

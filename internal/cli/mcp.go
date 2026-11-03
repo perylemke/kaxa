@@ -23,7 +23,7 @@ kaxa mcp and kaxa mcp start serve the Model Context Protocol on stdin and stdout
 
 Tools take a provider argument, so one workflow works with every provider. Without it, KAXA_DEFAULT_PROVIDER (or --provider) is used. Tokens come from KAXA_* environment variables, never from tool arguments.
 
-Stdout carries only the protocol. Progress and logs go to stderr. Sync copies only a Git repository that contains the current directory or sits below it.`,
+Stdout carries only the protocol. Progress and logs go to stderr. Sync copies only a Git repository that contains KAXA_MCP_ROOT, or the current directory when that variable is empty, or sits below it.`,
 		Example: `  kaxa mcp
   kaxa mcp start
   kaxa mcp init cursor
