@@ -211,6 +211,51 @@ func TestExecHidesAPIKeyInErrors(t *testing.T) {
 	}
 }
 
+func TestProcessOutputUsesFinalWhenStreamMisses(t *testing.T) {
+	t.Parallel()
+	const (
+		printf = "a b'$(echo pwned);echo"
+		idOut  = "uid\n"
+		errOut = "boom\n"
+		frame  = "hello"
+		line   = "hello\n"
+		rest   = "hello\nworld\n"
+	)
+	tests := []struct {
+		name             string
+		streamOut        string
+		streamErr        string
+		finalOut         string
+		finalErr         string
+		wantOut, wantErr string
+	}{
+		{name: "fast command", finalOut: idOut, wantOut: idOut},
+		{name: "printf without newline", finalOut: printf, wantOut: printf},
+		{name: "stderr only", finalErr: errOut, wantErr: errOut},
+		{name: "silent command"},
+		{name: "stream already showed cat", streamOut: frame, finalOut: line, wantOut: line},
+		{name: "stream showed every line", streamOut: line, finalOut: line, wantOut: line},
+		{name: "stream showed a prefix", streamOut: line, finalOut: rest, wantOut: rest},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var got processOutput
+			var stdout, stderr bytes.Buffer
+			if tt.streamOut != "" {
+				got.write(&stdout, &got.stdout, tt.streamOut)
+			}
+			if tt.streamErr != "" {
+				got.write(&stderr, &got.stderr, tt.streamErr)
+			}
+			got.finish(&stdout, &stderr, tt.finalOut, tt.finalErr)
+			if stdout.String() != tt.wantOut || stderr.String() != tt.wantErr {
+				t.Fatalf("stdout = %q stderr = %q", stdout.String(), stderr.String())
+			}
+		})
+	}
+}
+
 func TestPipedInputSkipsCharacterDevices(t *testing.T) {
 	t.Parallel()
 	null, err := os.Open(os.DevNull)

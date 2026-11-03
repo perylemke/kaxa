@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	sdk "github.com/blaxel-ai/sdk-go"
@@ -140,13 +141,14 @@ func (s *sdkClient) Run(ctx context.Context, name string, spec runSpec) (int, er
 	if err != nil {
 		return 0, err
 	}
+	// A short command can exit before this stream connects. The finished
+	// process still carries the output, and finish writes what the stream missed.
+	var streamed processOutput
 	stream := inst.Process.StreamLogs(ctx, ident, sdk.ProcessStreamOptions{
-		OnStdout: func(chunk string) { writeOut(spec.stdout, chunk) },
-		OnStderr: func(chunk string) { writeOut(spec.stderr, chunk) },
+		OnStdout: func(chunk string) { streamed.write(spec.stdout, &streamed.stdout, chunk) },
+		OnStderr: func(chunk string) { streamed.write(spec.stderr, &streamed.stderr, chunk) },
 	})
-	if stream != nil && stream.Close != nil {
-		defer stream.Close()
-	}
+	defer closeStream(stream)
 	if spec.stdin != nil {
 		if err := s.writeStdin(ctx, inst, ident, spec.stdin); err != nil {
 			s.kill(inst, ident)
@@ -163,7 +165,78 @@ func (s *sdkClient) Run(ctx context.Context, name string, spec runSpec) (int, er
 	if result == nil {
 		return 0, errors.New("blaxel: process returned no result")
 	}
+	closeStream(stream)
+	stdout, stderr := result.Stdout, result.Stderr
+	if stdout == "" && stderr == "" && !streamed.wrote() {
+		logs, logsErr := inst.Process.GetLogs(ctx, ident)
+		if logsErr != nil {
+			return 0, convertErr(logsErr)
+		}
+		if logs != nil {
+			stdout, stderr = logs.Stdout, logs.Stderr
+		}
+	}
+	streamed.finish(spec.stdout, spec.stderr, stdout, stderr)
 	return int(result.ExitCode), nil
+}
+
+// processOutput is the text the log stream already showed. The stream is one
+// line per frame and the scanner drops the frame newline.
+type processOutput struct {
+	mu             sync.Mutex
+	stdout, stderr strings.Builder
+}
+
+func (o *processOutput) write(w io.Writer, buf *strings.Builder, chunk string) {
+	line := streamFrame(chunk)
+	if line == "" {
+		return
+	}
+	o.mu.Lock()
+	buf.WriteString(line)
+	o.mu.Unlock()
+	writeOut(w, line)
+}
+
+func (o *processOutput) wrote() bool {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.stdout.Len() > 0 || o.stderr.Len() > 0
+}
+
+func (o *processOutput) finish(stdout, stderr io.Writer, finalOut, finalErr string) {
+	o.mu.Lock()
+	gotOut, gotErr := o.stdout.String(), o.stderr.String()
+	o.mu.Unlock()
+	writeOut(stdout, pendingOutput(gotOut, finalOut))
+	writeOut(stderr, pendingOutput(gotErr, finalErr))
+}
+
+// streamFrame puts back the newline the log scanner removed.
+func streamFrame(chunk string) string {
+	if chunk == "" || strings.HasSuffix(chunk, "\n") {
+		return chunk
+	}
+	return chunk + "\n"
+}
+
+// pendingOutput is the part of final that the stream has not written yet.
+// An empty stream means the process finished before the stream attached.
+func pendingOutput(streamed, final string) string {
+	if streamed == "" || strings.HasPrefix(final, streamed) {
+		return final[len(streamed):]
+	}
+	return ""
+}
+
+func closeStream(stream *sdk.StreamControl) {
+	if stream == nil {
+		return
+	}
+	if stream.Close != nil {
+		stream.Close()
+	}
+	stream.Wait()
 }
 
 func (s *sdkClient) Start(ctx context.Context, name string, spec runSpec) error {

@@ -8,6 +8,10 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 
 ## [Unreleased]
 
+### Fixed
+
+- `kaxa exec` on Blaxel prints the command output. A short command no longer finishes before the log stream attaches, and a streamed line keeps its newline.
+
 ### Added
 
 - Blaxel sandboxes as the `blaxel` provider, through the official Blaxel Go SDK, with `KAXA_BLAXEL_API_KEY` and `KAXA_BLAXEL_WORKSPACE`. It supports create (with `--sync`, `--template`, and `--api`), list, exec, console, sync, and destroy. The default image is `blaxel/base-image:latest` (user `root`, workspace `/root/workspace/<repo>`), the default region is `us-pdx-1`, and the default memory is 4096 MB. `create --api` starts an HTTP service and publishes a public preview named `kaxa-api`. `console` attaches to the terminal the sandbox starts, follows window resizing, and ends after 15 minutes without input. Restart, upgrade, snapshots, and `--running` are not available.
