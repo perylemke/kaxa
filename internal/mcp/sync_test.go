@@ -201,8 +201,8 @@ func TestSyncRepositoryNoInstallSkipsCommands(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sync: %v", err)
 	}
-	if len(fp.setupSteps) != 1 || len(fp.setupSteps[0].Commands) != 0 {
-		t.Fatalf("steps = %#v", fp.setupSteps)
+	if len(fp.setupSteps) != 0 {
+		t.Fatalf("steps = %#v, want no toolchain install", fp.setupSteps)
 	}
 	if len(out.SkippedCommands) != 1 || out.SkippedCommands[0][0] != "go" {
 		t.Fatalf("skipped = %v", out.SkippedCommands)

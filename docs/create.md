@@ -52,7 +52,7 @@ kaxa create --sync --dir ~/projects/api-python my-sprite
 
 Every sandbox has a workspace directory (`$HOME/workspace`), created at create time, so `kaxa sync` works on a sandbox created without `--sync`. Modal is the exception: only a sandbox created with `--sync` has one.
 
-`--no-install`, together with `--sync`, installs the toolchains and skips the dependency commands. kaxa prints the commands to run them by hand.
+`--no-install`, together with `--sync`, copies the repository and skips the toolchain and the dependency commands. kaxa prints the dependency commands to run them by hand. The image has to provide the tools those commands need.
 
 `exec` and `console` on a sandbox created with `--sync` start in the workspace: `/home/sprite/workspace` on Sprites, `/home/modal/workspace` on Modal, `/home/user/workspace` on E2B, `/home/agent/workspace` on Docker, `/home/daytona/workspace` on Daytona, `/root/workspace` on Blaxel. Without `--sync` they start in the home directory, with the toolchain `PATH` set.
 

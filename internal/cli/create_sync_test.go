@@ -387,7 +387,7 @@ func TestCreateSyncNoInstallSkipsCommands(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
-	if len(fp.setupSteps) != 1 || len(fp.setupSteps[0].Commands) != 0 {
-		t.Fatalf("steps = %#v", fp.setupSteps)
+	if len(fp.setupSteps) != 0 {
+		t.Fatalf("steps = %#v, want no toolchain install", fp.setupSteps)
 	}
 }

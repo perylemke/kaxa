@@ -19,7 +19,7 @@ type createIn struct {
 	Provider  string   `json:"provider,omitempty" jsonschema:"Provider name from list_providers. Defaults to KAXA_DEFAULT_PROVIDER."`
 	Name      string   `json:"name" jsonschema:"Sandbox name. Lowercase letters, digits and hyphens."`
 	Sync      bool     `json:"sync,omitempty" jsonschema:"Copy a local Git repository into the sandbox and install its dependencies."`
-	NoInstall bool     `json:"no_install,omitempty" jsonschema:"With sync, install the toolchains but skip the dependency commands. The response lists them in skipped_commands."`
+	NoInstall bool     `json:"no_install,omitempty" jsonschema:"With sync, copy the repository and skip the toolchain and the dependency commands. The response lists the dependency commands in skipped_commands."`
 	Dir       string   `json:"dir,omitempty" jsonschema:"Directory inside the Git repository to copy. Requires sync. Defaults to the server working directory. Must be related to the server working directory."`
 	Running   bool     `json:"running,omitempty" jsonschema:"Keep the sandbox running for one hour and serve a tmux terminal on its URL."`
 	API       bool     `json:"api,omitempty" jsonschema:"Publish one HTTP service on the sandbox URL. Requires api_cmd."`
@@ -43,7 +43,7 @@ type syncIn struct {
 	Provider  string `json:"provider,omitempty" jsonschema:"Provider name from list_providers. Defaults to KAXA_DEFAULT_PROVIDER."`
 	Name      string `json:"name" jsonschema:"Sandbox name. Any sandbox accepts sync, except a Modal sandbox that was not created with sync."`
 	Dir       string `json:"dir,omitempty" jsonschema:"Directory inside the Git repository to copy. Defaults to the server working directory. Must be related to the server working directory."`
-	NoInstall bool   `json:"no_install,omitempty" jsonschema:"Install the toolchains but skip the dependency commands. The response lists them in skipped_commands."`
+	NoInstall bool   `json:"no_install,omitempty" jsonschema:"Copy the repository and skip the toolchain and the dependency commands. The response lists the dependency commands in skipped_commands."`
 }
 
 type syncOut struct {

@@ -8,6 +8,10 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 
 ## [Unreleased]
 
+### Changed
+
+- `--no-install` on `kaxa sync` and `kaxa create --sync`, and `no_install` on the MCP `sync_repository` and `create_sandbox`, copies the repository and skips the toolchain install as well as the dependency commands. The dependency commands are still printed for you to run.
+
 ### Fixed
 
 - `kaxa exec` on Blaxel prints the command output. A short command no longer finishes before the log stream attaches, and a streamed line keeps its newline.

@@ -246,8 +246,8 @@ func TestSyncNoInstallSkipsCommandsAndPrintsThem(t *testing.T) {
 	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}
-	if len(fp.setupSteps) != 1 || len(fp.setupSteps[0].Commands) != 0 {
-		t.Fatalf("steps = %#v, want the toolchain step without commands", fp.setupSteps)
+	if len(fp.setupSteps) != 0 {
+		t.Fatalf("steps = %#v, want no toolchain install", fp.setupSteps)
 	}
 	text := out.String()
 	if !strings.Contains(text, "dependencies were not installed") || !strings.Contains(text, "go mod download") || !strings.Contains(text, filepath.Base(repo)) {

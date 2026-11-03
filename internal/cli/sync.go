@@ -26,7 +26,7 @@ func newSyncCmd(reg *registry.Registry) *cobra.Command {
 
 The repository lands in the workspace of the sandbox, including .git and excluding ignored files: /home/sprite/workspace/<repo> on Sprites, /home/modal/workspace/<repo> on Modal, /home/user/workspace/<repo> on E2B, /home/agent/workspace/<repo> on Docker, and /home/daytona/workspace/<repo> on Daytona. --dir selects the repository; without it, sync uses the current directory. A subdirectory still copies the whole Git repository.
 Every sandbox has a workspace, so one created without --sync accepts sync too, except on Modal: a Modal sandbox only has a workspace when it was created with --sync.
---no-install still installs the toolchains and skips the dependency commands, then prints the commands to run them by hand.
+--no-install copies the repository and skips the toolchain and the dependency commands, then prints those commands to run them by hand.
 If <repo> already exists in the sandbox, sync stops before copying and does not replace it. A failed copy or install keeps the sandbox.`,
 		Example: `  kaxa sync my-sprite
   kaxa sync --dir ~/projects/api-python my-sprite
@@ -38,7 +38,7 @@ If <repo> already exists in the sandbox, sync stops before copying and does not 
 		},
 	}
 	cmd.Flags().StringVar(&dir, "dir", "", "Git repository to copy (default: the current directory)")
-	cmd.Flags().BoolVar(&noInstall, "no-install", false, "install the toolchains but skip the dependency commands")
+	cmd.Flags().BoolVar(&noInstall, "no-install", false, "copy the repository and skip the toolchain and dependency installs")
 	return cmd
 }
 
