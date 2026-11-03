@@ -415,7 +415,7 @@ func recordFrom(sb *sdk.Sandbox) (Record, bool) {
 		return Record{}, false
 	}
 	rec := Record{
-		Name: sb.Metadata.Name, Status: mapStatus(string(sb.Status)),
+		Name: sb.Metadata.Name, Status: mapStatus(string(sb.Status)), Phase: string(sb.Status),
 		Labels: splitLabels(sb.Metadata.Labels[labelLabels]),
 		Image:  sb.Spec.Runtime.Image, Region: sb.Spec.Region,
 		CreatedAt: parseTime(sb.Metadata.CreatedAt),
@@ -432,14 +432,25 @@ func mapStatus(deployment string) string {
 	switch deployment {
 	case "DEPLOYED":
 		return statusRunning
-	case "FAILED":
+	case phaseFailed:
 		return statusError
 	case "ARCHIVED", "ARCHIVING":
 		return statusArchived
-	case "DEACTIVATED", "DEACTIVATING", "DELETING", "TERMINATED":
+	case "DEACTIVATED", "DEACTIVATING", phaseDeleting, phaseTerminated:
 		return statusStopped
 	default:
 		return statusStarting
+	}
+}
+
+// nameFree reports whether Blaxel will reuse this name. Get still returns a
+// terminated or failed sandbox, and list hides it.
+func nameFree(rec Record) bool {
+	switch rec.Phase {
+	case phaseTerminated, phaseFailed:
+		return true
+	default:
+		return false
 	}
 }
 

@@ -1,8 +1,11 @@
 package blaxel
 
 import (
+	"context"
 	"errors"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/perylemke/kaxa/internal/sandbox"
 )
@@ -238,6 +241,64 @@ func TestDestroy(t *testing.T) {
 	}
 	if err := p.Destroy(t.Context(), "Bad Name"); err == nil {
 		t.Fatal("invalid name accepted")
+	}
+}
+
+func TestDestroyWaitsUntilNameIsGone(t *testing.T) {
+	t.Parallel()
+	api := newFakeAPI()
+	api.lingerAfterDelete = 2
+	p := newTestProvider(t, api)
+	api.add(boxName, statusRunning)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	if err := p.Destroy(ctx, boxName); err != nil {
+		t.Fatalf("Destroy: %v", err)
+	}
+	if _, err := api.Find(t.Context(), boxName); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("sandbox still present: %v", err)
+	}
+}
+
+func TestDestroyAcceptsTerminatedName(t *testing.T) {
+	t.Parallel()
+	api := newFakeAPI()
+	api.terminateAfterDelete = true
+	p := newTestProvider(t, api)
+	api.add(boxName, statusRunning)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	if err := p.Destroy(ctx, boxName); err != nil {
+		t.Fatalf("Destroy: %v", err)
+	}
+	rec, err := api.Find(t.Context(), boxName)
+	if err != nil || rec.Phase != phaseTerminated {
+		t.Fatalf("record = %+v, %v", rec, err)
+	}
+	if _, err := p.Create(t.Context(), sandbox.Spec{Name: boxName}); err != nil {
+		t.Fatalf("Create over terminated: %v", err)
+	}
+	api.add("failed", statusError)
+	api.sandboxes["failed"].Phase = phaseFailed
+	if _, err := p.Create(t.Context(), sandbox.Spec{Name: "failed"}); err != nil {
+		t.Fatalf("Create over failed: %v", err)
+	}
+}
+
+func TestDestroyReportsNameThatStays(t *testing.T) {
+	t.Parallel()
+	api := newFakeAPI()
+	api.lingerAfterDelete = -1
+	p := newTestProvider(t, api)
+	p.SetGoneTimeout(30 * time.Millisecond)
+	api.add(boxName, statusRunning)
+	err := p.Destroy(t.Context(), boxName)
+	if err == nil || !strings.Contains(err.Error(), boxName) || !strings.Contains(err.Error(), "still exists") {
+		t.Fatalf("err = %v", err)
+	}
+	rec, findErr := api.Find(t.Context(), boxName)
+	if findErr != nil || rec.Phase != phaseDeleting {
+		t.Fatalf("record = %+v, %v", rec, findErr)
 	}
 }
 

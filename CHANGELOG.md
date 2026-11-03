@@ -11,6 +11,7 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 ### Fixed
 
 - `kaxa exec` on Blaxel prints the command output. A short command no longer finishes before the log stream attaches, and a streamed line keeps its newline.
+- `kaxa destroy` on Blaxel finishes when the sandbox is terminated or gone. Blaxel keeps returning that sandbox from Get, and the name can be created again.
 
 ### Added
 

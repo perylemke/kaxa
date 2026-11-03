@@ -24,12 +24,15 @@ const (
 	// ProviderName is the registry name of the provider.
 	ProviderName = "blaxel"
 
-	defaultImage    = "blaxel/base-image:latest"
-	defaultRegion   = "us-pdx-1"
-	defaultMemory   = 4096
-	defaultTimeout  = 3 * time.Minute
-	defaultPoll     = time.Second
-	cleanupTimeout  = 15 * time.Second
+	defaultImage   = "blaxel/base-image:latest"
+	defaultRegion  = "us-pdx-1"
+	defaultMemory  = 4096
+	defaultTimeout = 3 * time.Minute
+	defaultPoll    = time.Second
+	cleanupTimeout = 15 * time.Second
+	// goneTimeout is how long Destroy waits after the API accepts a delete.
+	// The name stays reserved until the sandbox is actually gone.
+	goneTimeout     = time.Minute
 	controlPlaneURL = "https://api.blaxel.ai/v0"
 )
 
@@ -53,7 +56,9 @@ type Provider struct {
 	memory   int
 	// startTimeout and pollInterval bound the waits for a sandbox.
 	startTimeout, pollInterval time.Duration
-	readyTimeout, readyEvery   time.Duration
+	// goneLimit bounds the wait after a delete. Zero means goneTimeout.
+	goneLimit                time.Duration
+	readyTimeout, readyEvery time.Duration
 }
 
 // New returns a Blaxel provider. Call Configure before use.
@@ -130,6 +135,14 @@ func (p *Provider) SetPolling(timeout, interval time.Duration) {
 	p.startTimeout, p.pollInterval = timeout, interval
 }
 
+// SetGoneTimeout sets how long Destroy waits for a deleted name to disappear.
+// Tests use it to avoid a minute-long wait.
+func (p *Provider) SetGoneTimeout(d time.Duration) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.goneLimit = d
+}
+
 func (p *Provider) polling() (timeout, interval time.Duration) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -166,9 +179,11 @@ func (p *Provider) Create(ctx context.Context, spec sandbox.Spec) (sandbox.ID, e
 	if err != nil {
 		return "", err
 	}
-	if _, err := c.Find(ctx, spec.Name); err == nil {
+	found, err := c.Find(ctx, spec.Name)
+	if err == nil && !nameFree(found) {
 		return "", userErr(ErrAlreadyExists, spec.Name, secrets...)
-	} else if !errors.Is(err, ErrNotFound) {
+	}
+	if err != nil && !errors.Is(err, ErrNotFound) {
 		return "", userErr(err, spec.Name, secrets...)
 	}
 	rec, err := c.Create(ctx, params)
@@ -307,7 +322,45 @@ func (p *Provider) Destroy(ctx context.Context, id sandbox.ID) error {
 		return userErr(err, string(id), secrets...)
 	}
 	p.recent.Delete(string(id))
+	// The API accepts the delete while Get still returns the sandbox. The name
+	// is free once that record is terminated or failed, which is before the 404.
+	if err := p.waitGone(ctx, c, string(id)); err != nil {
+		return userErr(err, string(id), secrets...)
+	}
 	return nil
+}
+
+// waitGone polls until the name is free. The caller's deadline is not used:
+// destroyAfterFailure cancels after 15s, which is shorter than this delete.
+func (p *Provider) waitGone(ctx context.Context, c apiClient, name string) error {
+	timeout, interval := p.goneWait()
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), timeout)
+	defer cancel()
+	for {
+		rec, err := c.Find(ctx, name)
+		if errors.Is(err, ErrNotFound) || (err == nil && nameFree(rec)) {
+			return nil
+		}
+		if err != nil && ctx.Err() == nil {
+			return err
+		}
+		if err := sleep(ctx, interval); err != nil {
+			return fmt.Errorf("sandbox %q still exists after delete", name)
+		}
+	}
+}
+
+func (p *Provider) goneWait() (time.Duration, time.Duration) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	timeout, interval := p.goneLimit, p.pollInterval
+	if timeout <= 0 {
+		timeout = goneTimeout
+	}
+	if interval <= 0 {
+		interval = defaultPoll
+	}
+	return timeout, interval
 }
 
 func (p *Provider) resolve(ctx context.Context, c apiClient, name string) (Record, error) {

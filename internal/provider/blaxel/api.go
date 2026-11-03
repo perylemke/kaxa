@@ -20,6 +20,12 @@ const (
 	statusArchived = "archived"
 	statusStopped  = "stopped"
 
+	// Blaxel keeps these on Get after the sandbox is finished. The name can be reused.
+	phaseFailed     = "FAILED"
+	phaseTerminated = "TERMINATED"
+	// phaseDeleting still holds the name until the sandbox is terminated.
+	phaseDeleting = "DELETING"
+
 	previewName = "kaxa-api"
 )
 
@@ -35,8 +41,11 @@ type CreateParams struct {
 
 // Record is one Blaxel sandbox as kaxa sees it. The kaxa name is the Blaxel name.
 type Record struct {
-	Name       string
-	Status     string
+	Name   string
+	Status string
+	// Phase is the API status. DELETING and TERMINATED both display as stopped,
+	// and only the raw value says whether the name is free.
+	Phase      string
 	Labels     []string
 	Image      string
 	Region     string

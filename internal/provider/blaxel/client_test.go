@@ -29,7 +29,7 @@ func TestRecordFromKeepsOnlyManaged(t *testing.T) {
 		Spec:   sdk.SandboxSpec{Region: defaultRegion, Runtime: sdk.SandboxRuntime{Image: defaultImage}},
 		Status: "DEPLOYED",
 	})
-	if !ok || rec.Name != boxName || rec.Status != statusRunning || rec.APIPort != 8000 || rec.Image != defaultImage {
+	if !ok || rec.Name != boxName || rec.Status != statusRunning || rec.Phase != "DEPLOYED" || rec.APIPort != 8000 || rec.Image != defaultImage {
 		t.Fatalf("record = %+v, ok = %v", rec, ok)
 	}
 	if len(rec.Labels) != 2 || rec.Labels[0] != "sync" || rec.Labels[1] != "team" {

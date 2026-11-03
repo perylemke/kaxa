@@ -34,9 +34,15 @@ type fakeAPI struct {
 	uploads      map[string]string
 	handler      func(runSpec) fakeResult
 	blindFind    bool
-	terms        []termCall
-	termOut      string
-	termErr      error
+	// lingerAfterDelete is how many Finds still see the sandbox after Delete.
+	// Negative means the name stays in DELETING. Zero removes it immediately.
+	lingerAfterDelete int
+	// terminateAfterDelete leaves the sandbox on Get with a terminated phase.
+	terminateAfterDelete bool
+	readsLeft            int
+	terms                []termCall
+	termOut              string
+	termErr              error
 }
 
 type termCall struct {
@@ -66,7 +72,7 @@ func (f *fakeAPI) Create(_ context.Context, p CreateParams) (Record, error) {
 	if f.createErr != nil {
 		return Record{}, f.createErr
 	}
-	if _, ok := f.sandboxes[p.Name]; ok {
+	if rec, ok := f.sandboxes[p.Name]; ok && !nameFree(*rec) {
 		return Record{}, ErrAlreadyExists
 	}
 	rec := &Record{
@@ -94,6 +100,13 @@ func (f *fakeAPI) Find(_ context.Context, name string) (Record, error) {
 	if !ok || f.blindFind {
 		return Record{}, ErrNotFound
 	}
+	if f.readsLeft > 0 {
+		f.readsLeft--
+		if f.readsLeft == 0 {
+			delete(f.sandboxes, name)
+			return Record{}, ErrNotFound
+		}
+	}
 	if rec.Status == statusStarting {
 		rec.Status = statusRunning
 	}
@@ -105,6 +118,17 @@ func (f *fakeAPI) Delete(_ context.Context, name string) error {
 	defer f.mu.Unlock()
 	if _, ok := f.sandboxes[name]; !ok {
 		return ErrNotFound
+	}
+	if f.terminateAfterDelete {
+		f.sandboxes[name].Status = statusStopped
+		f.sandboxes[name].Phase = phaseTerminated
+		return nil
+	}
+	if f.lingerAfterDelete != 0 {
+		f.readsLeft = f.lingerAfterDelete
+		f.sandboxes[name].Status = statusStopped
+		f.sandboxes[name].Phase = phaseDeleting
+		return nil
 	}
 	delete(f.sandboxes, name)
 	return nil
