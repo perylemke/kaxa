@@ -102,6 +102,17 @@ func (s *sdkClient) Find(ctx context.Context, name string) (Record, error) {
 	return rec, nil
 }
 
+func (s *sdkClient) Sandbox(ctx context.Context, name string) (*sdk.Sandbox, error) {
+	inst, err := s.get(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	if inst == nil || inst.Sandbox == nil {
+		return nil, ErrNotFound
+	}
+	return inst.Sandbox, nil
+}
+
 func (s *sdkClient) Delete(ctx context.Context, name string) error {
 	_, err := s.sandboxes.Delete(ctx, name)
 	return convertErr(err)

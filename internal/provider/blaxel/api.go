@@ -4,6 +4,8 @@ import (
 	"context"
 	"io"
 	"time"
+
+	sdk "github.com/blaxel-ai/sdk-go"
 )
 
 const (
@@ -70,6 +72,8 @@ type apiClient interface {
 	Create(ctx context.Context, p CreateParams) (Record, error)
 	List(ctx context.Context) ([]Record, error)
 	Find(ctx context.Context, name string) (Record, error)
+	// Sandbox returns the sandbox document for inspect detail fields.
+	Sandbox(ctx context.Context, name string) (*sdk.Sandbox, error)
 	Delete(ctx context.Context, name string) error
 	// PreviewURL returns the public preview URL, or ErrNotFound when none exists.
 	PreviewURL(ctx context.Context, name string) (string, error)

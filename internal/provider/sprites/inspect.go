@@ -12,7 +12,8 @@ import (
 const defaultAPIBase = "https://api.sprites.dev"
 
 func spriteToDetail(sp *spritesdk.Sprite, provider string) sandbox.Detail {
-	return sandbox.Detail{
+	auth := formatSpriteAuth(sp.URLSettings)
+	d := sandbox.Detail{
 		ID:           sandbox.ID(sp.Name()),
 		Provider:     provider,
 		Status:       sp.Status,
@@ -20,10 +21,37 @@ func spriteToDetail(sp *spritesdk.Sprite, provider string) sandbox.Detail {
 		SpriteUUID:   sp.ID,
 		Organization: sp.OrganizationName,
 		URL:          sp.URL,
-		Auth:         formatSpriteAuth(sp.URLSettings),
+		Auth:         auth,
 		CreatedAt:    sp.CreatedAt,
 		UpdatedAt:    sp.UpdatedAt,
 	}
+	d.Fields = spriteDetailFields(sp, auth)
+	return d
+}
+
+func spriteDetailFields(sp *spritesdk.Sprite, auth string) []sandbox.Field {
+	var fields []sandbox.Field
+	if sp.ID != "" {
+		fields = sandbox.AppendTextField(fields, "ID", "sprite-"+sp.ID)
+	}
+	fields = sandbox.AppendTextField(fields, "Organization", sp.OrganizationName)
+	fields = sandbox.AppendTextField(fields, "Region", sp.PrimaryRegion)
+	if sp.Config != nil {
+		fields = sandbox.AppendIntField(fields, "CPUs", sp.Config.CPUs)
+		if sp.Config.RamMB > 0 {
+			fields = sandbox.AppendFormattedField(fields, "Memory", "%d MB", sp.Config.RamMB)
+		}
+		if sp.Config.StorageGB > 0 {
+			fields = sandbox.AppendFormattedField(fields, "Storage", "%d GB", sp.Config.StorageGB)
+		}
+	}
+	fields = sandbox.AppendTextField(fields, "URL", sp.URL)
+	fields = sandbox.AppendTextField(fields, "Auth", auth)
+	fields = sandbox.AppendTimeField(fields, "Created", sp.CreatedAt)
+	fields = sandbox.AppendTimeField(fields, "Updated", sp.UpdatedAt)
+	fields = sandbox.AppendOptionalTimeField(fields, "Last running", sp.LastRunningAt)
+	fields = sandbox.AppendOptionalTimeField(fields, "Last warming", sp.LastWarmingAt)
+	return fields
 }
 
 func formatSpriteAuth(settings *spritesdk.URLSettings) string {

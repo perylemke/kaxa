@@ -7,6 +7,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	sdk "github.com/blaxel-ai/sdk-go"
 )
 
 const (
@@ -111,6 +113,20 @@ func (f *fakeAPI) Find(_ context.Context, name string) (Record, error) {
 		rec.Status = statusRunning
 	}
 	return *rec, nil
+}
+
+func (f *fakeAPI) Sandbox(_ context.Context, name string) (*sdk.Sandbox, error) {
+	rec, err := f.Find(context.Background(), name)
+	if err != nil {
+		return nil, err
+	}
+	return &sdk.Sandbox{
+		Metadata: sdk.Metadata{Name: rec.Name, CreatedAt: rec.CreatedAt.Format(time.RFC3339), Workspace: "kaxa"},
+		Spec: sdk.SandboxSpec{
+			Region:  rec.Region,
+			Runtime: sdk.SandboxRuntime{Image: rec.Image, Memory: 4096},
+		},
+	}, nil
 }
 
 func (f *fakeAPI) Delete(_ context.Context, name string) error {

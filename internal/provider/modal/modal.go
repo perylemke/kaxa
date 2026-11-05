@@ -129,6 +129,7 @@ func (p *Provider) Inspect(ctx context.Context, id sandbox.ID) (sandbox.Detail, 
 		Provider: p.Name(),
 		Status:   statusOf(r),
 		Labels:   r.Labels,
+		Fields:   sandbox.AppendTextField(nil, "ID", r.ID),
 	}, nil
 }
 

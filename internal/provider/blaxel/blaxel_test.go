@@ -203,6 +203,9 @@ func TestListSortedAndInspect(t *testing.T) {
 	if err != nil || d.Provider != ProviderName || d.URL != "" {
 		t.Fatalf("Inspect = %+v, %v", d, err)
 	}
+	if !fieldHasLabel(d.Fields, "Workspace") {
+		t.Fatalf("fields = %+v", d.Fields)
+	}
 	if _, err := p.Inspect(t.Context(), "missing"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("Inspect missing err = %v", err)
 	}
@@ -313,4 +316,13 @@ func TestDefaults(t *testing.T) {
 	if err != nil || rec.Image != defaultImage || rec.Region != defaultRegion {
 		t.Fatalf("record = %+v, %v", rec, err)
 	}
+}
+
+func fieldHasLabel(fields []sandbox.Field, label string) bool {
+	for _, f := range fields {
+		if f.Label == label {
+			return true
+		}
+	}
+	return false
 }
