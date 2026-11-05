@@ -3,7 +3,7 @@ module github.com/perylemke/kaxa
 go 1.27
 
 require (
-	charm.land/bubbletea/v2 v2.1.0
+	charm.land/bubbletea/v2 v2.1.1
 	charm.land/huh/v2 v2.0.3
 	github.com/blaxel-ai/sdk-go v0.29.1
 	github.com/charmbracelet/bubbles v1.0.0
