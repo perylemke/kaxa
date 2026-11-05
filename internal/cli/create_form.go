@@ -126,11 +126,11 @@ func buildCreateFormPages(
 	}
 
 	identity := huh.NewGroup(
-		huh.NewSelect[string]().Title("Provider").Options(options...).Value(&result.Provider).
+		shownField(huh.NewSelect[string]().Title("Provider").Options(options...).Value(&result.Provider).
 			Validate(func(name string) error {
 				return validateCreateProvider(name, lookup, flags, result)
-			}),
-		huh.NewInput().Title("Name").Value(&result.Name).Validate(validateCreateName),
+			})),
+		shownField(huh.NewInput().Title("Name").Value(&result.Name).Validate(validateCreateName)),
 	).Title("Create sandbox").Description("Step 1 · Provider and name")
 
 	optionsPage := huh.NewGroup(
@@ -151,25 +151,25 @@ func buildCreateFormPages(
 	).Title("Provider options").Description("Step 2 · Options this provider supports")
 
 	syncPage := huh.NewGroup(
-		huh.NewInput().Title("Directory").Description("Empty means the current directory.").Value(&result.Dir).
-			Validate(validateCreateSyncDir),
-		huh.NewConfirm().Title("Skip install").Affirmative("Yes").Negative("No").Value(&result.NoInstall),
+		shownField(huh.NewInput().Title("Directory").Description("Empty means the current directory.").Value(&result.Dir).
+			Validate(validateCreateSyncDir)),
+		shownField(huh.NewConfirm().Title("Skip install").Affirmative("Yes").Negative("No").Value(&result.NoInstall)),
 	).Title("Sync").Description("Step 3 · Repository")
 
 	apiPage := huh.NewGroup(
-		huh.NewInput().Title("API command").Description("Comma-separated argv. The first item is the binary.").Value(&apiRaw.command).
+		shownField(huh.NewInput().Title("API command").Description("Comma-separated argv. The first item is the binary.").Value(&apiRaw.command).
 			Validate(func(s string) error {
 				_, err := parseAPICommand(s)
 				if err != nil {
 					return errors.New(err.Error())
 				}
 				return nil
-			}),
-		huh.NewInput().Title("API port").Value(&apiRaw.port).Validate(func(s string) error {
+			})),
+		shownField(huh.NewInput().Title("API port").Value(&apiRaw.port).Validate(func(s string) error {
 			return validateAPIPortInput(s, result.Running)
-		}),
-		huh.NewInput().Title("API env").Description("Optional. Comma-separated KEY or KEY=VALUE entries.").Value(&apiRaw.env).
-			Validate(validateCreateAPIEnvInput),
+		})),
+		shownField(huh.NewInput().Title("API env").Description("Optional. Comma-separated KEY or KEY=VALUE entries.").Value(&apiRaw.env).
+			Validate(validateCreateAPIEnvInput)),
 	).Title("API").Description("Step 4 · Service")
 
 	return createFormPages{identity: identity, options: optionsPage, sync: syncPage, api: apiPage}
@@ -304,12 +304,7 @@ func runCreateWizard(out io.Writer, in io.Reader, accessible bool, pages createF
 	}
 	pages.sync = pages.sync.WithHideFunc(func() bool { return !result.Sync })
 	pages.api = pages.api.WithHideFunc(func() bool { return !result.API })
-	form := newThemedForm(pages.identity, pages.options, pages.sync, pages.api).
-		WithViewHook(func(v tea.View) tea.View {
-			v.ReportFocus = true
-			v.AltScreen = true
-			return v
-		})
+	form := newCreateWizardForm(pages.identity, pages.options, pages.sync, pages.api)
 	if err := form.Run(); err != nil {
 		return formRunErr(err)
 	}
@@ -422,6 +417,10 @@ func splitAPIEnvField(raw string) []string {
 	return out
 }
 
+func shownField(field huh.Field) huh.Field {
+	return &capabilityField{inner: field, show: func() bool { return true }}
+}
+
 func conditionalField(capsOf func() sandbox.Capabilities, feature sandbox.Feature, field huh.Field) huh.Field {
 	return &capabilityField{
 		inner: field,
@@ -484,7 +483,9 @@ func (c *capabilityField) Skip() bool {
 
 func (c *capabilityField) Zoom() bool { return c.inner.Zoom() }
 
-func (c *capabilityField) KeyBinds() []key.Binding { return c.inner.KeyBinds() }
+func (c *capabilityField) KeyBinds() []key.Binding {
+	return append(c.inner.KeyBinds(), key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("ctrl+c", "quit")))
+}
 
 func (c *capabilityField) WithTheme(t huh.Theme) huh.Field {
 	c.inner = c.inner.WithTheme(t)

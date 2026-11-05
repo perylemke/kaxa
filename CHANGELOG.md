@@ -10,7 +10,7 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 
 ### Changed
 
-- `kaxa create` without a name uses a provider-aware wizard: after you choose the provider, the form only asks for options that provider supports, then sync and API details when those are enabled. In a terminal it runs on the alternate screen so the wizard does not mix with scrollback.
+- `kaxa create` without a name uses a provider-aware wizard: after you choose the provider, the form only asks for options that provider supports, then sync and API details when those are enabled. In a terminal it runs on the alternate screen so the wizard does not mix with scrollback. Ctrl+C cancels, and the footer shows that shortcut.
 - `kaxa list` detail view shows provider-specific fields from each backend's GET, and the help line lists only the keys that provider supports. An unsupported key stays on the detail screen with the same message as the standalone command.
 - `--no-install` on `kaxa sync` and `kaxa create --sync`, and `no_install` on the MCP `sync_repository` and `create_sandbox`, copies the repository and skips the toolchain install as well as the dependency commands. The dependency commands are still printed for you to run.
 
