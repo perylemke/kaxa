@@ -59,12 +59,21 @@ type Info struct {
 	Labels   []string
 }
 
+// Field is one inspect line for the list detail view. Text and At are alternatives.
+// The list view drops a field whose Text is empty and whose At is zero.
+type Field struct {
+	Label string
+	Text  string
+	At    time.Time
+}
+
 // Detail is a full sandbox record for inspect and TUI detail views.
 type Detail struct {
 	ID           ID
 	Provider     string
 	Status       string
 	Labels       []string
+	Fields       []Field
 	SpriteUUID   string
 	Organization string
 	URL          string

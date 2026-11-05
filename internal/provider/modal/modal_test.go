@@ -187,6 +187,12 @@ func TestInspect(t *testing.T) {
 	if d.ID != testName || d.Provider != "modal" || d.Status != "running" || len(d.Labels) != 1 {
 		t.Fatalf("detail = %+v", d)
 	}
+	if len(d.Fields) != 1 || d.Fields[0].Label != "ID" || d.Fields[0].Text != testSandboxID {
+		t.Fatalf("fields = %+v", d.Fields)
+	}
+	if !d.CreatedAt.IsZero() {
+		t.Fatal("modal inspect should not set CreatedAt")
+	}
 
 	_, err = p.Inspect(context.Background(), "missing")
 	ue, ok := usererr.As(err)

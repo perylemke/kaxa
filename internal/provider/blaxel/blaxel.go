@@ -293,16 +293,22 @@ func (p *Provider) Inspect(ctx context.Context, id sandbox.ID) (sandbox.Detail, 
 	d := sandbox.Detail{
 		ID: sandbox.ID(rec.Name), Provider: p.Name(), Status: rec.Status, Labels: rec.Labels, CreatedAt: rec.CreatedAt,
 	}
-	if rec.APIPort == 0 {
-		return d, nil
+	var url, auth string
+	if rec.APIPort != 0 {
+		u, err := c.PreviewURL(ctx, rec.Name)
+		switch {
+		case err == nil:
+			url, auth = u, sandbox.URLAuthPublic
+		case !errors.Is(err, ErrNotFound):
+			return sandbox.Detail{}, userErr(err, string(id), secrets...)
+		}
 	}
-	url, err := c.PreviewURL(ctx, rec.Name)
-	switch {
-	case err == nil:
-		d.URL, d.Auth = url, sandbox.URLAuthPublic
-	case !errors.Is(err, ErrNotFound):
+	d.URL, d.Auth = url, auth
+	sb, err := c.Sandbox(ctx, rec.Name)
+	if err != nil && !errors.Is(err, ErrNotFound) {
 		return sandbox.Detail{}, userErr(err, string(id), secrets...)
 	}
+	d.Fields = blaxelDetailFields(sb, url, auth)
 	return d, nil
 }
 

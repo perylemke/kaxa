@@ -216,18 +216,25 @@ func (p *Provider) Inspect(ctx context.Context, id sandbox.ID) (sandbox.Detail, 
 	if err != nil {
 		return sandbox.Detail{}, userErr(err, string(id), secrets...)
 	}
+	full, err := c.Get(ctx, rec.ID)
+	if err == nil {
+		rec = full
+	}
 	d := sandbox.Detail{
 		ID: sandbox.ID(rec.Name), Provider: p.Name(), Status: rec.Status, Labels: rec.Labels, CreatedAt: rec.CreatedAt,
 	}
+	var url, auth string
 	if rec.APIPort > 0 {
 		ep, err := c.GetPort(ctx, rec.ID, rec.APIPort)
 		switch {
 		case err == nil && ep.Public:
-			d.URL, d.Auth = ep.URL, sandbox.URLAuthPublic
+			url, auth = ep.URL, sandbox.URLAuthPublic
 		case err != nil && !errors.Is(err, ErrNotFound):
 			return sandbox.Detail{}, userErr(err, string(id), secrets...)
 		}
 	}
+	d.URL, d.Auth = url, auth
+	d.Fields = daytonaDetailFields(rec, url, auth)
 	return d, nil
 }
 

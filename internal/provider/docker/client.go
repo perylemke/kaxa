@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -70,6 +71,8 @@ type Record struct {
 	Etag      string
 	Endpoint  Endpoint
 	Ports     []PublishedPort
+	CPUs      int
+	MemoryMiB int
 	managed   bool
 }
 
@@ -218,6 +221,44 @@ func parseAPIError(status int, raw []byte) *APIError {
 	return &APIError{Status: status, Code: we.Code, Message: we.Message}
 }
 
+// flexInt reads a JSON number or a decimal string. Docker's list API encodes memoryMib as a string.
+type flexInt int
+
+func (n *flexInt) UnmarshalJSON(raw []byte) error {
+	raw = bytes.TrimSpace(raw)
+	if len(raw) == 0 || string(raw) == "null" {
+		*n = 0
+		return nil
+	}
+	if raw[0] == '"' {
+		var s string
+		if err := json.Unmarshal(raw, &s); err != nil {
+			return err
+		}
+		if s == "" {
+			*n = 0
+			return nil
+		}
+		v, err := strconv.Atoi(s)
+		if err != nil {
+			return fmt.Errorf("docker: resources: %w", err)
+		}
+		*n = flexInt(v)
+		return nil
+	}
+	var v int
+	if err := json.Unmarshal(raw, &v); err != nil {
+		return err
+	}
+	*n = flexInt(v)
+	return nil
+}
+
+type wireResources struct {
+	CPUs      flexInt `json:"cpus"`
+	MemoryMiB flexInt `json:"memoryMib"`
+}
+
 // wireSandbox is the part of the Sandbox resource kaxa reads.
 type wireSandbox struct {
 	Name        string `json:"name"`
@@ -228,6 +269,7 @@ type wireSandbox struct {
 		ImageRef  string            `json:"imageRef"`
 		CreatedAt string            `json:"createdAt"`
 		Etag      string            `json:"etag"`
+		Resources *wireResources    `json:"resources,omitempty"`
 		Endpoint  struct {
 			URI string `json:"uri"`
 		} `json:"endpoint"`
@@ -257,6 +299,10 @@ func (w wireSandbox) record(headerEtag string) Record {
 		if r.Failure == "" {
 			r.Failure = w.Failure.Code
 		}
+	}
+	if w.Core.Resources != nil {
+		r.CPUs = int(w.Core.Resources.CPUs)
+		r.MemoryMiB = int(w.Core.Resources.MemoryMiB)
 	}
 	for key := range w.Core.Labels {
 		if label, ok := strings.CutPrefix(key, labelPrefix); ok {

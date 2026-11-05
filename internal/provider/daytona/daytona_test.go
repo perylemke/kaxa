@@ -168,6 +168,9 @@ func TestListSortedAndInspect(t *testing.T) {
 	if err != nil || d.Provider != "daytona" || d.URL != "" {
 		t.Fatalf("Inspect = %+v, %v", d, err)
 	}
+	if len(d.Fields) == 0 || d.Fields[0].Label != "ID" {
+		t.Fatalf("fields = %+v", d.Fields)
+	}
 	if _, err := p.Inspect(t.Context(), "missing"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("Inspect missing err = %v", err)
 	}

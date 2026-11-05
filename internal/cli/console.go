@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"io"
 	"os"
 	"os/signal"
 	"syscall"
@@ -22,27 +23,30 @@ func newConsoleCmd(reg *registry.Registry) *cobra.Command {
 		Long:    "Opens an interactive bash shell. Requires a terminal.",
 		Args:    requireConsoleName,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts := sandbox.ExecOptions{
-				Command: []string{"bash"},
-				Stdin:   os.Stdin,
-				Stdout:  cmd.OutOrStdout(),
-				Stderr:  cmd.ErrOrStderr(),
-				TTY:     true,
-			}
-
-			ctx, cleanup, err := wrapInteractive(cmd.Context(), &opts)
-			if err != nil {
-				return err
-			}
-			defer cleanup()
-
 			p, err := providerFromCmd(cmd, reg)
 			if err != nil {
 				return err
 			}
-			return p.Exec(ctx, sandbox.ID(args[0]), opts)
+			return openSandboxConsole(cmd.Context(), p, sandbox.ID(args[0]), cmd.OutOrStdout(), cmd.ErrOrStderr())
 		},
 	}
+}
+
+// openSandboxConsole opens the same interactive shell as kaxa console.
+func openSandboxConsole(ctx context.Context, p sandbox.Provider, id sandbox.ID, out, errOut io.Writer) error {
+	opts := sandbox.ExecOptions{
+		Command: []string{"bash"},
+		Stdin:   os.Stdin,
+		Stdout:  out,
+		Stderr:  errOut,
+		TTY:     true,
+	}
+	ctx, cleanup, err := wrapInteractive(ctx, &opts)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+	return p.Exec(ctx, id, opts)
 }
 
 func requireConsoleName(_ *cobra.Command, args []string) error {

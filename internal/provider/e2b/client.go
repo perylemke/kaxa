@@ -70,6 +70,13 @@ type Record struct {
 	APIPort int
 	// Template is the template the sandbox was created from. Empty means base.
 	Template string
+	// ListTemplateID is templateID from the list API when present.
+	ListTemplateID string
+	CPUCount       int
+	MemoryMB       int
+	DiskSizeMB     int
+	EndAt          time.Time
+	Domain         string
 }
 
 // Connection is what the sandbox daemon needs to accept a request.
@@ -117,10 +124,16 @@ type sandboxResponse struct {
 }
 
 type listedSandbox struct {
-	SandboxID string            `json:"sandboxID"`
-	StartedAt time.Time         `json:"startedAt"`
-	State     string            `json:"state"`
-	Metadata  map[string]string `json:"metadata"`
+	SandboxID  string            `json:"sandboxID"`
+	StartedAt  time.Time         `json:"startedAt"`
+	State      string            `json:"state"`
+	Metadata   map[string]string `json:"metadata"`
+	TemplateID string            `json:"templateID"`
+	CPUCount   *int              `json:"cpuCount"`
+	MemoryMB   *int              `json:"memoryMB"`
+	DiskSizeMB *int              `json:"diskSizeMB"`
+	EndAt      *time.Time        `json:"endAt"`
+	Domain     *string           `json:"domain"`
 }
 
 func (c *restClient) Create(ctx context.Context, p CreateParams) (string, error) {
@@ -222,6 +235,22 @@ func recordOf(s listedSandbox) (Record, bool) {
 		rec.APIPort = port
 	}
 	rec.Template = s.Metadata[metaTemplate]
+	rec.ListTemplateID = s.TemplateID
+	if s.CPUCount != nil {
+		rec.CPUCount = *s.CPUCount
+	}
+	if s.MemoryMB != nil {
+		rec.MemoryMB = *s.MemoryMB
+	}
+	if s.DiskSizeMB != nil {
+		rec.DiskSizeMB = *s.DiskSizeMB
+	}
+	if s.EndAt != nil {
+		rec.EndAt = *s.EndAt
+	}
+	if s.Domain != nil {
+		rec.Domain = *s.Domain
+	}
 	return rec, true
 }
 

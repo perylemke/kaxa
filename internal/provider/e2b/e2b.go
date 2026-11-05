@@ -11,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strconv"
 	"sync"
 	"time"
 
@@ -190,9 +189,11 @@ func (p *Provider) Inspect(ctx context.Context, id sandbox.ID) (sandbox.Detail, 
 		Labels:    rec.Labels,
 		CreatedAt: rec.StartedAt,
 	}
-	if rec.APIPort > 0 {
-		d.URL, d.Auth = "https://"+strconv.Itoa(rec.APIPort)+"-"+rec.ID+"."+defaultDomain, sandbox.URLAuthPublic
+	url, auth := e2bPublicURL(rec, defaultDomain)
+	if url != "" {
+		d.URL, d.Auth = url, auth
 	}
+	d.Fields = e2bDetailFields(rec, d.URL, d.Auth)
 	return d, nil
 }
 

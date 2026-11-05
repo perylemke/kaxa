@@ -63,6 +63,34 @@ type Record struct {
 	APIPort int
 	// Template is the snapshot the sandbox was created from. Empty means default.
 	Template string
+
+	// Fields below are filled on Get for the list detail view.
+	RawState            string
+	Snapshot            string
+	User                string
+	Public              bool
+	Target              string
+	CPU                 int32
+	Memory              int32
+	Disk                int32
+	GPU                 int32
+	GpuType             string
+	Spot                bool
+	ErrorReason         string
+	DesiredState        string
+	AutoStopInterval    int
+	AutoPauseInterval   int
+	AutoArchiveInterval int
+	AutoDeleteInterval  int
+	AutoDestroyAt       string
+	LastActivityAt      string
+	UpdatedAt           string
+	SandboxClass        string
+	VolumeMounts        []string
+	Kvm                 bool
+	NetworkBlockAll     bool
+	NetworkAllowList    string
+	DomainAllowList     string
 }
 
 // Image is a disk snapshot captured from a sandbox.
@@ -237,6 +265,7 @@ func (s *sdkClient) Get(ctx context.Context, id string) (Record, error) {
 	if !ok {
 		return Record{}, ErrNotFound
 	}
+	enrichRecord(&rec, sb)
 	return rec, nil
 }
 

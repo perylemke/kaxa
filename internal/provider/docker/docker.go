@@ -230,6 +230,7 @@ func (p *Provider) Inspect(ctx context.Context, id sandbox.ID) (sandbox.Detail, 
 		Labels:    rec.Labels,
 		URL:       publishedURL(rec),
 		CreatedAt: rec.CreatedAt,
+		Fields:    dockerDetailFields(rec),
 	}, nil
 }
 

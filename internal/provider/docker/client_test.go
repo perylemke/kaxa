@@ -97,6 +97,33 @@ func checkParsedRecord(t *testing.T, r Record) {
 	}
 }
 
+func TestListDecodesResourcesMemoryAsStringOrNumber(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		resources string
+	}{
+		{name: "string memoryMib", resources: `"resources":{"cpus":2,"memoryMib":"4096"}`},
+		{name: "numeric memoryMib", resources: `"resources":{"cpus":2,"memoryMib":4096}`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			payload := `{"sandboxes":[{"name":"sandboxes/abc","displayName":"box","core":{"status":"running","labels":{"kaxa.managed":"true"},` + tt.resources + `}}]}`
+			c, _ := newAPIServer(t, func(w http.ResponseWriter, _ *http.Request) {
+				_, _ = w.Write([]byte(payload))
+			})
+			got, err := c.List(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(got) != 1 || got[0].CPUs != 2 || got[0].MemoryMiB != 4096 {
+				t.Fatalf("got %+v", got)
+			}
+		})
+	}
+}
+
 func TestFindFiltersByDisplayName(t *testing.T) {
 	t.Parallel()
 	c, srv := newAPIServer(t, func(w http.ResponseWriter, _ *http.Request) {

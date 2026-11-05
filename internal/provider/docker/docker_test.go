@@ -226,6 +226,9 @@ func TestInspect(t *testing.T) {
 	if d.Status != statusRunning || d.Provider != "docker" || d.CreatedAt.IsZero() || d.URL != "" {
 		t.Fatalf("detail = %+v", d)
 	}
+	if !fieldContains(d.Fields, "Image") {
+		t.Fatalf("fields = %+v", d.Fields)
+	}
 }
 
 func TestInspectShowsThePublishedURL(t *testing.T) {
@@ -335,4 +338,13 @@ func TestAPIErrorMessage(t *testing.T) {
 			t.Errorf("got %q, want %q", got, tt.want)
 		}
 	}
+}
+
+func fieldContains(fields []sandbox.Field, label string) bool {
+	for _, f := range fields {
+		if f.Label == label {
+			return true
+		}
+	}
+	return false
 }

@@ -29,11 +29,12 @@ func newListCmd(reg *registry.Registry) *cobra.Command {
 				return err
 			}
 			if listOutputIsTTY(out) {
-				res, err := runListInteractive(cmd.Context(), providers, infos)
-				if err != nil {
-					return err
-				}
-				return handleListPostAction(cmd, providers, res)
+				return runListWithConsoleLoop(
+					cmd.Context(), providers, infos,
+					cmd.InOrStdin(), out, cmd.ErrOrStderr(),
+					runListInteractive,
+					openSandboxConsole,
+				)
 			}
 			return writeListPlain(out, infos)
 		},
