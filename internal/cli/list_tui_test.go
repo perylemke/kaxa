@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -13,37 +14,99 @@ import (
 	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
-func TestListInteractiveDetailViewShowsFields(t *testing.T) {
+func TestListInteractiveDetailViewSprites(t *testing.T) {
 	t.Parallel()
 
+	now := time.Now()
 	m := listInteractiveModel{
 		mode: listModeDetail,
+		providers: map[string]sandbox.Provider{
+			spritesProviderName: &recordingURLProvider{},
+		},
+		infos: []sandbox.Info{{ID: fixtureDemo, Provider: spritesProviderName}},
 		detail: sandbox.Detail{
-			ID:           fixtureDemo,
-			Status:       fixtureWarm,
-			SpriteUUID:   "uuid-1",
-			Organization: "acme",
-			URL:          "https://demo.sprites.dev",
-			Auth:         "sprite · admins",
-			Labels:       []string{"kaxa", "team=a"},
-			CreatedAt:    time.Now().Add(-2 * time.Hour),
-			UpdatedAt:    time.Now().Add(-5 * time.Minute),
+			ID:       fixtureDemo,
+			Provider: spritesProviderName,
+			Status:   fixtureWarm,
+			Labels:   []string{"kaxa", "team=a"},
+			Fields: []sandbox.Field{
+				{Label: "ID", Text: "sprite-uuid-1"},
+				{Label: "Region", Text: "iad"},
+				{Label: "CPUs", Text: "2"},
+				{Label: "Last running", At: now.Add(-time.Hour)},
+				{Label: "URL", Text: "https://demo.sprites.dev"},
+				{Label: "Auth", Text: "sprite · admins"},
+			},
 		},
 	}
 	view := stripANSI(m.View())
 	for _, want := range []string{
 		fixtureDemo,
+		spritesProviderName,
 		fixtureWarm,
 		"sprite-uuid-1",
-		"acme",
+		"iad",
+		"CPUs",
+		"Last running",
 		"https://demo.sprites.dev",
 		"sprite · admins",
 		"kaxa,team=a",
 		"r restart",
 		"enter auth",
+		"u upgrade",
+		"c console",
 	} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("view missing %q:\n%s", want, view)
+		}
+	}
+}
+
+func TestListInteractiveDetailViewModal(t *testing.T) {
+	t.Parallel()
+
+	m := listInteractiveModel{
+		mode: listModeDetail,
+		providers: map[string]sandbox.Provider{
+			formModalProvider: modalListStub{},
+		},
+		infos: []sandbox.Info{{ID: fixtureDemo, Provider: formModalProvider}},
+		detail: sandbox.Detail{
+			ID:       fixtureDemo,
+			Provider: formModalProvider,
+			Status:   "running",
+			Fields:   []sandbox.Field{{Label: "ID", Text: "sb-abc"}},
+		},
+	}
+	view := stripANSI(m.View())
+	for _, mustNot := range []string{"Updated", "Organization", "enter auth", "r restart", "u upgrade"} {
+		if strings.Contains(view, mustNot) {
+			t.Fatalf("view must not contain %q:\n%s", mustNot, view)
+		}
+	}
+	if !strings.Contains(view, "sb-abc") || !strings.Contains(view, "c console") || !strings.Contains(view, "d destroy") {
+		t.Fatalf("view = %q", view)
+	}
+}
+
+func TestListInteractiveDetailViewE2B(t *testing.T) {
+	t.Parallel()
+
+	m := listInteractiveModel{
+		mode: listModeDetail,
+		providers: map[string]sandbox.Provider{
+			e2bProviderName: e2bListStub{},
+		},
+		infos:  []sandbox.Info{{ID: fixtureDemo, Provider: e2bProviderName}},
+		detail: sandbox.Detail{ID: fixtureDemo, Provider: e2bProviderName, Status: "running"},
+	}
+	view := stripANSI(m.View())
+	if !strings.Contains(view, "r restart") {
+		t.Fatalf("view = %q", view)
+	}
+	for _, mustNot := range []string{"enter auth", "u upgrade"} {
+		if strings.Contains(view, mustNot) {
+			t.Fatalf("view must not contain %q:\n%s", mustNot, view)
 		}
 	}
 }
@@ -53,7 +116,7 @@ func TestListInteractiveListViewShowsHelp(t *testing.T) {
 
 	m := newListInteractiveModel(context.TODO(), nil, []sandbox.Info{
 		{ID: "a", Status: fixtureWarm, Provider: spritesProviderName},
-	})
+	}, 0)
 	m.mode = listModeTable
 	view := stripANSI(m.View())
 	if !strings.Contains(view, "enter detail") || !strings.Contains(view, "a") {
@@ -64,8 +127,13 @@ func TestListInteractiveListViewShowsHelp(t *testing.T) {
 func TestListEnterOpensURLAuth(t *testing.T) {
 	t.Parallel()
 
+	p := &recordingURLProvider{}
 	m := listInteractiveModel{
-		mode:   listModeDetail,
+		mode: listModeDetail,
+		providers: map[string]sandbox.Provider{
+			spritesProviderName: p,
+		},
+		infos:  []sandbox.Info{{ID: fixtureDemo, Provider: spritesProviderName}},
 		detail: sandbox.Detail{ID: fixtureDemo, Auth: "sprite · admins"},
 	}
 	next, cmd := m.updateDetailKey(tea.KeyMsg{Type: tea.KeyEnter})
@@ -75,6 +143,153 @@ func TestListEnterOpensURLAuth(t *testing.T) {
 	}
 	if cmd == nil {
 		t.Fatal("expected quit")
+	}
+}
+
+func TestListDetailUnsupportedKeyStaysOnScreen(t *testing.T) {
+	t.Parallel()
+
+	m := listInteractiveModel{
+		mode: listModeDetail,
+		providers: map[string]sandbox.Provider{
+			formModalProvider: modalListStub{},
+		},
+		infos:  []sandbox.Info{{ID: fixtureDemo, Provider: formModalProvider}},
+		detail: sandbox.Detail{ID: fixtureDemo, Provider: formModalProvider},
+	}
+	next, cmd := m.updateDetailKey(tea.KeyMsg{Type: tea.KeyEnter})
+	got := authModel(t, next)
+	if got.postAction != listPostNone || cmd != nil {
+		t.Fatalf("action=%v cmd=%v", got.postAction, cmd)
+	}
+	view := stripANSI(got.View())
+	if !strings.Contains(view, "url auth is not available for modal") {
+		t.Fatalf("view = %q", view)
+	}
+}
+
+func TestListDetailUnsupportedRestartMessage(t *testing.T) {
+	t.Parallel()
+
+	m := listInteractiveModel{
+		mode: listModeDetail,
+		providers: map[string]sandbox.Provider{
+			formModalProvider: modalListStub{},
+		},
+		infos:  []sandbox.Info{{ID: fixtureDemo, Provider: formModalProvider}},
+		detail: sandbox.Detail{ID: fixtureDemo, Provider: formModalProvider},
+	}
+	next, cmd := m.updateDetailKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
+	got := authModel(t, next)
+	if got.postAction != listPostNone || cmd != nil {
+		t.Fatalf("action=%v", got.postAction)
+	}
+	if !strings.Contains(stripANSI(got.View()), "restart is not available for modal") {
+		t.Fatalf("view = %q", stripANSI(got.View()))
+	}
+}
+
+func TestListDetailConsoleKey(t *testing.T) {
+	t.Parallel()
+
+	m := listInteractiveModel{
+		mode: listModeDetail,
+		providers: map[string]sandbox.Provider{
+			formModalProvider: modalListStub{},
+		},
+		infos:  []sandbox.Info{{ID: fixtureDemo, Provider: formModalProvider}},
+		detail: sandbox.Detail{ID: fixtureDemo, Provider: formModalProvider},
+	}
+	next, cmd := m.updateDetailKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
+	got := authModel(t, next)
+	if got.postAction != listPostConsole || got.postID != fixtureDemo || got.postProv != formModalProvider {
+		t.Fatalf("action=%v id=%q provider=%q", got.postAction, got.postID, got.postProv)
+	}
+	if cmd == nil {
+		t.Fatal("expected quit")
+	}
+}
+
+func TestListConsoleLoopReopensTable(t *testing.T) {
+	t.Parallel()
+
+	infos := []sandbox.Info{
+		{ID: "a", Provider: spritesProviderName},
+		{ID: fixtureDemo, Provider: formModalProvider},
+	}
+	providers := map[string]sandbox.Provider{
+		spritesProviderName: &recordingURLProvider{},
+		formModalProvider:   modalListStub{},
+	}
+	calls := 0
+	run := func(_ context.Context, _ map[string]sandbox.Provider, _ []sandbox.Info, startCursor int) (listTUIResult, error) {
+		calls++
+		if calls == 1 {
+			if startCursor != 0 {
+				t.Fatalf("start cursor = %d", startCursor)
+			}
+			return listTUIResult{postAction: listPostConsole, id: fixtureDemo, provider: formModalProvider}, nil
+		}
+		if startCursor != 1 {
+			t.Fatalf("second start cursor = %d, want 1", startCursor)
+		}
+		return listTUIResult{}, nil
+	}
+	opened := false
+	open := func(_ context.Context, p sandbox.Provider, id sandbox.ID, _, _ io.Writer) error {
+		if p.Name() != formModalProvider || id != fixtureDemo {
+			t.Fatalf("open %q %q", p.Name(), id)
+		}
+		opened = true
+		return nil
+	}
+	err := runListWithConsoleLoop(context.Background(), providers, infos, strings.NewReader(""), new(bytes.Buffer), new(bytes.Buffer), run, open)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !opened || calls != 2 {
+		t.Fatalf("opened=%v calls=%d", opened, calls)
+	}
+}
+
+func TestListConsoleLoopOpenErrorContinues(t *testing.T) {
+	t.Parallel()
+
+	infos := []sandbox.Info{{ID: fixtureDemo, Provider: formModalProvider}}
+	providers := map[string]sandbox.Provider{formModalProvider: modalListStub{}}
+	calls := 0
+	run := func(_ context.Context, _ map[string]sandbox.Provider, _ []sandbox.Info, _ int) (listTUIResult, error) {
+		calls++
+		if calls == 1 {
+			return listTUIResult{postAction: listPostConsole, id: fixtureDemo, provider: formModalProvider}, nil
+		}
+		return listTUIResult{}, nil
+	}
+	open := func(context.Context, sandbox.Provider, sandbox.ID, io.Writer, io.Writer) error {
+		return errors.New("console failed")
+	}
+	errOut := new(bytes.Buffer)
+	err := runListWithConsoleLoop(context.Background(), providers, infos, strings.NewReader(""), new(bytes.Buffer), errOut, run, open)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls != 2 || !strings.Contains(errOut.String(), "console failed") {
+		t.Fatalf("calls=%d stderr=%q", calls, errOut.String())
+	}
+}
+
+func TestListDetailEscClearsUnsupportedMessage(t *testing.T) {
+	t.Parallel()
+
+	m := listInteractiveModel{
+		mode:      listModeDetail,
+		providers: map[string]sandbox.Provider{formModalProvider: modalListStub{}},
+		detailMsg: "restart is not available for modal",
+	}
+	next, _ := m.updateDetailKey(tea.KeyMsg{Type: tea.KeyEsc})
+	got := authModel(t, next)
+	if got.mode != listModeTable || got.detailMsg != "" {
+		t.Fatalf("mode=%v msg=%q", got.mode, got.detailMsg)
 	}
 }
 
@@ -130,7 +345,7 @@ func TestRunListURLAuthCancel(t *testing.T) {
 func TestRunListURLAuthRejectsProvider(t *testing.T) {
 	t.Parallel()
 
-	err := runListURLAuth(context.Background(), strings.NewReader("y\n"), new(bytes.Buffer), new(bytes.Buffer), idleProvider{}, listTUIResult{
+	err := runListURLAuth(context.Background(), strings.NewReader("y\n"), new(bytes.Buffer), new(bytes.Buffer), modalListStub{}, listTUIResult{
 		id:   fixtureDemo,
 		auth: sandbox.URLAuthPublic,
 	})
@@ -159,6 +374,40 @@ func (idleProvider) Exec(context.Context, sandbox.ID, sandbox.ExecOptions) error
 
 func (idleProvider) Destroy(context.Context, sandbox.ID) error { return nil }
 
+type modalListStub struct{}
+
+func (modalListStub) Name() string { return formModalProvider }
+
+func (modalListStub) Create(context.Context, sandbox.Spec) (sandbox.ID, error) { return "", nil }
+
+func (modalListStub) List(context.Context) ([]sandbox.Info, error) { return nil, nil }
+
+func (modalListStub) Inspect(context.Context, sandbox.ID) (sandbox.Detail, error) {
+	return sandbox.Detail{}, nil
+}
+
+func (modalListStub) Exec(context.Context, sandbox.ID, sandbox.ExecOptions) error { return nil }
+
+func (modalListStub) Destroy(context.Context, sandbox.ID) error { return nil }
+
+type e2bListStub struct{}
+
+func (e2bListStub) Name() string { return e2bProviderName }
+
+func (e2bListStub) Create(context.Context, sandbox.Spec) (sandbox.ID, error) { return "", nil }
+
+func (e2bListStub) List(context.Context) ([]sandbox.Info, error) { return nil, nil }
+
+func (e2bListStub) Inspect(context.Context, sandbox.ID) (sandbox.Detail, error) {
+	return sandbox.Detail{}, nil
+}
+
+func (e2bListStub) Restart(context.Context, sandbox.ID) error { return nil }
+
+func (e2bListStub) Exec(context.Context, sandbox.ID, sandbox.ExecOptions) error { return nil }
+
+func (e2bListStub) Destroy(context.Context, sandbox.ID) error { return nil }
+
 type recordingURLProvider struct {
 	idleProvider
 	auth   string
@@ -184,7 +433,7 @@ func TestListDetailActionKeepsRowProvider(t *testing.T) {
 
 	m := newListInteractiveModel(context.TODO(), nil, []sandbox.Info{
 		{ID: "a", Status: fixtureWarm, Provider: spritesProviderName},
-	})
+	}, 0)
 	m.mode = listModeDetail
 	m.detail = sandbox.Detail{ID: "a"}
 
