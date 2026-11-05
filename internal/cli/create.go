@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 
@@ -37,7 +36,7 @@ func newCreateCmd(reg *registry.Registry) *cobra.Command {
 --api-env sets a variable for that service: KEY=VALUE, or KEY to copy the value from your shell so a secret stays out of the command line. Repeat it for more variables. Values cannot contain commas. HOME, USER, PATH, and KAXA_ names are reserved.
 --public makes the Sprites URL reachable without an account. A failed auth change leaves the sandbox in place.
 --template starts a sandbox from a template. On E2B it is a template you built with the E2B CLI or SDK, for example one with more memory, and it must have the same user and home as the base template (user, /home/user); without it, kaxa uses KAXA_E2B_TEMPLATE, then base. On Docker it is an image reference that Docker can pull, and it must have the same user and home as the Docker agent images (agent, /home/agent); without it, kaxa uses KAXA_DOCKER_TEMPLATE, then the image of the shell agent. On Daytona it is an image (or snapshot name) that Daytona can start, and it must have the same user and home as the Daytona default image (daytona, /home/daytona); without it, kaxa uses KAXA_DAYTONA_TEMPLATE, then the Daytona default.
-Without a name, the form asks for the same choices. When API is yes, it asks for the command and the port.`,
+Without a name, a wizard asks for the provider and name, then only the options that provider supports, then sync and API details when those are enabled. In a terminal it uses the alternate screen so the form does not mix with your scrollback; only the result is printed when it finishes.`,
 		Example: `  kaxa create --sync my-sprite
   kaxa create --sync --dir ~/projects/api-python my-sprite
   kaxa create --sync --api --public --api-cmd .venv/bin/uvicorn,app.main:app,--host,0.0.0.0,--port,8000 my-sprite
@@ -116,30 +115,28 @@ func resolveCreateRequest(cmd *cobra.Command, reg *registry.Registry, args []str
 	if err != nil {
 		return createRequest{}, err
 	}
-	form, err := collectCreateForm(cmd.InOrStdin(), cmd.ErrOrStderr(), reg.Names(), cfg.Provider, flags)
+	form, err := collectCreateForm(cmd.InOrStdin(), cmd.ErrOrStderr(), reg.Names(), cfg.Provider, reg.Get, flags, portSet)
 	if err != nil {
 		return createRequest{}, err
 	}
 	req := createRequest{
-		Name:    form.Name,
-		Running: form.Running,
-		Sync:    form.Sync,
-		API:     form.API,
-		APIPort: form.APIPort,
-		APICmd:  form.APICmd,
-		Public:  form.Public,
-
-		Template:  flags.Template,
-		NoInstall: flags.NoInstall,
-	}
-	if form.API {
-		if req.APIEnv, err = lifecycle.ResolveAPIEnv(flags.APIEnv, os.LookupEnv); err != nil {
-			return createRequest{}, err
-		}
+		Name:      form.Name,
+		Running:   form.Running,
+		Sync:      form.Sync,
+		API:       form.API,
+		APIPort:   form.APIPort,
+		APICmd:    form.APICmd,
+		APIEnv:    form.APIEnv,
+		Public:    form.Public,
+		Template:  form.Template,
+		NoInstall: form.NoInstall,
 	}
 	cfg.Provider = form.Provider
 	cmd.SetContext(withConfig(cmd.Context(), cfg))
-	return withRepo(req, flags)
+	merged := flags
+	merged.Dir = form.Dir
+	merged.DirSet = form.DirSet
+	return withRepo(req, merged)
 }
 
 func writeCreated(cmd *cobra.Command, p sandbox.Provider, id sandbox.ID, req createRequest) error {

@@ -7,7 +7,7 @@ kaxa create [name]
 kaxa new [name]
 ```
 
-Without a name, a form asks for the name, provider, and the same yes/no choices as the flags. When API is yes, the form asks for the command and the port. The form uses the Dracula theme. It does not ask for `--dir`; pass that flag if you need it.
+Without a name, a wizard asks for the provider and name, then only the options that provider supports. With sync enabled it asks for the repository directory and whether to skip install. With API enabled it asks for the command, the port, and optional environment variables. The wizard uses the Dracula theme. In a terminal it occupies the alternate screen and returns a clean prompt when it finishes; only the result is printed in your scrollback. Flags you already passed stay as the initial answer; an empty line keeps that default.
 
 Sprites, Modal, E2B, Docker, Daytona, and Blaxel implement create. `--running` and public URLs exist only for Sprites; the others reject them with a message that names the providers that have them. API publish works on Sprites, E2B, Docker, Daytona, and Blaxel. `--sync` works on all six; see [Sync](#sync).
 

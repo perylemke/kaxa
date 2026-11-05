@@ -102,7 +102,7 @@ kaxa version
 export KAXA_DEFAULT_PROVIDER=sprites
 export KAXA_SPRITES_TOKEN=...   # never commit real tokens
 
-kaxa create                     # form for name, provider, running, sync, and API
+kaxa create                     # wizard for name, provider, and supported options
 kaxa create my-sprite
 kaxa create --running my-sprite  # stay up for 1 hour and open a tmux terminal in the browser
 kaxa create --sync my-sprite     # copy this git repository into /home/sprite/workspace/<repo>
