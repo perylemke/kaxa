@@ -85,7 +85,8 @@ func syncedMessage(p sandbox.Provider, res lifecycle.Result, repo string) string
 		return msg
 	}
 	var b strings.Builder
-	b.WriteString(msg + "\ndependencies were not installed; run them with:")
+	b.WriteString(msg)
+	b.WriteString("\n\ndependencies were not installed; run them with:")
 	for _, argv := range res.Skipped {
 		fmt.Fprintf(&b, "\n  kaxa exec %s -- sh -c 'cd %s && %s'", res.ID, skippedDir(res.WorkDir), strings.Join(argv, " "))
 	}

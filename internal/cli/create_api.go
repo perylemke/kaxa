@@ -102,7 +102,8 @@ func createdMessage(ref, provider string, detail sandbox.Detail, req createReque
 		fmt.Fprintf(&b, " forwards to port %d", req.APIPort)
 	}
 	if access := urlAccess(provider, detail.Auth, req.Public); access != "" {
-		b.WriteString("\n" + access)
+		b.WriteString("\n")
+		b.WriteString(access)
 	}
 	return b.String()
 }
