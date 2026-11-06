@@ -17,6 +17,7 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 
 ### Fixed
 
+- `kaxa create` wizard no longer inserts large blank gaps between visible fields when other provider-specific fields are hidden.
 - `kaxa list` on Docker accepts `memoryMib` in list responses as a number or a string, so listing no longer fails when the API returns quoted values.
 - Toolchain downloads install `curl` when the sandbox image does not have it, using `apt-get` or `apk`. An image that already has `curl` skips that step.
 - `kaxa exec` on Blaxel prints the command output. A short command no longer finishes before the log stream attaches, and a streamed line keeps its newline.

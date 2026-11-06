@@ -630,11 +630,19 @@ func conditionalField(capsOf func() sandbox.Capabilities, feature sandbox.Featur
 }
 
 type capabilityField struct {
-	inner huh.Field
-	show  func() bool
+	inner    huh.Field
+	show     func() bool
+	fieldPos huh.FieldPosition
 }
 
 func (c *capabilityField) visible() bool { return c.show() }
+
+func (c *capabilityField) viewSeparatorPrefix() string {
+	if !c.visible() || c.fieldPos.Field == c.fieldPos.FirstField {
+		return ""
+	}
+	return "\n\n"
+}
 
 func (c *capabilityField) Init() tea.Cmd { return c.inner.Init() }
 
@@ -651,7 +659,7 @@ func (c *capabilityField) View() string {
 	if !c.visible() {
 		return ""
 	}
-	return c.inner.View()
+	return c.viewSeparatorPrefix() + c.inner.View()
 }
 
 func (c *capabilityField) Blur() tea.Cmd  { return c.inner.Blur() }
@@ -707,6 +715,7 @@ func (c *capabilityField) WithHeight(height int) huh.Field {
 }
 
 func (c *capabilityField) WithPosition(p huh.FieldPosition) huh.Field {
+	c.fieldPos = p
 	c.inner = c.inner.WithPosition(p)
 	return c
 }
@@ -717,9 +726,10 @@ func (c *capabilityField) GetValue() any { return c.inner.GetValue() }
 
 // presetField is like capabilityField but reads visibility from the form result (provider name and presets).
 type presetField struct {
-	result *createFormResult
-	inner  huh.Field
-	show   func(*createFormResult) bool
+	result   *createFormResult
+	inner    huh.Field
+	show     func(*createFormResult) bool
+	fieldPos huh.FieldPosition
 }
 
 func presetConditionalField(result *createFormResult, show func(*createFormResult) bool, field huh.Field) huh.Field {
@@ -731,6 +741,13 @@ func (c *presetField) visible() bool {
 		return true
 	}
 	return c.show(c.result)
+}
+
+func (c *presetField) viewSeparatorPrefix() string {
+	if !c.visible() || c.fieldPos.Field == c.fieldPos.FirstField {
+		return ""
+	}
+	return "\n\n"
 }
 
 func (c *presetField) Init() tea.Cmd { return c.inner.Init() }
@@ -748,7 +765,7 @@ func (c *presetField) View() string {
 	if !c.visible() {
 		return ""
 	}
-	return c.inner.View()
+	return c.viewSeparatorPrefix() + c.inner.View()
 }
 
 func (c *presetField) Blur() tea.Cmd  { return c.inner.Blur() }
@@ -804,6 +821,7 @@ func (c *presetField) WithHeight(height int) huh.Field {
 }
 
 func (c *presetField) WithPosition(p huh.FieldPosition) huh.Field {
+	c.fieldPos = p
 	c.inner = c.inner.WithPosition(p)
 	return c
 }
