@@ -13,6 +13,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"slices"
 	"strings"
@@ -20,6 +21,7 @@ import (
 	"time"
 
 	"github.com/perylemke/kaxa/internal/sandbox"
+	"github.com/perylemke/kaxa/internal/usererr"
 )
 
 // ProviderName is the registry name of the provider.
@@ -147,6 +149,45 @@ func (p *Provider) fail(api apiClient, err error, name string) error {
 	return userErr(err, name, api.secrets()...)
 }
 
+func dockerResources(spec sandbox.Spec) (cpus, memMiB int, err error) {
+	cpus = defaultResources.CPUs
+	memMiB = defaultResources.MemoryMiB
+	wantCPU := spec.CPU != 0
+	wantMem := spec.MemoryMiB != 0
+	if !wantCPU && !wantMem {
+		return cpus, memMiB, nil
+	}
+	if wantCPU {
+		if spec.CPU < 0 || spec.CPU != math.Trunc(spec.CPU) {
+			return 0, 0, usererr.New(
+				"cpu must be a positive whole number of cores for docker",
+				"omit --cpu or use an integer (docker accepts only certain cpu and memory pairs)",
+			)
+		}
+		n := int(spec.CPU)
+		if n < 1 {
+			return 0, 0, usererr.New(
+				"cpu must be a positive whole number of cores for docker",
+				"omit --cpu or use an integer (docker accepts only certain cpu and memory pairs)",
+			)
+		}
+		cpus = n
+	}
+	if wantMem {
+		if spec.MemoryMiB < 1 {
+			return 0, 0, usererr.New("memory must be greater than zero", "omit --memory or pass a positive size in MiB")
+		}
+		memMiB = spec.MemoryMiB
+	}
+	return cpus, memMiB, nil
+}
+
+// SupportsCPU marks Docker as honoring sandbox CPU when set (integer cores).
+func (*Provider) SupportsCPU() {}
+
+// SupportsMemory marks Docker as honoring sandbox memory (MiB) when set.
+func (*Provider) SupportsMemory() {}
+
 // Create starts a sandbox from spec.Template, then the default template, then
 // the image of the shell agent, and waits until it runs.
 func (p *Provider) Create(ctx context.Context, spec sandbox.Spec) (sandbox.ID, error) {
@@ -154,6 +195,10 @@ func (p *Provider) Create(ctx context.Context, spec sandbox.Spec) (sandbox.ID, e
 		return "", err
 	}
 	if err := validateTemplate(spec.Template); err != nil {
+		return "", err
+	}
+	cpus, mem, err := dockerResources(spec)
+	if err != nil {
 		return "", err
 	}
 	api, err := p.ready()
@@ -169,7 +214,7 @@ func (p *Provider) Create(ctx context.Context, spec sandbox.Spec) (sandbox.ID, e
 	if image == "" {
 		image = shellImage
 	}
-	rec, err := api.Create(ctx, CreateParams{Name: spec.Name, Labels: slices.Clone(spec.Labels), Image: image})
+	rec, err := api.Create(ctx, CreateParams{Name: spec.Name, Labels: slices.Clone(spec.Labels), Image: image, CPUs: cpus, MemoryMiB: mem})
 	if err != nil {
 		return "", p.fail(api, err, spec.Name)
 	}

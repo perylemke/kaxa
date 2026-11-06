@@ -23,6 +23,8 @@ const (
 	FeatureRunning           Feature = "running"
 	FeatureTemplate          Feature = "template"
 	FeatureSnapshot          Feature = "snapshot"
+	FeatureCPU               Feature = "cpu"
+	FeatureMemory            Feature = "memory"
 )
 
 // UnsupportedError reports that a provider does not offer a feature.
@@ -80,6 +82,8 @@ type Capabilities struct {
 	Upgrade   bool `json:"upgrade"`
 	Running   bool `json:"running"`
 	Template  bool `json:"template"`
+	CPU       bool `json:"cpu"`
+	Memory    bool `json:"memory"`
 	Snapshot  bool `json:"snapshot"`
 	// SnapshotRestore is the RestoreMode of a provider that has Snapshot.
 	SnapshotRestore string `json:"snapshot_restore,omitempty"`
@@ -98,6 +102,10 @@ func (c Capabilities) Has(feature Feature) bool {
 		return c.Template
 	case FeatureSnapshot:
 		return c.Snapshot
+	case FeatureCPU:
+		return c.CPU
+	case FeatureMemory:
+		return c.Memory
 	case FeatureSync:
 		return c.Sync
 	case FeatureDependencyInstall:
@@ -122,9 +130,12 @@ func CapabilitiesOf(p Provider) Capabilities {
 	_, upgrade := p.(Upgrader)
 	_, running := p.(RunningSupport)
 	_, template := p.(TemplateSupport)
+	_, cpu := p.(CPUSupport)
+	_, memory := p.(MemorySupport)
 	caps := Capabilities{
 		Sync: sync, Setup: setup, API: api, PublicURL: public, Layout: layout,
 		Restart: restart, Upgrade: upgrade, Running: running, Template: template,
+		CPU: cpu, Memory: memory,
 	}
 	if s, ok := p.(Snapshotter); ok {
 		caps.Snapshot = true

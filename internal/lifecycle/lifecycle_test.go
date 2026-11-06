@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -20,6 +21,11 @@ const (
 	uvicorn = "uvicorn"
 	bigTpl  = "big"
 	e2bName = "e2b"
+
+	stepCreate  = "create"
+	stepSetup   = "setup"
+	stepPublish = "publish"
+	stepPublic  = "public"
 )
 
 type recorder struct {
@@ -43,7 +49,7 @@ const errReserved = "reserved"
 func (b basicProvider) Name() string { return "fake" }
 func (b basicProvider) Create(_ context.Context, spec sandbox.Spec) (sandbox.ID, error) {
 	b.rec.created = spec
-	b.rec.steps = append(b.rec.steps, "create")
+	b.rec.steps = append(b.rec.steps, stepCreate)
 	return sandbox.ID(spec.Name), nil
 }
 func (basicProvider) List(context.Context) ([]sandbox.Info, error) { return nil, nil }
@@ -77,13 +83,13 @@ func (f *fullProvider) SyncWorkspace(_ context.Context, _ sandbox.ID, archive io
 		}
 	}
 	f.rec.synced = true
-	f.rec.steps = append(f.rec.steps, "sync")
+	f.rec.steps = append(f.rec.steps, stepSync)
 	return f.syncErr
 }
 
 func (f *fullProvider) SetupProjects(_ context.Context, _ sandbox.ID, _ string, steps []project.Step) error {
 	f.rec.setups++
-	f.rec.steps = append(f.rec.steps, "setup")
+	f.rec.steps = append(f.rec.steps, stepSetup)
 	f.rec.setupSteps = append([]project.Step(nil), steps...)
 	return f.setupErr
 }
@@ -93,15 +99,18 @@ func (f *fullProvider) PublishAPI(_ context.Context, _ sandbox.ID, workDir strin
 	f.rec.workDir = workDir
 	f.rec.port = port
 	f.rec.env = append([]string(nil), env...)
-	f.rec.steps = append(f.rec.steps, "publish")
+	f.rec.steps = append(f.rec.steps, stepPublish)
 	return f.publishErr
 }
 
 func (f *fullProvider) SetURLAuth(_ context.Context, _ sandbox.ID, auth string) error {
 	f.rec.publicSet = auth == sandbox.URLAuthPublic
-	f.rec.steps = append(f.rec.steps, "public")
+	f.rec.steps = append(f.rec.steps, stepPublic)
 	return f.publicErr
 }
+
+func (*fullProvider) SupportsCPU()    {}
+func (*fullProvider) SupportsMemory() {}
 
 func (f *fullProvider) HomeDir() string { return "/home/box" }
 func (f *fullProvider) RepoDir(repo string) (string, error) {
@@ -151,7 +160,7 @@ func TestCreateLabelsAndOrder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
-	want := []string{"create", "sync", "setup", "publish", "public"}
+	want := []string{stepCreate, stepSync, stepSetup, stepPublish, stepPublic}
 	if !slices.Equal(rec.steps, want) {
 		t.Fatalf("steps = %v, want %v", rec.steps, want)
 	}
@@ -163,6 +172,61 @@ func TestCreateLabelsAndOrder(t *testing.T) {
 	}
 	if rec.workDir != res.WorkDir || rec.port != 8000 || !rec.publicSet {
 		t.Fatalf("publish dir=%q port=%d public=%v", rec.workDir, rec.port, rec.publicSet)
+	}
+}
+
+func TestCreateSyncMultipleRepos(t *testing.T) {
+	t.Parallel()
+
+	p, rec := newFull()
+	base := t.TempDir()
+	r1 := filepath.Join(base, "a")
+	r2 := filepath.Join(base, "b")
+	for _, d := range []string{r1, r2} {
+		cmd := exec.Command("git", "init", "-q")
+		cmd.Dir = d
+		cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1")
+		if err := os.MkdirAll(d, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git init: %v\n%s", err, out)
+		}
+		writeFile(t, d, "go.mod", "module x\n\ngo 1.27\n")
+	}
+	root1, name1, err := lifecycle.ResolveRepo(r1, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root2, name2, err := lifecycle.ResolveRepo(r2, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if name1 == name2 {
+		t.Fatalf("need distinct repo names, got %q twice", name1)
+	}
+
+	res, err := lifecycle.Create(context.Background(), p, lifecycle.Request{
+		Name: boxName, Sync: true,
+		Repos: []lifecycle.RepoCopy{{Root: root1, Repo: name1}, {Root: root2, Repo: name2}},
+	}, nil)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	var syncCount int
+	for _, s := range rec.steps {
+		if s == stepSync {
+			syncCount++
+		}
+	}
+	if syncCount != 2 {
+		t.Fatalf("want 2 sync steps, got %v", rec.steps)
+	}
+	if rec.setups != 2 {
+		t.Fatalf("want 2 setups, got setups=%d steps=%v", rec.setups, rec.steps)
+	}
+	if res.WorkDir != "/home/box/ws/"+name1 {
+		t.Fatalf("WorkDir = %q", res.WorkDir)
 	}
 }
 
@@ -295,6 +359,8 @@ func TestCheckRejectsMissingCapabilities(t *testing.T) {
 		{name: "public", req: lifecycle.Request{Name: boxName, Public: true}, want: "public urls"},
 		{name: "running", req: lifecycle.Request{Name: boxName, Running: true}, want: "running"},
 		{name: "template", req: lifecycle.Request{Name: boxName, Template: bigTpl}, want: "template"},
+		{name: "cpu", req: lifecycle.Request{Name: boxName, CPU: 1}, want: "cpu"},
+		{name: "memory", req: lifecycle.Request{Name: boxName, MemoryMiB: 1024}, want: "memory"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -374,6 +440,18 @@ func TestCreatePassesTemplateToSpec(t *testing.T) {
 	}
 }
 
+func TestCreatePassesCPUAndMemoryToSpec(t *testing.T) {
+	t.Parallel()
+
+	p, rec := newFull()
+	if _, err := lifecycle.Create(context.Background(), p, lifecycle.Request{Name: boxName, CPU: 2, MemoryMiB: 4096}, nil); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if rec.created.CPU != 2 || rec.created.MemoryMiB != 4096 {
+		t.Fatalf("spec = %+v", rec.created)
+	}
+}
+
 func TestCheckRequiresLayoutForAPI(t *testing.T) {
 	t.Parallel()
 
@@ -424,7 +502,7 @@ func TestResolveRepoRejectsBadDirs(t *testing.T) {
 		dir  string
 		want string
 	}{
-		{name: "missing", dir: dir + "/missing", want: "was not found"},
+		{name: "missing", dir: dir + "/missing", want: "does not exist"},
 		{name: "file", dir: file, want: "not a directory"},
 		{name: "empty", dir: " ", want: "directory is required"},
 		{name: "not a repo", dir: plain, want: plain + " is not inside a git repository"},
@@ -591,5 +669,109 @@ func TestCheckRejectsPublicTerminal(t *testing.T) {
 				t.Fatalf("create: %v", err)
 			}
 		})
+	}
+}
+
+func TestResolveReposEmptyUsesWd(t *testing.T) {
+	tmp := t.TempDir()
+	t.Chdir(tmp)
+
+	runGitForRepoTest(t, tmp, "init", "-q")
+	goModRel := "go.mod"
+	if err := os.WriteFile(filepath.Join(tmp, goModRel), []byte("module x\n\ngo 1.27\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	runGitForRepoTest(t, tmp, "add", goModRel)
+	runGitForRepoTest(t, tmp, "commit", "-m", "init")
+
+	got, err := lifecycle.ResolveRepos("", false)
+	if err != nil {
+		t.Fatalf("ResolveRepos: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("len = %d, want 1", len(got))
+	}
+	if got[0].Repo != filepath.Base(tmp) {
+		t.Fatalf("Repo name = %q", got[0].Repo)
+	}
+}
+
+func TestResolveReposCommaTwoRepos(t *testing.T) {
+	tmp := t.TempDir()
+	a := filepath.Join(tmp, "alpha")
+	b := filepath.Join(tmp, "beta")
+	mkdirGitInitForResolveRepos(t, a, "a")
+	mkdirGitInitForResolveRepos(t, b, "b")
+
+	got, err := lifecycle.ResolveRepos(a+","+b, true)
+	if err != nil {
+		t.Fatalf("ResolveRepos: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("len = %d", len(got))
+	}
+	names := []string{got[0].Repo, got[1].Repo}
+	if names[0] != "alpha" || names[1] != "beta" {
+		t.Fatalf("repos = %#v", got)
+	}
+}
+
+func TestResolveReposRejectEmptySegment(t *testing.T) {
+	tmp := t.TempDir()
+	mkdirGitInitForResolveRepos(t, filepath.Join(tmp, "a"), "x")
+
+	_, err := lifecycle.ResolveRepos(tmp+"/a,,", true)
+	if err == nil || !strings.Contains(err.Error(), "empty") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestResolveReposRejectDuplicateRoot(t *testing.T) {
+	tmp := t.TempDir()
+	p := filepath.Join(tmp, "once")
+	mkdirGitInitForResolveRepos(t, p, "o")
+
+	_, err := lifecycle.ResolveRepos(p+","+p, true)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestResolveReposRejectDuplicateWorkspaceName(t *testing.T) {
+	tmp := t.TempDir()
+	a := filepath.Join(tmp, "x", "r1")
+	b := filepath.Join(tmp, "y", "r1")
+	mkdirGitInitForResolveRepos(t, a, "f")
+	mkdirGitInitForResolveRepos(t, b, "f")
+
+	_, err := lifecycle.ResolveRepos(a+","+b, true)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func mkdirGitInitForResolveRepos(t *testing.T, dir, fname string) {
+	t.Helper()
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	runGitForRepoTest(t, dir, "init", "-q")
+	if err := os.WriteFile(filepath.Join(dir, fname), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	runGitForRepoTest(t, dir, "add", fname)
+	runGitForRepoTest(t, dir, "commit", "-m", "init")
+}
+
+func runGitForRepoTest(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", args...) //nolint:gosec // test helper; argv from fixed tests only
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(),
+		"GIT_CONFIG_NOSYSTEM=1",
+		"GIT_AUTHOR_DATE=1970-01-01T00:00:00Z", "GIT_COMMITTER_DATE=1970-01-01T00:00:00Z",
+		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
 	}
 }

@@ -1,6 +1,7 @@
 package cli
 
 const (
+	commandCreate   = "create"
 	fixtureDemo     = "demo"
 	fixtureWarm     = "warm"
 	fixtureCold     = "cold"

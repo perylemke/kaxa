@@ -48,6 +48,8 @@ func (fullProvider) PublishAPI(context.Context, sandbox.ID, string, int, []strin
 func (fullProvider) SetURLAuth(context.Context, sandbox.ID, string) error { return nil }
 func (fullProvider) HomeDir() string                                      { return "/home/box" }
 func (fullProvider) RepoDir(repo string) (string, error)                  { return "/home/box/ws/" + repo, nil }
+func (fullProvider) SupportsCPU()                                         {}
+func (fullProvider) SupportsMemory()                                      {}
 func (f fullProvider) Available() bool                                    { return !f.unavailable }
 
 func TestCapabilitiesOfBareProvider(t *testing.T) {
@@ -63,7 +65,7 @@ func TestCapabilitiesOfFullProvider(t *testing.T) {
 	t.Parallel()
 
 	got := sandbox.CapabilitiesOf(fullProvider{})
-	want := sandbox.Capabilities{Sync: true, Setup: true, API: true, PublicURL: true, Layout: true, Restart: true, Upgrade: true, Running: true, Template: true}
+	want := sandbox.Capabilities{Sync: true, Setup: true, API: true, PublicURL: true, Layout: true, Restart: true, Upgrade: true, Running: true, Template: true, CPU: true, Memory: true}
 	if got != want {
 		t.Fatalf("capabilities = %+v, want %+v", got, want)
 	}
@@ -94,7 +96,7 @@ func TestIsAvailable(t *testing.T) {
 func TestCapabilitiesHas(t *testing.T) {
 	t.Parallel()
 
-	caps := sandbox.Capabilities{Restart: true, PublicURL: true, Template: true}
+	caps := sandbox.Capabilities{Restart: true, PublicURL: true, Template: true, CPU: true, Memory: true}
 	tests := []struct {
 		feature sandbox.Feature
 		want    bool
@@ -103,6 +105,8 @@ func TestCapabilitiesHas(t *testing.T) {
 		{sandbox.FeatureURLAuth, true},
 		{sandbox.FeaturePublicURLs, true},
 		{sandbox.FeatureTemplate, true},
+		{sandbox.FeatureCPU, true},
+		{sandbox.FeatureMemory, true},
 		{sandbox.FeatureUpgrade, false},
 		{sandbox.FeatureRunning, false},
 		{sandbox.FeatureSync, false},

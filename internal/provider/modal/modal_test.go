@@ -39,7 +39,7 @@ func TestCapabilities(t *testing.T) {
 	t.Parallel()
 
 	want := sandbox.Capabilities{
-		Sync: true, Setup: true, Layout: true,
+		Sync: true, Setup: true, Layout: true, CPU: true, Memory: true,
 		Snapshot: true, SnapshotRestore: string(sandbox.RestoreNewSandbox),
 	}
 	if got := sandbox.CapabilitiesOf(modal.New()); got != want {
@@ -106,6 +106,24 @@ func TestCreate(t *testing.T) {
 	}
 	if got := fake.boxes[testName]; got == nil || len(got.Labels) != 2 {
 		t.Fatalf("stored = %+v", got)
+	}
+	if fake.lastCPU != 0 || fake.lastMemoryMiB != 0 {
+		t.Fatalf("defaults omitted resources: cpu=%v mem=%d", fake.lastCPU, fake.lastMemoryMiB)
+	}
+}
+
+func TestCreatePassesCPUAndMemory(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeClient()
+	p := newProvider(t, fake)
+	if _, err := p.Create(context.Background(), sandbox.Spec{
+		Name: testName, Labels: []string{testKaxa}, CPU: 1.5, MemoryMiB: 2048,
+	}); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if fake.lastCPU != 1.5 || fake.lastMemoryMiB != 2048 {
+		t.Fatalf("resources = %v, %d", fake.lastCPU, fake.lastMemoryMiB)
 	}
 }
 

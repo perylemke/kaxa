@@ -28,6 +28,8 @@ type createIn struct {
 	APIEnv    []string `json:"api_env,omitempty" jsonschema:"Environment of the HTTP service. Each item is KEY=VALUE, or KEY to copy the value from the server environment so secrets stay out of the conversation. Values cannot contain commas. HOME, USER, PATH and KAXA_ names are reserved. Requires api."`
 	Public    bool     `json:"public,omitempty" jsonschema:"Make the sandbox URL reachable without a provider account."`
 	Template  string   `json:"template,omitempty" jsonschema:"Template to start the sandbox from. Only for providers whose capabilities report template (E2B, docker, daytona). Defaults to KAXA_E2B_TEMPLATE, KAXA_DOCKER_TEMPLATE or KAXA_DAYTONA_TEMPLATE, then base. A custom template must have the same user and home as base (E2B: user, /home/user; docker: agent, /home/agent; daytona: daytona, /home/daytona)."`
+	CPU       float64  `json:"cpu,omitempty" jsonschema:"CPU cores for the sandbox (Modal and Docker; fractional on Modal). Omit for the provider default. Requires capabilities.cpu."`
+	MemoryMiB int      `json:"memory_mib,omitempty" jsonschema:"Memory in MiB (Modal, Docker, Blaxel). Omit for the provider default. Requires capabilities.memory."`
 }
 
 type createOut struct {

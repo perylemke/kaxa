@@ -268,7 +268,7 @@ func TestCreateSyncDirRejectsBadPath(t *testing.T) {
 		dir  string
 		want string
 	}{
-		{name: "missing", dir: filepath.Join(dir, "missing"), want: "was not found"},
+		{name: "missing", dir: filepath.Join(dir, "missing"), want: "does not exist"},
 		{name: "file", dir: file, want: "not a directory"},
 		{name: "empty", dir: " ", want: "directory is required"},
 		{name: "not a repo", dir: plain, want: plain + " is not inside a git repository"},
@@ -297,8 +297,10 @@ type syncingProvider struct {
 	*fakeProvider
 	syncErr    error
 	synced     bool
+	syncCount  int
 	setupErr   error
 	setupRepo  string
+	setupRepos []string
 	setupSteps []project.Step
 }
 
@@ -311,6 +313,7 @@ func (s *syncingProvider) SyncWorkspace(_ context.Context, _ sandbox.ID, archive
 		}
 	}
 	s.synced = true
+	s.syncCount++
 	return s.syncErr
 }
 
@@ -319,6 +322,7 @@ func (s *syncingProvider) SetupProjects(_ context.Context, _ sandbox.ID, repoNam
 		return errors.New("setup before sync")
 	}
 	s.setupRepo = repoName
+	s.setupRepos = append(s.setupRepos, repoName)
 	s.setupSteps = steps
 	return s.setupErr
 }
@@ -389,5 +393,42 @@ func TestCreateSyncNoInstallSkipsCommands(t *testing.T) {
 	}
 	if len(fp.setupSteps) != 0 {
 		t.Fatalf("steps = %#v, want no toolchain install", fp.setupSteps)
+	}
+}
+
+func TestCreateSyncTwoCommaSeparatedDirs(t *testing.T) {
+	base := t.TempDir()
+	r1 := filepath.Join(base, "repo-one")
+	r2 := filepath.Join(base, "repo-two")
+	for _, d := range []string{r1, r2} {
+		if err := os.MkdirAll(d, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		cmd := exec.Command("git", "init", "-q")
+		cmd.Dir = d
+		cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git init: %v\n%s", err, out)
+		}
+		if err := os.WriteFile(filepath.Join(d, "go.mod"), []byte("module example.com/demo\n\ngo 1.27\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	fp := newRepoSyncProvider("kaxa", sandbox.SyncLabel)
+	cmd := newCreateCmd(t, fp)
+	cmd.SetArgs([]string{
+		testProviderFlag, testSpritesName, testCmdCreate, testBoxName,
+		testSyncFlag, testDirFlag, r1 + "," + r2,
+	})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if fp.syncCount != 2 {
+		t.Fatalf("sync count = %d", fp.syncCount)
+	}
+	if len(fp.setupRepos) != 2 {
+		t.Fatalf("setup repos = %#v", fp.setupRepos)
 	}
 }

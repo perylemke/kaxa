@@ -68,6 +68,12 @@ func (p *Provider) Name() string {
 	return "modal"
 }
 
+// SupportsCPU marks Modal as honoring sandbox CPU requests when non-zero.
+func (*Provider) SupportsCPU() {}
+
+// SupportsMemory marks Modal as honoring sandbox memory (MiB) when non-zero.
+func (*Provider) SupportsMemory() {}
+
 // Create starts a sandbox that lives for up to 24 hours and stops after one idle hour.
 func (p *Provider) Create(ctx context.Context, spec sandbox.Spec) (sandbox.ID, error) {
 	if err := validateName(spec.Name); err != nil {
@@ -77,7 +83,8 @@ func (p *Provider) Create(ctx context.Context, spec sandbox.Spec) (sandbox.ID, e
 	if err != nil {
 		return "", err
 	}
-	if _, err := c.Create(ctx, spec.Name, spec.Labels, slices.Contains(spec.Labels, sandbox.SyncLabel)); err != nil {
+	withTools := slices.Contains(spec.Labels, sandbox.SyncLabel)
+	if _, err := c.Create(ctx, spec.Name, spec.Labels, withTools, spec.CPU, spec.MemoryMiB); err != nil {
 		return "", userErr(err, spec.Name, secrets...)
 	}
 	return sandbox.ID(spec.Name), nil

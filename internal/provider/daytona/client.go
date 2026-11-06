@@ -127,6 +127,9 @@ type apiClient interface {
 	CaptureImage(ctx context.Context, id, name string) (Image, error)
 	// ListImages returns the named images whose name starts with prefix.
 	ListImages(ctx context.Context, prefix string) ([]Image, error)
+	// ListSnapshotCatalog returns every snapshot the account can see, including
+	// platform snapshots and ones that are not active. The caller filters.
+	ListSnapshotCatalog(ctx context.Context) ([]snapshotCatalogRow, error)
 	GetImage(ctx context.Context, name string) (Image, error)
 	DeleteImage(ctx context.Context, id string) error
 }
@@ -377,6 +380,41 @@ func (s *sdkClient) CaptureImage(ctx context.Context, id, name string) (Image, e
 		return Image{}, convertErr(err)
 	}
 	return s.GetImage(ctx, name)
+}
+
+// snapshotCatalogRow is one snapshot from Snapshot.List, before filtering.
+type snapshotCatalogRow struct {
+	Name    string
+	CPU     int
+	Memory  int
+	Disk    int
+	General bool
+	State   string
+}
+
+const snapshotStateActive = "active"
+
+func (s *sdkClient) ListSnapshotCatalog(ctx context.Context) ([]snapshotCatalogRow, error) {
+	var rows []snapshotCatalogRow
+	limit := pageSize
+	for page := 1; ; page++ {
+		got, err := s.c.Snapshot.List(ctx, &page, &limit)
+		if err != nil {
+			return nil, convertErr(err)
+		}
+		for _, snap := range got.Items {
+			if snap == nil {
+				continue
+			}
+			rows = append(rows, snapshotCatalogRow{
+				Name: snap.Name, CPU: snap.CPU, Memory: snap.Memory, Disk: snap.Disk,
+				General: snap.General, State: snap.State,
+			})
+		}
+		if page >= got.TotalPages || len(got.Items) == 0 {
+			return rows, nil
+		}
+	}
 }
 
 func (s *sdkClient) ListImages(ctx context.Context, prefix string) ([]Image, error) {

@@ -341,6 +341,53 @@ func TestCreateRejectsTemplateWithoutCapability(t *testing.T) {
 	}
 }
 
+type computeFake struct{ *fakeProvider }
+
+func (computeFake) SupportsCPU()    {}
+func (computeFake) SupportsMemory() {}
+
+func TestCreatePassesCPUAndMemoryMCP(t *testing.T) {
+	t.Parallel()
+
+	fp := &fakeProvider{name: testSprites}
+	svc := newTestService(t, t.TempDir(), testSprites, computeFake{fp})
+	if _, err := svc.create(context.Background(), createIn{Name: testBox, CPU: 2, MemoryMiB: 4096}); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if len(fp.created) != 1 || fp.created[0].CPU != 2 || fp.created[0].MemoryMiB != 4096 {
+		t.Fatalf("created = %+v", fp.created)
+	}
+}
+
+func TestCreateRejectsCPUWithoutCapability(t *testing.T) {
+	t.Parallel()
+
+	fp := &fakeProvider{name: testSprites}
+	svc := newTestService(t, t.TempDir(), testSprites, fp)
+	_, err := svc.create(context.Background(), createIn{Name: testBox, CPU: 1})
+	wantErr(t, err, "cpu is not available for "+testSprites)
+	if len(fp.created) != 0 {
+		t.Fatalf("created %v", fp.created)
+	}
+}
+
+func TestCreateRejectsMemoryWithoutCapability(t *testing.T) {
+	t.Parallel()
+
+	svc := newTestService(t, t.TempDir(), testPlain, plainProvider{name: testPlain})
+	_, err := svc.create(context.Background(), createIn{Name: testBox, MemoryMiB: 1024})
+	wantErr(t, err, "memory is not available for plain")
+}
+
+func TestCreateRejectsInvalidMemoryMib(t *testing.T) {
+	t.Parallel()
+
+	fp := &fakeProvider{name: testSprites}
+	svc := newTestService(t, t.TempDir(), testSprites, computeFake{fp})
+	_, err := svc.create(context.Background(), createIn{Name: testBox, MemoryMiB: -1})
+	wantErr(t, err, "memory_mib")
+}
+
 func TestCreateSyncReturnsWorkDir(t *testing.T) {
 	t.Parallel()
 

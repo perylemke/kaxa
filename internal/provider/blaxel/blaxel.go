@@ -93,6 +93,9 @@ func (p *Provider) Configure(apiKey, workspace string) error {
 // SupportsTemplate marks Blaxel as a provider that starts sandboxes from an image.
 func (*Provider) SupportsTemplate() {}
 
+// SupportsMemory marks Blaxel as honoring sandbox memory (MiB) when non-zero.
+func (*Provider) SupportsMemory() {}
+
 // SetDefaultTemplate sets the image used when a create names none. An empty
 // name restores blaxel/base-image:latest.
 func (p *Provider) SetDefaultTemplate(name string) error {
@@ -204,7 +207,7 @@ func (p *Provider) createParams(spec sandbox.Spec) (CreateParams, error) {
 		return CreateParams{}, err
 	}
 	params := CreateParams{
-		Name: spec.Name, Image: image, Region: p.regionFor(), Memory: p.memoryFor(), Labels: spec.Labels,
+		Name: spec.Name, Image: image, Region: p.regionFor(), Memory: p.memoryFor(spec), Labels: spec.Labels,
 	}
 	if !spec.ExposeAPI {
 		return params, nil
@@ -240,7 +243,10 @@ func (p *Provider) regionFor() string {
 	return defaultRegion
 }
 
-func (p *Provider) memoryFor() int {
+func (p *Provider) memoryFor(spec sandbox.Spec) int {
+	if spec.MemoryMiB > 0 {
+		return spec.MemoryMiB
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.memory > 0 {

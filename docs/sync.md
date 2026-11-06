@@ -3,14 +3,15 @@
 Copy another Git repository into a sandbox that already exists. This works for Sprites, Modal, E2B, Docker, Daytona, and Blaxel.
 
 ```bash
-kaxa sync <name> [--dir <path>]
+kaxa sync <name> [--dir <path>[,<path>...]]
 ```
 
-The sandbox must have been created with `--sync`; see [create](create.md#sync). `sync` copies the Git repository that contains `--dir`, or the current directory when `--dir` is omitted, including `.git` and excluding ignored files. A subdirectory still copies the whole repository. `--dir` may point at any local repository, and a relative path is resolved from the current directory.
+The sandbox must have been created with `--sync`; see [create](create.md#sync). `sync` copies each Git repository named by `--dir`, or the current directory when `--dir` is omitted, including `.git` and excluding ignored files. Separate several paths with commas. A subdirectory still copies the whole repository. A relative path is resolved from the current directory. A path that does not exist fails with `directory "<path>" does not exist` before anything is copied.
 
 ```bash
 kaxa sync my-sprite
 kaxa sync --dir ~/projects/api-python my-sprite
+kaxa sync --dir ~/projects/api-python,~/projects/web my-sprite
 kaxa --provider modal sync my-box
 kaxa --provider e2b sync my-box
 ```

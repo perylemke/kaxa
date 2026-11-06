@@ -14,10 +14,12 @@ import (
 
 // fakeClient is an in-memory modal SDK client.
 type fakeClient struct {
-	boxes     map[string]*modal.Record
-	creates   int
-	withTools bool
-	failWith  error
+	boxes         map[string]*modal.Record
+	creates       int
+	withTools     bool
+	lastCPU       float64
+	lastMemoryMiB int
+	failWith      error
 
 	// Snapshot bookkeeping.
 	nextImage     int
@@ -47,9 +49,10 @@ func newFakeClient() *fakeClient {
 	return &fakeClient{boxes: map[string]*modal.Record{}}
 }
 
-func (f *fakeClient) Create(_ context.Context, name string, labels []string, withTools bool) (modal.Record, error) {
+func (f *fakeClient) Create(_ context.Context, name string, labels []string, withTools bool, cpu float64, memoryMiB int) (modal.Record, error) {
 	f.creates++
 	f.withTools = withTools
+	f.lastCPU, f.lastMemoryMiB = cpu, memoryMiB
 	if f.failWith != nil {
 		return modal.Record{}, f.failWith
 	}

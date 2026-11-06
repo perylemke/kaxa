@@ -231,6 +231,36 @@ func TestSyncRejectsProviderWithoutSupport(t *testing.T) {
 	}
 }
 
+func TestSyncCopiesEachRepository(t *testing.T) {
+	t.Parallel()
+
+	p, rec := newSyncProvider()
+	root1, name1 := gitRepo(t)
+	root2, name2 := gitRepo(t)
+	writeFile(t, root1, "go.mod", "module x\n\ngo 1.27\n")
+	writeFile(t, root2, "go.mod", "module y\n\ngo 1.27\n")
+
+	res, err := lifecycle.Sync(context.Background(), p, lifecycle.SyncRequest{
+		Name:  boxName,
+		Repos: []lifecycle.RepoCopy{{Root: root1, Repo: name1}, {Root: root2, Repo: name2}},
+	}, nil)
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	var syncCount int
+	for _, step := range rec.steps {
+		if step == stepSync {
+			syncCount++
+		}
+	}
+	if syncCount != 2 || rec.setups != 2 {
+		t.Fatalf("steps = %v setups = %d", rec.steps, rec.setups)
+	}
+	if res.WorkDir != "/home/box/ws/"+name1 {
+		t.Fatalf("WorkDir = %q", res.WorkDir)
+	}
+}
+
 func TestSyncReportsEachSlowStep(t *testing.T) {
 	t.Parallel()
 

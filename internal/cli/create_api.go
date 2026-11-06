@@ -30,6 +30,10 @@ type createFlags struct {
 	// NoInstall copies the repository without installing the toolchain or running
 	// the dependency commands.
 	NoInstall bool
+	// CPU is a request in fractional cores. Zero means the provider default.
+	CPU float64
+	// MemoryMiB is memory in MiB. Zero means the provider default.
+	MemoryMiB int
 }
 
 func applyAPIFlags(req *createRequest, flags createFlags, portSet bool) error {
@@ -102,7 +106,8 @@ func createdMessage(ref, provider string, detail sandbox.Detail, req createReque
 		fmt.Fprintf(&b, " forwards to port %d", req.APIPort)
 	}
 	if access := urlAccess(provider, detail.Auth, req.Public); access != "" {
-		b.WriteString("\n" + access)
+		b.WriteString("\n")
+		b.WriteString(access)
 	}
 	return b.String()
 }

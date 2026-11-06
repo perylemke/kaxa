@@ -18,6 +18,9 @@ const (
 
 var openBrowserFn = openBrowserURL
 
+// browserExecCommand builds the launcher process; tests replace it.
+var browserExecCommand = exec.Command // #nosec G204 -- launcher is a fixed OS binary; the URL is checked by browserCommand
+
 var errUnsafeURL = errors.New("refusing to open a URL that is not a plain https address")
 
 func openBrowserURL(rawURL string) error {
@@ -28,7 +31,7 @@ func openBrowserURL(rawURL string) error {
 	if err != nil {
 		return err
 	}
-	cmd := exec.Command(name, args...) // #nosec G204 -- launcher is a fixed OS binary; the URL is checked by browserCommand
+	cmd := browserExecCommand(name, args...)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("open browser: %w", err)
 	}

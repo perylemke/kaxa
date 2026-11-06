@@ -107,7 +107,7 @@ func serverRoot() (string, error) {
 
 func (s *service) register(srv *sdk.Server) {
 	addTool(s, srv, "list_providers", "List providers",
-		"List the registered sandbox providers, whether each is available, and which optional features it supports (sync, setup, api, public_url, workspace_layout, snapshot). A provider with snapshot also reports snapshot_restore: in_place or new_sandbox.",
+		"List the registered sandbox providers, whether each is available, and which optional features it supports (sync, setup, api, public_url, workspace_layout, cpu, memory, snapshot). A provider with snapshot also reports snapshot_restore: in_place or new_sandbox.",
 		readOnly, s.listProviders)
 	addTool(s, srv, "create_sandbox", "Create a sandbox",
 		"Create a sandbox. With sync it copies a local Git repository into the sandbox and installs its dependencies; a failed copy, install or API publish deletes the sandbox. Can take minutes.",
