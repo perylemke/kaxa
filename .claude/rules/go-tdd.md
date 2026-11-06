@@ -14,3 +14,5 @@ paths:
 - E2E and acceptance tests live under `test/e2e` and `test/acceptance` with `//go:build e2e` and `//go:build acceptance`.
 - Use `t.Setenv`, `t.TempDir`, and `t.Helper()` instead of global env or fixed paths.
 - Assert errors with `errors.Is` / `errors.As`; avoid brittle string matching on full error text unless necessary.
+- Before a commit or push, `make test` and `make coverage` must pass.
+- Every Go package you change in the commit must reach at least 90% statement coverage (`go tool cover -func`); packages the commit does not touch are out of scope.

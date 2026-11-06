@@ -33,6 +33,8 @@ make prerelease SCOPE=minor TYPE=rc # tag and push a test version (alpha|beta|rc
 
 Run `make test` at minimum, and `make lint` after Go changes, before saying work is done. Report the real result.
 
+Before a commit or push, `make test` and `make coverage` must pass, and every Go package changed in that commit should stay at or above 90% statement coverage; see `.cursor/rules/go-tdd.mdc` and `.cursor/rules/commits.mdc` (mirrored under `.claude/rules/`).
+
 ## Layout
 
 - `cmd/kaxa/main.go` — builds the registry and calls `cli.Execute`; no business logic.

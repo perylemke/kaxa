@@ -298,13 +298,16 @@ func finalizeCreateFormResult(
 	return result, nil
 }
 
+// createWizardExtraTeaOpts is appended by tests (e.g. WithoutRenderer) so non-accessible wizard runs without a PTY.
+var createWizardExtraTeaOpts []tea.ProgramOption
+
 func runCreateWizard(out io.Writer, in io.Reader, accessible bool, pages createFormPages, result *createFormResult) error {
 	if accessible {
 		return runAccessibleCreateWizard(out, in, pages, result)
 	}
 	pages.sync = pages.sync.WithHideFunc(func() bool { return !result.Sync })
 	pages.api = pages.api.WithHideFunc(func() bool { return !result.API })
-	form := newCreateWizardForm(pages.identity, pages.options, pages.sync, pages.api)
+	form := newCreateWizardForm(pages.identity, pages.options, pages.sync, pages.api).WithProgramOptions(createWizardExtraTeaOpts...)
 	if err := form.Run(); err != nil {
 		return formRunErr(err)
 	}

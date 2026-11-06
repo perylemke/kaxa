@@ -5,9 +5,11 @@ import (
 	"context"
 	"errors"
 	"io"
+	"strconv"
 	"strings"
 	"testing"
 
+	"charm.land/huh/v2"
 	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
@@ -213,5 +215,245 @@ func TestApplyCreateFormCapabilitiesClearsOnProviderChange(t *testing.T) {
 	applyCreateFormCapabilities(&result, sandbox.CapabilitiesOf(formModalFake{formBareProvider{name: formModalProvider}}))
 	if result.DirSet || result.NoInstall || result.Dir != "" {
 		t.Fatalf("sync off should clear dir: %+v", result)
+	}
+}
+
+func TestCollectCreateFormNoProviders(t *testing.T) {
+	t.Parallel()
+
+	_, err := collectCreateForm(strings.NewReader(""), new(bytes.Buffer), nil, "", formWizardLookup, createFlags{}, false)
+	if err == nil || !strings.Contains(err.Error(), "no sandbox providers registered") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestValidateCreateFlagsPreFormRejectsOrphanFlags(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		flags   createFlags
+		portSet bool
+		want    string
+	}{
+		{name: "api-cmd", flags: createFlags{APICmd: "serve"}, want: "--api-cmd requires --api"},
+		{name: "api-port", flags: createFlags{APIPort: 8000}, portSet: true, want: "--api-port requires --api"},
+		{name: "api-env", flags: createFlags{APIEnv: []string{"FOO=1"}}, want: "--api-env requires --api"},
+		{name: "dir", flags: createFlags{Dir: "/tmp", DirSet: true}, want: "--dir requires --sync"},
+		{name: "no-install", flags: createFlags{NoInstall: true}, want: "--no-install requires --sync"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			err := validateCreateFlagsPreForm(tc.flags, tc.portSet)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("err = %v, want %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestCreateFormPreFormFailsBeforeWizard(t *testing.T) {
+	t.Parallel()
+
+	_, err := collectCreateForm(
+		strings.NewReader(""),
+		new(bytes.Buffer),
+		formProviders(),
+		spritesProviderName,
+		formWizardLookup,
+		createFlags{APICmd: "x"},
+		false,
+	)
+	if err == nil || !strings.Contains(err.Error(), "--api-cmd requires --api") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestValidateCreateNameEmpty(t *testing.T) {
+	t.Parallel()
+	if err := validateCreateName("   "); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestValidateCreateRunningPublicWithoutAPI(t *testing.T) {
+	t.Parallel()
+	r := &createFormResult{Public: true, API: false}
+	if err := validateCreateRunning(true, r); err == nil || !strings.Contains(err.Error(), "tmux terminal") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestValidateCreatePublicRunningWithoutAPI(t *testing.T) {
+	t.Parallel()
+	r := &createFormResult{Running: true, API: false}
+	if err := validateCreatePublic(true, r); err == nil || !strings.Contains(err.Error(), "tmux terminal") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestValidateCreateSyncAnswerFalseClearsSyncFields(t *testing.T) {
+	t.Parallel()
+	result := createFormResult{Dir: "/tmp/x", DirSet: true, NoInstall: true}
+	if err := validateCreateSyncAnswer(false, &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Dir != "" || result.DirSet || result.NoInstall {
+		t.Fatalf("result = %+v", result)
+	}
+}
+
+func TestValidateCreateAPIAnswerFalseResetsRaw(t *testing.T) {
+	t.Parallel()
+	raw := &createFormAPIRaw{command: "a,b", port: "9000", env: "X"}
+	if err := validateCreateAPIAnswer(false, raw); err != nil {
+		t.Fatal(err)
+	}
+	if raw.command != "" || raw.env != "" || raw.port != strconv.Itoa(defaultAPIPort) {
+		t.Fatalf("raw = %+v", raw)
+	}
+}
+
+func TestValidateCreateSyncDirInvalidPath(t *testing.T) {
+	t.Parallel()
+	err := validateCreateSyncDir("/no-such-directory-kaxa-test-12345")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestValidateCreateAPIEnvInputInvalidKey(t *testing.T) {
+	t.Parallel()
+	err := validateCreateAPIEnvInput("123BAD")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestFinalizeCreateFormResultPublicRunningWithoutAPI(t *testing.T) {
+	t.Parallel()
+	lookup := func(string) (sandbox.Provider, error) {
+		return formSpritesFake{formBareProvider{name: spritesProviderName}}, nil
+	}
+	res := createFormResult{Provider: spritesProviderName, Name: "x", Running: true, Public: true, API: false}
+	_, err := finalizeCreateFormResult(lookup, createFlags{}, res, createFormAPIRaw{})
+	if err == nil || !strings.Contains(err.Error(), "tmux terminal") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestFinalizeCreateFormResultWithAPIParsesCommand(t *testing.T) {
+	t.Parallel()
+	lookup := func(string) (sandbox.Provider, error) {
+		return formE2BFake{formBareProvider{name: e2bProviderName}}, nil
+	}
+	res := createFormResult{Provider: e2bProviderName, Name: "svc", API: true}
+	raw := createFormAPIRaw{command: "python,-m,http.server", port: "9000", env: ""}
+	got, err := finalizeCreateFormResult(lookup, createFlags{}, res, raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.APIPort != 9000 || len(got.APICmd) != 3 || got.APICmd[0] != "python" {
+		t.Fatalf("got = %+v", got)
+	}
+}
+
+func TestParsedAPIPortTmuxConflict(t *testing.T) {
+	t.Parallel()
+	_, err := parsedAPIPort(strconv.Itoa(webtmuxHTTPPort), true)
+	if err == nil || !strings.Contains(err.Error(), "tmux") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestFormBareProviderStubs(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	p := formBareProvider{name: formModalProvider}
+	if _, err := p.Create(ctx, sandbox.Spec{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.List(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.Inspect(ctx, "x"); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.Exec(ctx, "x", sandbox.ExecOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.Destroy(ctx, "x"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestFormRunErrMapsUserAborted(t *testing.T) {
+	t.Parallel()
+	err := formRunErr(huh.ErrUserAborted)
+	if !errors.Is(err, errCreateCancelled) {
+		t.Fatalf("err = %v", err)
+	}
+	if formRunErr(errors.New("other")) == nil {
+		t.Fatal("expected pass-through")
+	}
+}
+
+func TestCheckCreateFormFlagsEachUnsupported(t *testing.T) {
+	t.Parallel()
+
+	modalP := formModalFake{formBareProvider{name: formModalProvider}}
+	e2bP := formE2BFake{formBareProvider{name: e2bProviderName}}
+
+	if err := checkCreateFormFlags(modalP, createFlags{Running: true}); err == nil {
+		t.Fatal("expected running unsupported on modal")
+	}
+	if err := checkCreateFormFlags(modalP, createFlags{Template: "x"}); err == nil {
+		t.Fatal("expected template unsupported on modal")
+	}
+	if err := checkCreateFormFlags(modalP, createFlags{API: true}); err == nil {
+		t.Fatal("expected api unsupported on modal")
+	}
+	if err := checkCreateFormFlags(modalP, createFlags{Public: true}); err == nil {
+		t.Fatal("expected public unsupported on modal")
+	}
+	if err := checkCreateFormFlags(e2bP, createFlags{}); err != nil {
+		t.Fatalf("e2b supports flags: %v", err)
+	}
+}
+
+func TestFinalizeCreateFormResultAPIParseErrors(t *testing.T) {
+	t.Parallel()
+
+	lookup := func(string) (sandbox.Provider, error) {
+		return formE2BFake{formBareProvider{name: e2bProviderName}}, nil
+	}
+	res := createFormResult{Provider: e2bProviderName, Name: "x", API: true, Running: true}
+	_, err := finalizeCreateFormResult(lookup, createFlags{}, res, createFormAPIRaw{command: "", port: "8000"})
+	if err == nil {
+		t.Fatal("expected empty api command error")
+	}
+	_, err = finalizeCreateFormResult(lookup, createFlags{}, res, createFormAPIRaw{command: "x", port: "0"})
+	if err == nil {
+		t.Fatal("expected port error")
+	}
+}
+
+func TestValidateCreateRunningPublicOKWhenAPI(t *testing.T) {
+	t.Parallel()
+
+	r := &createFormResult{Public: true, API: true}
+	if err := validateCreateRunning(true, r); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestValidateCreatePublicOKWhenNotRunning(t *testing.T) {
+	t.Parallel()
+
+	r := &createFormResult{Running: false, API: false}
+	if err := validateCreatePublic(true, r); err != nil {
+		t.Fatal(err)
 	}
 }

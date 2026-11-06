@@ -3,6 +3,7 @@ module github.com/perylemke/kaxa
 go 1.27
 
 require (
+	charm.land/bubbles/v2 v2.0.0
 	charm.land/bubbletea/v2 v2.1.1
 	charm.land/huh/v2 v2.0.3
 	github.com/blaxel-ai/sdk-go v0.29.1
@@ -10,6 +11,7 @@ require (
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/charmbracelet/x/ansi v0.11.9
+	github.com/creack/pty v1.1.24
 	github.com/daytona/clients/sdk-go v0.227.0
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
 	github.com/modal-labs/modal-client/go v0.11.1
@@ -22,7 +24,6 @@ require (
 )
 
 require (
-	charm.land/bubbles/v2 v2.0.0 // indirect
 	charm.land/lipgloss/v2 v2.0.1 // indirect
 	github.com/Masterminds/semver/v3 v3.5.0 // indirect
 	github.com/aristanetworks/gomap v0.0.0-20230726210543-f4e41046dced // indirect

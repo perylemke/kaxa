@@ -11,6 +11,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/perylemke/kaxa/internal/lifecycle"
 	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
@@ -121,6 +122,173 @@ func TestListInteractiveListViewShowsHelp(t *testing.T) {
 	view := stripANSI(m.View())
 	if !strings.Contains(view, "enter detail") || !strings.Contains(view, "a") {
 		t.Fatalf("view = %q", view)
+	}
+}
+
+func TestListInteractiveApplyDetailError(t *testing.T) {
+	t.Parallel()
+
+	m := listInteractiveModel{mode: listModeTable}
+	next := m.applyDetail(detailLoadedMsg{err: errors.New("boom")})
+	if next.mode != listModeDetail || next.detailErr == nil {
+		t.Fatalf("mode=%v err=%v", next.mode, next.detailErr)
+	}
+}
+
+func TestListInteractiveUpdateDetailLoadedMsg(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	providers := map[string]sandbox.Provider{spritesProviderName: idleProvider{}}
+	infos := []sandbox.Info{{ID: "a", Status: fixtureWarm, Provider: spritesProviderName}}
+	m := newListInteractiveModel(ctx, providers, infos, 0)
+	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatal("expected inspect cmd")
+	}
+	lm := authModel(t, next)
+	if lm.mode != listModeDetailLoading {
+		t.Fatalf("mode = %d", lm.mode)
+	}
+	msg := cmd()
+	next2, _ := lm.Update(msg)
+	got := authModel(t, next2)
+	if got.mode != listModeDetail {
+		t.Fatalf("mode = %d", got.mode)
+	}
+}
+
+func TestListInteractiveUpdateIgnoresUnknownMsg(t *testing.T) {
+	t.Parallel()
+
+	m := newListInteractiveModel(context.Background(), nil, []sandbox.Info{
+		{ID: "a", Status: fixtureWarm, Provider: spritesProviderName},
+	}, 0)
+	next, cmd := m.Update(struct{ x int }{1})
+	if cmd != nil {
+		t.Fatalf("cmd = %v", cmd)
+	}
+	authModel(t, next)
+}
+
+func TestListInteractiveTableEnterNoSandboxes(t *testing.T) {
+	t.Parallel()
+
+	m := newListInteractiveModel(context.Background(), nil, []sandbox.Info{}, 0)
+	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd != nil {
+		t.Fatal("expected no cmd")
+	}
+	authModel(t, next)
+}
+
+func TestListInteractiveDetailLoadingQuit(t *testing.T) {
+	t.Parallel()
+
+	m := listInteractiveModel{mode: listModeDetailLoading}
+	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	if cmd == nil {
+		t.Fatal("expected quit")
+	}
+	_ = authModel(t, next)
+}
+
+func TestInspectCmdNilProvider(t *testing.T) {
+	t.Parallel()
+
+	cmd := inspectCmd(context.Background(), nil, sandbox.Info{Provider: "sprites", ID: "x"})
+	msg := cmd()
+	d, ok := msg.(detailLoadedMsg)
+	if !ok || d.err == nil {
+		t.Fatalf("msg = %#v", msg)
+	}
+}
+
+func TestHandleListPostActionStreamsMissingProvider(t *testing.T) {
+	t.Parallel()
+
+	err := handleListPostActionStreams(
+		context.Background(),
+		strings.NewReader("y\n"),
+		new(bytes.Buffer),
+		new(bytes.Buffer),
+		map[string]sandbox.Provider{},
+		listTUIResult{postAction: listPostRestart, id: fixtureDemo, provider: spritesProviderName},
+	)
+	if err == nil || !strings.Contains(err.Error(), "is not configured") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestListTableHeightCapsAtMax(t *testing.T) {
+	t.Parallel()
+
+	if got := listTableHeight(100); got != 20 {
+		t.Fatalf("got %d", got)
+	}
+}
+
+func TestListInfoIndexMissing(t *testing.T) {
+	t.Parallel()
+
+	if got := listInfoIndex([]sandbox.Info{{ID: "a", Provider: spritesProviderName}}, "sprites", "b"); got != -1 {
+		t.Fatalf("got %d", got)
+	}
+}
+
+func TestDetailIDUsesRowWhenDetailEmpty(t *testing.T) {
+	t.Parallel()
+
+	m := listInteractiveModel{
+		mode:      listModeDetail,
+		infos:     []sandbox.Info{{ID: "row-id", Provider: spritesProviderName}},
+		detail:    sandbox.Detail{},
+		detailErr: lifecycle.Unsupported(&idleProvider{}, sandbox.FeatureRestart),
+	}
+	m.table = newListTable(m.infos, true, listTableHeight(len(m.infos)))
+	if got := m.detailID(); got != "row-id" {
+		t.Fatalf("detailID = %q", got)
+	}
+}
+
+func TestFormatRelativeTimeNonZero(t *testing.T) {
+	t.Parallel()
+
+	s := formatRelativeTime(time.Now().Add(-2 * time.Second))
+	if !strings.Contains(s, "ago") {
+		t.Fatalf("got %q", s)
+	}
+}
+
+func TestListInteractiveUpdateKeyDefaultBranch(t *testing.T) {
+	t.Parallel()
+
+	m := listInteractiveModel{mode: 99}
+	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeySpace})
+	am := authModel(t, next)
+	if cmd != nil || am.mode != 99 {
+		t.Fatalf("cmd=%v mode=%d", cmd, am.mode)
+	}
+}
+
+func TestDetailFeatureActionNilProvider(t *testing.T) {
+	t.Parallel()
+
+	m := listInteractiveModel{mode: listModeDetail, detail: sandbox.Detail{ID: "x"}}
+	next, cmd := m.detailFeatureAction(nil, sandbox.FeatureRestart, listPostRestart, "x", spritesProviderName)
+	got := authModel(t, next)
+	if cmd != nil || got.postAction != listPostNone || got.detailMsg != "" {
+		t.Fatalf("postAction=%v msg=%q", got.postAction, got.detailMsg)
+	}
+}
+
+func TestShowUnsupportedNilProvider(t *testing.T) {
+	t.Parallel()
+
+	m := listInteractiveModel{}
+	out := m.showUnsupported(nil, sandbox.FeatureRestart)
+	if out.detailMsg != "" {
+		t.Fatalf("msg = %q", out.detailMsg)
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"os"
 	"strings"
 	"testing"
 
@@ -136,7 +137,7 @@ func TestCreateInteractiveForm(t *testing.T) {
 	errOut := new(bytes.Buffer)
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
-	cmd.SetIn(strings.NewReader(strings.Join([]string{"demo", "1", "y", "n", "n", "n", ""}, "\n")))
+	cmd.SetIn(strings.NewReader(strings.Join([]string{"1", "demo", "y", "n", "n", "n", ""}, "\n")))
 	cmd.SetArgs([]string{testCmdCreate})
 	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 	t.Setenv("KAXA_DEFAULT_PROVIDER", "")
@@ -750,6 +751,21 @@ func TestExecReturnsExitError(t *testing.T) {
 	}
 	if exitErr.Code != 7 {
 		t.Fatalf("code = %d", exitErr.Code)
+	}
+}
+
+func TestExecutePropagatesRemoteExitCode(t *testing.T) {
+	fp := &fakeProvider{name: testSpritesName, execErr: &sandbox.ExitError{Code: 7}}
+	reg := spritesRegistry(t, fp)
+	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
+
+	old := os.Args
+	t.Cleanup(func() { os.Args = old })
+	os.Args = []string{"kaxa", testProviderFlag, testSpritesName, testCmdExec, testArgBox, "false"}
+
+	code := cli.Execute(reg)
+	if code != 7 {
+		t.Fatalf("exit code = %d", code)
 	}
 }
 
