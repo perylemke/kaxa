@@ -23,11 +23,14 @@ func withRepo(req createRequest, flags createFlags) (createRequest, error) {
 		}
 		return req, nil
 	}
-	root, name, err := lifecycle.ResolveRepo(flags.Dir, flags.DirSet)
+	copies, err := lifecycle.ResolveRepos(flags.Dir, flags.DirSet)
 	if err != nil {
 		return createRequest{}, err
 	}
-	req.Root = root
-	req.Repo = name
+	req.Repos = copies
+	if len(copies) > 0 {
+		req.Root = copies[0].Root
+		req.Repo = copies[0].Repo
+	}
 	return req, nil
 }

@@ -129,7 +129,7 @@ func TestCreateFormModalAccessible(t *testing.T) {
 }
 
 func TestCreateFormSpritesAccessibleDefaults(t *testing.T) {
-	in := strings.NewReader(strings.Join([]string{"", fixturePery, "", "", "", "", ""}, "\n"))
+	in := strings.NewReader(strings.Join([]string{"", fixturePery, "", "", "", "", "", ""}, "\n"))
 	out := new(bytes.Buffer)
 
 	got, err := collectCreateForm(in, out, formProviders(), spritesProviderName, formWizardLookup, createFlags{Running: true, Sync: true}, false)
@@ -150,7 +150,7 @@ func TestCreateFormSpritesAccessibleDefaults(t *testing.T) {
 func TestCreateFormE2BAccessible(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://example")
 	in := strings.NewReader(strings.Join([]string{
-		"3", fixturePery, "y", "my-template", "y", "", "n",
+		"3", fixturePery, "y", "", "my-template", "y", "n",
 		".venv/bin/uvicorn,app.main:app", "9000", "DATABASE_URL",
 	}, "\n"))
 	out := new(bytes.Buffer)
@@ -166,7 +166,7 @@ func TestCreateFormE2BAccessible(t *testing.T) {
 		t.Fatalf("api = port %d cmd %#v", got.APIPort, got.APICmd)
 	}
 	assertFormPrompts(t, out.String(),
-		[]string{"Template", "Sync", "API", "Directory", "Skip install", "API command", "API port", "API env"},
+		[]string{"Template", "Sync", "API", "Directories", "Skip install", "API command", "API port", "API env"},
 		[]string{"Running", "Public", "Size"},
 	)
 }
@@ -187,7 +187,7 @@ func assertFormPrompts(t *testing.T, view string, want, omit []string) {
 
 func TestCreateFormSpritesSyncPage(t *testing.T) {
 	in := strings.NewReader(strings.Join([]string{
-		"2", fixturePery, "n", "y", "n", "n", "", "y",
+		"2", fixturePery, "n", "y", "", "n", "n", "y",
 	}, "\n"))
 	out := new(bytes.Buffer)
 
@@ -198,7 +198,7 @@ func TestCreateFormSpritesSyncPage(t *testing.T) {
 	if !got.Sync || !got.NoInstall || got.DirSet {
 		t.Fatalf("sync = %+v", got)
 	}
-	if !strings.Contains(out.String(), "Directory") || !strings.Contains(out.String(), "Skip install") {
+	if !strings.Contains(out.String(), "Directories") || !strings.Contains(out.String(), "Skip install") {
 		t.Fatalf("prompts = %q", out.String())
 	}
 }

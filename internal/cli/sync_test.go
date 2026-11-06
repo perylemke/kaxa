@@ -183,7 +183,7 @@ func TestSyncRejectsBadRepositoryBeforeTouchingSandbox(t *testing.T) {
 		want string
 	}{
 		{"current directory is not a repository", []string{testBoxName}, "current directory is not inside a git repository"},
-		{"missing --dir", []string{testBoxName, testDirFlag, filepath.Join(plain, "missing")}, "was not found"},
+		{"missing --dir", []string{testBoxName, testDirFlag, filepath.Join(plain, "missing")}, "does not exist"},
 		{"--dir is not a repository", []string{testBoxName, testDirFlag, plain}, "is not inside a git repository"},
 	}
 	for _, tt := range tests {

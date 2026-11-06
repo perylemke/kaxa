@@ -142,13 +142,14 @@ func buildCreateFormPages(
 		}
 		return sandbox.CapabilitiesOf(p)
 	}
-	identity := huh.NewGroup(
+	identityFields := []huh.Field{
 		shownField(huh.NewSelect[string]().Title("Provider").Options(options...).Value(&result.Provider).
 			Validate(func(name string) error {
 				return validateCreateProvider(name, lookup, flags, result)
 			})),
 		shownField(huh.NewInput().Title("Name").Value(&result.Name).Validate(validateCreateName)),
-	).Title("Create sandbox").Description("Step 1 · Provider and name")
+	}
+	identity := huh.NewGroup(identityFields...).Title("Create sandbox").Description("Step 1 · Provider and name")
 
 	optionsPage := huh.NewGroup(
 		conditionalField(capsOf, sandbox.FeatureRunning,
@@ -157,6 +158,11 @@ func buildCreateFormPages(
 		conditionalField(capsOf, sandbox.FeatureSync,
 			huh.NewConfirm().Title("Sync").Affirmative("Yes").Negative("No").Value(&result.Sync).
 				Validate(func(v bool) error { return validateCreateSyncAnswer(v, result) })),
+		presetConditionalField(result, syncDirsVisible(capsOf),
+			huh.NewInput().Title("Directories").
+				Description("Comma-separated paths. Empty uses the current directory. Each path must be inside a git repo.").
+				Value(&result.Dir).
+				Validate(validateCreateSyncDir)),
 		conditionalField(capsOf, sandbox.FeatureTemplate,
 			huh.NewInput().Title("Template").Description("Empty means the provider default.").Value(&result.Template)),
 		conditionalField(capsOf, sandbox.FeatureAPIPublish,
@@ -207,10 +213,8 @@ func buildCreateFormPages(
 	).Title("Provider options").Description("Step 2 · Options this provider supports")
 
 	syncPage := huh.NewGroup(
-		shownField(huh.NewInput().Title("Directory").Description("Empty means the current directory.").Value(&result.Dir).
-			Validate(validateCreateSyncDir)),
 		shownField(huh.NewConfirm().Title("Skip install").Affirmative("Yes").Negative("No").Value(&result.NoInstall)),
-	).Title("Sync").Description("Step 3 · Repository")
+	).Title("Sync").Description("Step 3 · Install")
 
 	apiPage := huh.NewGroup(
 		shownField(huh.NewInput().Title("API command").Description("Comma-separated argv. The first item is the binary.").Value(&apiRaw.command).
@@ -342,7 +346,7 @@ func validateCreateSyncDir(dir string) error {
 	if dir == "" {
 		return nil
 	}
-	_, _, err := lifecycle.ResolveRepo(dir, true)
+	_, err := lifecycle.ResolveRepos(dir, true)
 	return err
 }
 
@@ -914,6 +918,12 @@ func genericCPUVisible(capsOf func() sandbox.Capabilities) func(*createFormResul
 			return false
 		}
 		return capsOf().Has(sandbox.FeatureCPU)
+	}
+}
+
+func syncDirsVisible(capsOf func() sandbox.Capabilities) func(*createFormResult) bool {
+	return func(r *createFormResult) bool {
+		return r.Sync && capsOf().Has(sandbox.FeatureSync)
 	}
 }
 

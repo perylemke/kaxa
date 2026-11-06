@@ -7,7 +7,7 @@ kaxa create [name]
 kaxa new [name]
 ```
 
-Without a name, a wizard asks for the provider and name, then only the options that provider supports. The provider list includes only backends that have credentials set (`KAXA_*`); if none are configured, the command fails like `kaxa list`. When you pass `--provider` and that backend has credentials, the wizard lists only that provider, already selected, and shows the name field under it. Modal uses dropdowns for CPU and memory (with an **Other** line for custom values); Docker uses one **Size** dropdown for the fixed CPU and memory pairs that the Cloud Sandboxes API allows; Blaxel uses a memory dropdown with preset MiB sizes. A value you already passed with `--memory` that is not in the list appears as an extra option so the wizard matches the flag. With sync enabled it asks for the repository directory and whether to skip install. With API enabled it asks for the command, the port, and optional environment variables. The wizard uses the Dracula theme. In a terminal it occupies the alternate screen and returns a clean prompt when it finishes; only the result is printed in your scrollback. Ctrl+C cancels; the footer shows that shortcut. Flags you already passed stay as the initial answer; an empty line keeps that default.
+Without a name, a wizard asks for the provider and name, then only the options that provider supports. The provider list includes only backends that have credentials set (`KAXA_*`); if none are configured, the command fails like `kaxa list`. When you pass `--provider` and that backend has credentials, the wizard lists only that provider, already selected, and shows the name field under it. Modal uses dropdowns for CPU and memory (with an **Other** line for custom values); Docker uses one **Size** dropdown for the fixed CPU and memory pairs that the Cloud Sandboxes API allows; Blaxel uses a memory dropdown with preset MiB sizes. A value you already passed with `--memory` that is not in the list appears as an extra option so the wizard matches the flag. When Sync is Yes, a Directories field opens on that same step (comma-separated paths; empty uses the current directory once). The next step asks whether to skip install. With API enabled it asks for the command, the port, and optional environment variables. The wizard uses the Dracula theme. In a terminal it occupies the alternate screen and returns a clean prompt when it finishes; only the result is printed in your scrollback. Ctrl+C cancels; the footer shows that shortcut. Flags you already passed stay as the initial answer; an empty line keeps that default.
 
 Sprites, Modal, E2B, Docker, Daytona, and Blaxel implement create. `--running` and public URLs exist only for Sprites; the others reject them with a message that names the providers that have them. API publish works on Sprites, E2B, Docker, Daytona, and Blaxel. `--sync` works on all six; see [Sync](#sync).
 
@@ -27,7 +27,7 @@ Docker sandboxes run in Docker's cloud, created through the Docker Sandboxes API
 | --- | --- |
 | `--running` | Keep the sandbox up for one hour, serve tmux on its URL, and open that URL in a browser |
 | `--sync` | Copy the current Git repository into `/home/sprite/workspace/<repo>` (Sprites) `/home/modal/workspace/<repo>` (Modal), `/home/user/workspace/<repo>` (E2B), `/home/agent/workspace/<repo>` (Docker), `/home/daytona/workspace/<repo>` (Daytona), or `/root/workspace/<repo>` (Blaxel) |
-| `--dir` | Git repository to copy. Requires `--sync`. Default: the current directory |
+| `--dir` | Comma-separated Git repositories to copy. Requires `--sync`. Default: the current directory once |
 | `--api` | Publish one HTTP service on the Sprites URL, on the E2B sandbox URL for the API port, on the Docker URL that Docker gives the published port, on the public preview URL of the API port on Daytona, or on a public preview named `kaxa-api` on Blaxel. Requires `--api-cmd` |
 | `--api-cmd` | Comma-separated argv. The first item is the binary |
 | `--api-port` | Port the process listens on. Default `8000`. `8080` is reserved when `--running` is also set |
@@ -47,7 +47,7 @@ Docker sandboxes run in Docker's cloud, created through the Docker Sandboxes API
 
 The copy leaves out credentials: untracked files such as `.env` or `id_rsa` stop the sync with an error, and `.git/config` is stripped of URL credentials and `http.extraHeader`. See [sync](sync.md#limits).
 
-`--dir` must exist and be a directory. A relative path is resolved from the current directory. A missing path, a file, or a directory outside a Git repository fails before create.
+`--dir` lists one or more paths separated by commas (no space-only segments). Each path must exist and be a directory inside a Git repository. A relative path is resolved from the current directory. Listing the same repository twice, or two repos whose directory name would collide in `workspace/<repo>`, fails before create.
 
 ```bash
 kaxa create --sync my-sprite
@@ -99,7 +99,7 @@ kaxa expects the same layout as `base`: user `user`, home `/home/user`, workspac
 
 `--api` starts one service named `kaxa-api` after the copy. `--api-cmd` is comma-separated argv. The process must listen on `0.0.0.0` and on `--api-port`.
 
-With `--sync`, the repository must look like an HTTP API. A CLI project is rejected before the sandbox is created. `--api` without `--sync` does not inspect a local project.
+With `--sync`, every listed repository must look like an HTTP API. A CLI project is rejected before the sandbox is created. `--api` without `--sync` does not inspect a local project. The API service and reported `WorkDir` use the first repository.
 
 Create waits until `sprite-env services get kaxa-api` reports `running`, for up to 90 seconds, because Rails and the JVM start slowly. `failed` stops immediately. If the service does not become `running`, the sandbox is deleted.
 

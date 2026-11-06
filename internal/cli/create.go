@@ -33,7 +33,7 @@ func newCreateCmd(reg *registry.Registry) *cobra.Command {
 		Short:   "Create a sandbox",
 		Long: `Create a sandbox on the selected provider.
 
---sync copies this Git repository into /home/sprite/workspace/<repo> on Sprites, /home/modal/workspace/<repo> on Modal, /home/user/workspace/<repo> on E2B, /home/agent/workspace/<repo> on Docker, or /home/daytona/workspace/<repo> on Daytona, and installs Go, Rust, Python, Node, Ruby (Gemfile), or Clojure (deps.edn) dependencies found at the root. --dir selects that repository; without it, sync uses the current directory. A subdirectory still copies the whole Git repository. A failed copy or install deletes the sandbox.
+--sync copies one or more Git repositories into workspace/<repo> on the provider and installs Go, Rust, Python, Node, Ruby (Gemfile), or Clojure (deps.edn) dependencies found at each root. --dir is comma-separated paths; without it, sync uses the current directory once. A subdirectory still copies the whole Git repository. Duplicates or two repos with the same directory name are rejected. A failed copy or install deletes the sandbox.
 --running keeps the sandbox up for one hour and opens a tmux session on its URL.
 --api publishes one HTTP service on that URL after the copy. It requires --api-cmd and works with Sprites, E2B, Docker, and Daytona. With --sync, the repository must be an HTTP API; a CLI project is rejected before the sandbox is created. The process must listen on 0.0.0.0 and on --api-port (8000 unless you change it). Together with --running, port 8080 stays with tmux and the URL forwards to the API. A failed publish deletes the sandbox. Create waits until the service is running. If it fails or does not become running within 90s, the sandbox is deleted.
 --api-env sets a variable for that service: KEY=VALUE, or KEY to copy the value from your shell so a secret stays out of the command line. Repeat it for more variables. Values cannot contain commas. HOME, USER, PATH, and KAXA_ names are reserved.
@@ -71,7 +71,7 @@ Without a name, a wizard asks for the provider and name, then only the options t
 	cmd.Flags().BoolVar(&keepRunning, "running", false, "keep the sandbox running for 1 hour and open a tmux terminal in the browser")
 	cmd.Flags().BoolVar(&syncWorkspace, "sync", false, "copy the local git repository into the sandbox workspace")
 	cmd.Flags().BoolVar(&noInstall, "no-install", false, "with --sync, copy the repository and skip the toolchain and dependency installs")
-	cmd.Flags().StringVar(&syncDir, "dir", "", "git repository to copy with --sync (default: current directory)")
+	cmd.Flags().StringVar(&syncDir, "dir", "", "comma-separated git repo paths to copy with --sync (default: current directory once)")
 	cmd.Flags().BoolVar(&exposeAPI, "api", false, "publish an HTTP service on the sandbox URL (requires --api-cmd; Sprites, E2B, Docker and Daytona)")
 	cmd.Flags().StringVar(&apiCmd, "api-cmd", "", "comma-separated argv; first item is the binary (example: .venv/bin/uvicorn,app.main:app,--host,0.0.0.0,--port,8000)")
 	cmd.Flags().IntVar(&apiPort, "api-port", defaultAPIPort, "port for --api; the process must listen on 0.0.0.0 (8080 is reserved with --running)")
