@@ -10,6 +10,7 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 
 ### Changed
 
+- The `kaxa create` wizard lists only providers that have credentials; the default option is the first available when `KAXA_DEFAULT_PROVIDER` is unset or does not match a configured backend. With `--provider`, the wizard lists only that provider when it is configured, with that provider selected, and shows the name field under it.
 - Agent and contributor docs (`.cursor/rules`, `.claude/rules`, `CLAUDE.md`) now state that `make test` and `make coverage` must pass before commit or push, and that Go packages touched in a change should keep at least 90% statement coverage.
 - `kaxa create` without a name uses a provider-aware wizard: after you choose the provider, the form only asks for options that provider supports, then sync and API details when those are enabled. In a terminal it runs on the alternate screen so the wizard does not mix with scrollback. Ctrl+C cancels, and the footer shows that shortcut. Where the provider supports it, CPU and memory are chosen from preset lists (Modal includes **Other** for custom values; Docker uses one size for the API’s fixed pairs; Blaxel lists preset memory sizes and adds an extra option when `--memory` is outside that list).
 - `kaxa list` detail view shows provider-specific fields from each backend's GET, and the help line lists only the keys that provider supports. An unsupported key stays on the detail screen with the same message as the standalone command.

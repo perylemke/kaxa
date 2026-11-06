@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/spf13/cobra"
 
@@ -128,7 +129,26 @@ func resolveCreateRequest(cmd *cobra.Command, reg *registry.Registry, args []str
 	if err != nil {
 		return createRequest{}, err
 	}
-	form, err := collectCreateForm(cmd.InOrStdin(), cmd.ErrOrStderr(), reg.Names(), cfg.Provider, reg.Get, flags, portSet)
+	_, providerNames, err := lifecycle.ListTargets(reg, cfg)
+	if err != nil {
+		return createRequest{}, err
+	}
+	if cmd.Flags().Changed("provider") && !slices.Contains(providerNames, cfg.Provider) {
+		if _, err := lifecycle.ResolveProvider(reg, cfg, cfg.Provider); err != nil {
+			return createRequest{}, err
+		}
+	}
+	defaultProvider := cfg.Provider
+	if !slices.Contains(providerNames, defaultProvider) {
+		defaultProvider = providerNames[0]
+		cfg.Provider = defaultProvider
+		cmd.SetContext(withConfig(cmd.Context(), cfg))
+	}
+	wizardProviders := providerNames
+	if cmd.Flags().Changed("provider") && slices.Contains(providerNames, cfg.Provider) {
+		wizardProviders = []string{cfg.Provider}
+	}
+	form, err := collectCreateForm(cmd.InOrStdin(), cmd.ErrOrStderr(), wizardProviders, defaultProvider, reg.Get, flags, portSet)
 	if err != nil {
 		return createRequest{}, err
 	}

@@ -68,6 +68,12 @@ func collectCreateForm(
 	}
 
 	result, apiRaw := seedCreateFormResult(defaultProvider, flags)
+	if len(providers) == 1 {
+		result.Provider = providers[0]
+		if err := validateCreateProvider(result.Provider, lookup, flags, &result); err != nil {
+			return createFormResult{}, err
+		}
+	}
 	pages := buildCreateFormPages(providers, lookup, flags, &result, &apiRaw)
 
 	accessible := !inputIsTTY(in)
