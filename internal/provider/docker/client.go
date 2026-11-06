@@ -84,6 +84,9 @@ type CreateParams struct {
 	Name   string
 	Labels []string
 	Image  string
+	// CPUs and MemoryMiB are the sandbox size. Zero uses defaultResources.
+	CPUs      int
+	MemoryMiB int
 }
 
 // Credential is a short-lived token for the process API of one sandbox.
@@ -473,7 +476,14 @@ func newCreateBody(p CreateParams) createBody {
 	for _, l := range p.Labels {
 		labels[labelPrefix+l] = labelTrue
 	}
-	b := createBody{DisplayName: p.Name, ImageRef: p.Image, Resources: defaultResources, Labels: labels}
+	res := defaultResources
+	if p.CPUs > 0 {
+		res.CPUs = p.CPUs
+	}
+	if p.MemoryMiB > 0 {
+		res.MemoryMiB = p.MemoryMiB
+	}
+	b := createBody{DisplayName: p.Name, ImageRef: p.Image, Resources: res, Labels: labels}
 	// The image runs a command that does nothing, so the sandbox stays up for
 	// kaxa exec and kaxa console instead of exiting with the image's command.
 	b.StartupExecution.RawImage.Start.Argv = []string{"tail", "-f", "/dev/null"}

@@ -396,6 +396,8 @@ func TestCapabilities(t *testing.T) {
 		sandbox.FeatureRestart:           true,
 		sandbox.FeatureTemplate:          true,
 		sandbox.FeatureAPIPublish:        true,
+		sandbox.FeatureCPU:               true,
+		sandbox.FeatureMemory:            true,
 		sandbox.FeatureRunning:           false,
 		sandbox.FeatureSnapshot:          true,
 		sandbox.FeatureUpgrade:           false,

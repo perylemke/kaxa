@@ -103,6 +103,9 @@ func (f *fullProvider) SetURLAuth(_ context.Context, _ sandbox.ID, auth string) 
 	return f.publicErr
 }
 
+func (*fullProvider) SupportsCPU()    {}
+func (*fullProvider) SupportsMemory() {}
+
 func (f *fullProvider) HomeDir() string { return "/home/box" }
 func (f *fullProvider) RepoDir(repo string) (string, error) {
 	return "/home/box/ws/" + repo, nil
@@ -295,6 +298,8 @@ func TestCheckRejectsMissingCapabilities(t *testing.T) {
 		{name: "public", req: lifecycle.Request{Name: boxName, Public: true}, want: "public urls"},
 		{name: "running", req: lifecycle.Request{Name: boxName, Running: true}, want: "running"},
 		{name: "template", req: lifecycle.Request{Name: boxName, Template: bigTpl}, want: "template"},
+		{name: "cpu", req: lifecycle.Request{Name: boxName, CPU: 1}, want: "cpu"},
+		{name: "memory", req: lifecycle.Request{Name: boxName, MemoryMiB: 1024}, want: "memory"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -371,6 +376,18 @@ func TestCreatePassesTemplateToSpec(t *testing.T) {
 	}
 	if rec.created.Template != bigTpl {
 		t.Fatalf("spec = %+v, want template big", rec.created)
+	}
+}
+
+func TestCreatePassesCPUAndMemoryToSpec(t *testing.T) {
+	t.Parallel()
+
+	p, rec := newFull()
+	if _, err := lifecycle.Create(context.Background(), p, lifecycle.Request{Name: boxName, CPU: 2, MemoryMiB: 4096}, nil); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if rec.created.CPU != 2 || rec.created.MemoryMiB != 4096 {
+		t.Fatalf("spec = %+v", rec.created)
 	}
 }
 

@@ -26,6 +26,7 @@ type fakeResult struct {
 type fakeAPI struct {
 	mu           sync.Mutex
 	sandboxes    map[string]*Record
+	lastCreate   CreateParams
 	previews     map[string]string
 	createStatus string
 	createErr    error
@@ -77,6 +78,7 @@ func (f *fakeAPI) Create(_ context.Context, p CreateParams) (Record, error) {
 	if rec, ok := f.sandboxes[p.Name]; ok && !nameFree(*rec) {
 		return Record{}, ErrAlreadyExists
 	}
+	f.lastCreate = p
 	rec := &Record{
 		Name: p.Name, Status: f.createStatus, Labels: slices.Clone(p.Labels),
 		Image: p.Image, Region: p.Region, APIPort: p.APIPort, CreatedAt: time.Unix(1_700_000_000, 0),

@@ -112,6 +112,7 @@ kaxa create --provider e2b --template big --sync my-box   # E2B: start from your
 kaxa create --provider docker --sync my-box   # same, on Docker's cloud, into /home/agent/workspace/<repo>
 kaxa create --provider daytona --sync my-box  # same, on Daytona, into /home/daytona/workspace/<repo>
 kaxa create --provider blaxel --sync my-box   # same, on Blaxel, into /root/workspace/<repo>
+kaxa create --provider modal --cpu 2 --memory 8192 my-box   # optional CPU and memory (MiB); omit for defaults
 kaxa create --sync --dir ~/projects/api-python my-sprite
 kaxa create --sync --api --public --api-cmd .venv/bin/uvicorn,app.main:app,--host,0.0.0.0,--port,8000 my-sprite
 kaxa new my-sprite               # alias of create

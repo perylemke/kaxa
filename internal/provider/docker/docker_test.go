@@ -92,6 +92,30 @@ func TestCreateStartsSandboxAndWaitsUntilRunning(t *testing.T) {
 	if got.Name != testSandbox || got.Image != shellImage || !slices.Equal(got.Labels, []string{labelKaxa, sandbox.SyncLabel}) {
 		t.Fatalf("create params = %+v", got)
 	}
+	if got.CPUs != defaultResources.CPUs || got.MemoryMiB != defaultResources.MemoryMiB {
+		t.Fatalf("default resources = %+v", got)
+	}
+}
+
+func TestCreatePassesResourcesWhenSet(t *testing.T) {
+	t.Parallel()
+	p, api, _ := newTestProvider(t)
+	if _, err := p.Create(context.Background(), sandbox.Spec{Name: testSandbox, CPU: 4, MemoryMiB: 8192}); err != nil {
+		t.Fatal(err)
+	}
+	got := api.created[0]
+	if got.CPUs != 4 || got.MemoryMiB != 8192 {
+		t.Fatalf("create params = %+v", got)
+	}
+}
+
+func TestCreateRejectsFractionalCPU(t *testing.T) {
+	t.Parallel()
+	p, _, _ := newTestProvider(t)
+	_, err := p.Create(context.Background(), sandbox.Spec{Name: testSandbox, CPU: 1.5})
+	if err == nil || !strings.Contains(err.Error(), "whole number") {
+		t.Fatalf("err = %v", err)
+	}
 }
 
 func TestCreateImage(t *testing.T) {

@@ -7,7 +7,7 @@ kaxa create [name]
 kaxa new [name]
 ```
 
-Without a name, a wizard asks for the provider and name, then only the options that provider supports. With sync enabled it asks for the repository directory and whether to skip install. With API enabled it asks for the command, the port, and optional environment variables. The wizard uses the Dracula theme. In a terminal it occupies the alternate screen and returns a clean prompt when it finishes; only the result is printed in your scrollback. Ctrl+C cancels; the footer shows that shortcut. Flags you already passed stay as the initial answer; an empty line keeps that default.
+Without a name, a wizard asks for the provider and name, then only the options that provider supports. Modal uses dropdowns for CPU and memory (with an **Other** line for custom values); Docker uses one **Size** dropdown for the fixed CPU and memory pairs that the Cloud Sandboxes API allows; Blaxel uses a memory dropdown with preset MiB sizes. A value you already passed with `--memory` that is not in the list appears as an extra option so the wizard matches the flag. With sync enabled it asks for the repository directory and whether to skip install. With API enabled it asks for the command, the port, and optional environment variables. The wizard uses the Dracula theme. In a terminal it occupies the alternate screen and returns a clean prompt when it finishes; only the result is printed in your scrollback. Ctrl+C cancels; the footer shows that shortcut. Flags you already passed stay as the initial answer; an empty line keeps that default.
 
 Sprites, Modal, E2B, Docker, Daytona, and Blaxel implement create. `--running` and public URLs exist only for Sprites; the others reject them with a message that names the providers that have them. API publish works on Sprites, E2B, Docker, Daytona, and Blaxel. `--sync` works on all six; see [Sync](#sync).
 
@@ -34,8 +34,12 @@ Docker sandboxes run in Docker's cloud, created through the Docker Sandboxes API
 | `--api-env` | Environment variable for the service: `KEY=VALUE`, or `KEY` to copy the value from your shell. Repeat for more. Requires `--api` |
 | `--public` | Make the Sprites URL reachable without an account. Refused with `--running` unless `--api` is set |
 | `--template` | E2B, Docker, Daytona, and Blaxel: the template to start the sandbox from. Default: `KAXA_E2B_TEMPLATE`, `KAXA_DOCKER_TEMPLATE`, `KAXA_DAYTONA_TEMPLATE`, or `KAXA_BLAXEL_TEMPLATE`, then the base image. See [Templates on E2B](#templates-on-e2b) and [Templates on Docker](#templates-on-docker) |
+| `--cpu` | CPU cores for the sandbox (Modal and Docker; fractional values are allowed on Modal; integer-only on Docker). Omit for the provider default. Unsupported providers reject the flag |
+| `--memory` | Memory in MiB (Modal, Docker, Blaxel). Overrides `KAXA_BLAXEL_MEMORY` for that Blaxel create only. Omit for the provider default |
 
 `--api-cmd`, `--api-env`, and a changed `--api-port` require `--api`. `--dir` requires `--sync`.
+
+`list_providers` reports `cpu` and `memory` in each provider's capabilities when the backend can honor `--cpu` or `--memory`. The MCP `create_sandbox` tool accepts optional `cpu` and `memory_mib` with the same rules.
 
 ## Sync
 

@@ -41,6 +41,10 @@ type Request struct {
 	// NoInstall copies the repository and skips the toolchain and the dependency
 	// commands. It only applies with Sync.
 	NoInstall bool
+	// CPU is a fractional CPU request in physical cores. Zero means the provider default.
+	CPU float64
+	// MemoryMiB is memory for the sandbox in MiB. Zero means the provider default.
+	MemoryMiB int
 }
 
 // Labels returns the provider labels for the sandbox.
@@ -93,12 +97,34 @@ func Check(p sandbox.Provider, req Request) error {
 			return err
 		}
 	}
-	if req.Public {
-		if _, ok := p.(sandbox.PublicURL); !ok {
-			return Unsupported(p, sandbox.FeaturePublicURLs)
+	if err := checkPublicRequest(p, req); err != nil {
+		return err
+	}
+	return checkComputeRequest(p, req)
+}
+
+func checkPublicRequest(p sandbox.Provider, req Request) error {
+	if !req.Public {
+		return nil
+	}
+	if _, ok := p.(sandbox.PublicURL); !ok {
+		return Unsupported(p, sandbox.FeaturePublicURLs)
+	}
+	if req.Running && !req.API {
+		return sandbox.PublicTerminalError()
+	}
+	return nil
+}
+
+func checkComputeRequest(p sandbox.Provider, req Request) error {
+	if req.CPU != 0 {
+		if _, ok := p.(sandbox.CPUSupport); !ok {
+			return Unsupported(p, sandbox.FeatureCPU)
 		}
-		if req.Running && !req.API {
-			return sandbox.PublicTerminalError()
+	}
+	if req.MemoryMiB != 0 {
+		if _, ok := p.(sandbox.MemorySupport); !ok {
+			return Unsupported(p, sandbox.FeatureMemory)
 		}
 	}
 	return nil
@@ -172,6 +198,8 @@ func createSandbox(ctx context.Context, p sandbox.Provider, req Request, run Run
 			ExposeAPI: req.API,
 			APIPort:   apiPortOf(req),
 			Template:  req.Template,
+			CPU:       req.CPU,
+			MemoryMiB: req.MemoryMiB,
 		})
 		if createErr != nil {
 			return createErr

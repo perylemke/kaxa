@@ -49,6 +49,12 @@ type Spec struct {
 	// Template names the image the sandbox starts from. Empty means the
 	// provider default. Only a provider that implements TemplateSupport accepts it.
 	Template string
+	// CPU is a fractional CPU request in physical cores. Zero means the provider
+	// default. Only providers that implement CPUSupport read it.
+	CPU float64
+	// MemoryMiB is memory for the sandbox in MiB. Zero means the provider default.
+	// Only providers that implement MemorySupport read it.
+	MemoryMiB int
 }
 
 // Info summarizes an existing sandbox.
@@ -182,6 +188,16 @@ type RunningSupport interface {
 // template when Spec.Template is set.
 type TemplateSupport interface {
 	SupportsTemplate()
+}
+
+// CPUSupport marks a provider that honors Spec.CPU when non-zero.
+type CPUSupport interface {
+	SupportsCPU()
+}
+
+// MemorySupport marks a provider that honors Spec.MemoryMiB when non-zero.
+type MemorySupport interface {
+	SupportsMemory()
 }
 
 // Provider is a sandbox backend (Sprites, Modal, etc.).

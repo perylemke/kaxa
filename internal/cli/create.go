@@ -23,6 +23,8 @@ func newCreateCmd(reg *registry.Registry) *cobra.Command {
 	var apiEnv []string
 	var publicURL bool
 	var template string
+	var cpu float64
+	var memoryMiB int
 
 	cmd := &cobra.Command{
 		Use:     "create [name]",
@@ -36,6 +38,7 @@ func newCreateCmd(reg *registry.Registry) *cobra.Command {
 --api-env sets a variable for that service: KEY=VALUE, or KEY to copy the value from your shell so a secret stays out of the command line. Repeat it for more variables. Values cannot contain commas. HOME, USER, PATH, and KAXA_ names are reserved.
 --public makes the Sprites URL reachable without an account. A failed auth change leaves the sandbox in place.
 --template starts a sandbox from a template. On E2B it is a template you built with the E2B CLI or SDK, for example one with more memory, and it must have the same user and home as the base template (user, /home/user); without it, kaxa uses KAXA_E2B_TEMPLATE, then base. On Docker it is an image reference that Docker can pull, and it must have the same user and home as the Docker agent images (agent, /home/agent); without it, kaxa uses KAXA_DOCKER_TEMPLATE, then the image of the shell agent. On Daytona it is an image (or snapshot name) that Daytona can start, and it must have the same user and home as the Daytona default image (daytona, /home/daytona); without it, kaxa uses KAXA_DAYTONA_TEMPLATE, then the Daytona default.
+--cpu and --memory request compute for the sandbox (empty means the provider default). Modal accepts fractional CPU and memory in MiB; Docker accepts both with integer CPU only; Blaxel accepts memory only. Other providers reject these flags.
 Without a name, a wizard asks for the provider and name, then only the options that provider supports, then sync and API details when those are enabled. In a terminal it uses the alternate screen so the form does not mix with your scrollback; only the result is printed when it finishes.`,
 		Example: `  kaxa create --sync my-sprite
   kaxa create --sync --dir ~/projects/api-python my-sprite
@@ -58,7 +61,9 @@ Without a name, a wizard asks for the provider and name, then only the options t
 				APIEnv:    apiEnv,
 				Public:    publicURL,
 
-				Template: template,
+				Template:  template,
+				CPU:       cpu,
+				MemoryMiB: memoryMiB,
 			})
 		},
 	}
@@ -72,7 +77,9 @@ Without a name, a wizard asks for the provider and name, then only the options t
 	cmd.Flags().StringArrayVar(&apiEnv, "api-env", nil, "environment variable for the --api service: KEY=VALUE, or KEY to copy it from this shell; repeat for more (no commas in values)")
 	cmd.Flags().StringVar(&template, "template", "", "template to start the sandbox from (E2B, Docker and Daytona; default: KAXA_E2B_TEMPLATE, KAXA_DOCKER_TEMPLATE or KAXA_DAYTONA_TEMPLATE, then base)")
 	cmd.Flags().BoolVar(&publicURL, "public", false, "make the Sprites URL reachable without authentication")
-	markProviderFlags(cmd, "running", "api", "api-cmd", "api-port", "api-env", "template", "public")
+	cmd.Flags().Float64Var(&cpu, "cpu", 0, "CPU cores for the sandbox (Modal and Docker; fractional on Modal; omit for the provider default)")
+	cmd.Flags().IntVar(&memoryMiB, "memory", 0, "memory for the sandbox in MiB (Modal, Docker, Blaxel; omit for the provider default)")
+	markProviderFlags(cmd, "running", "api", "api-cmd", "api-port", "api-env", "template", "public", "cpu", "memory")
 	return cmd
 }
 
@@ -105,7 +112,13 @@ func cancelledOrErr(cmd *cobra.Command, err error) error {
 
 func resolveCreateRequest(cmd *cobra.Command, reg *registry.Registry, args []string, flags createFlags, portSet bool) (createRequest, error) {
 	if len(args) == 1 {
-		req := createRequest{Name: args[0], Running: flags.Running, Sync: flags.Sync, Template: flags.Template, NoInstall: flags.NoInstall}
+		if err := validateCreateComputeFlags(flags.CPU, flags.MemoryMiB); err != nil {
+			return createRequest{}, err
+		}
+		req := createRequest{
+			Name: args[0], Running: flags.Running, Sync: flags.Sync, Template: flags.Template, NoInstall: flags.NoInstall,
+			CPU: flags.CPU, MemoryMiB: flags.MemoryMiB,
+		}
 		if err := applyAPIFlags(&req, flags, portSet); err != nil {
 			return createRequest{}, err
 		}
@@ -130,6 +143,8 @@ func resolveCreateRequest(cmd *cobra.Command, reg *registry.Registry, args []str
 		Public:    form.Public,
 		Template:  form.Template,
 		NoInstall: form.NoInstall,
+		CPU:       form.CPU,
+		MemoryMiB: form.MemoryMiB,
 	}
 	cfg.Provider = form.Provider
 	cmd.SetContext(withConfig(cmd.Context(), cfg))

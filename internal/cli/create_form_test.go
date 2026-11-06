@@ -22,6 +22,9 @@ func (formModalFake) SyncWorkspace(context.Context, sandbox.ID, io.Reader) error
 	return nil
 }
 
+func (formModalFake) SupportsCPU()    {}
+func (formModalFake) SupportsMemory() {}
+
 type formSpritesFake struct{ formBareProvider }
 
 func (formSpritesFake) SupportsRunning()                                   {}
@@ -47,6 +50,38 @@ func (formE2BFake) PublishAPI(context.Context, sandbox.ID, string, int, []string
 	return nil
 }
 
+const (
+	formDockerProvider = "docker"
+	formBlaxelProvider = "blaxel"
+)
+
+type formDockerFake struct{ formBareProvider }
+
+func (formDockerFake) SupportsCPU()                                       {}
+func (formDockerFake) SupportsMemory()                                    {}
+func (formDockerFake) SupportsTemplate()                                  {}
+func (formDockerFake) PrepareWorkspace(context.Context, sandbox.ID) error { return nil }
+func (formDockerFake) SyncWorkspace(context.Context, sandbox.ID, io.Reader) error {
+	return nil
+}
+
+func (formDockerFake) PublishAPI(context.Context, sandbox.ID, string, int, []string, []string) error {
+	return nil
+}
+
+type formBlaxelFake struct{ formBareProvider }
+
+func (formBlaxelFake) SupportsMemory()                                    {}
+func (formBlaxelFake) SupportsTemplate()                                  {}
+func (formBlaxelFake) PrepareWorkspace(context.Context, sandbox.ID) error { return nil }
+func (formBlaxelFake) SyncWorkspace(context.Context, sandbox.ID, io.Reader) error {
+	return nil
+}
+
+func (formBlaxelFake) PublishAPI(context.Context, sandbox.ID, string, int, []string, []string) error {
+	return nil
+}
+
 func formWizardLookup(name string) (sandbox.Provider, error) {
 	switch name {
 	case formModalProvider:
@@ -55,17 +90,22 @@ func formWizardLookup(name string) (sandbox.Provider, error) {
 		return formSpritesFake{formBareProvider{name: spritesProviderName}}, nil
 	case e2bProviderName:
 		return formE2BFake{formBareProvider{name: e2bProviderName}}, nil
+	case formDockerProvider:
+		return formDockerFake{formBareProvider{name: formDockerProvider}}, nil
+	case formBlaxelProvider:
+		return formBlaxelFake{formBareProvider{name: formBlaxelProvider}}, nil
 	default:
 		return nil, errors.New("unknown provider")
 	}
 }
 
 func formProviders() []string {
-	return []string{formModalProvider, spritesProviderName, e2bProviderName}
+	return []string{formModalProvider, spritesProviderName, e2bProviderName, formDockerProvider, formBlaxelProvider}
 }
 
 func TestCreateFormModalAccessible(t *testing.T) {
-	in := strings.NewReader(strings.Join([]string{"1", fixtureDemo, "n", ""}, "\n"))
+	// modal=1, name, sync=n, CPU default, Memory default (each select needs one line)
+	in := strings.NewReader(strings.Join([]string{"1", fixtureDemo, "n", "1", "1"}, "\n"))
 	out := new(bytes.Buffer)
 
 	got, err := collectCreateForm(in, out, formProviders(), spritesProviderName, formWizardLookup, createFlags{}, false)
@@ -76,7 +116,7 @@ func TestCreateFormModalAccessible(t *testing.T) {
 		t.Fatalf("result = %+v", got)
 	}
 	view := out.String()
-	for _, title := range []string{"Name", "Provider", "Sync"} {
+	for _, title := range []string{"Name", "Provider", "Sync", "CPU", "Memory"} {
 		if !strings.Contains(view, title) {
 			t.Fatalf("prompts missing %q: %q", title, view)
 		}
@@ -127,7 +167,7 @@ func TestCreateFormE2BAccessible(t *testing.T) {
 	}
 	assertFormPrompts(t, out.String(),
 		[]string{"Template", "Sync", "API", "Directory", "Skip install", "API command", "API port", "API env"},
-		[]string{"Running", "Public"},
+		[]string{"Running", "Public", "Size"},
 	)
 }
 
@@ -421,6 +461,30 @@ func TestCheckCreateFormFlagsEachUnsupported(t *testing.T) {
 	if err := checkCreateFormFlags(e2bP, createFlags{}); err != nil {
 		t.Fatalf("e2b supports flags: %v", err)
 	}
+	if err := checkCreateFormFlags(e2bP, createFlags{CPU: 1}); err == nil {
+		t.Fatal("expected cpu unsupported on e2b")
+	}
+	if err := checkCreateFormFlags(modalP, createFlags{MemoryMiB: 1024}); err != nil {
+		t.Fatalf("modal supports memory: %v", err)
+	}
+}
+
+func TestApplyCreateFormCapabilitiesClearsCPUOnUnsupportedProvider(t *testing.T) {
+	t.Parallel()
+	var result createFormResult
+	result.Provider = formModalProvider
+	result.cpuInput = "2"
+	result.CPU = 2
+	result.memoryInput = "4096"
+	result.MemoryMiB = 4096
+	result.Provider = e2bProviderName
+	applyCreateFormCapabilities(&result, sandbox.CapabilitiesOf(formE2BFake{formBareProvider{name: e2bProviderName}}))
+	if result.cpuInput != "" || result.CPU != 0 || result.memoryInput != "" || result.MemoryMiB != 0 {
+		t.Fatalf("cleared compute: %+v", result)
+	}
+	if result.cpuPreset != "" || result.memoryPreset != "" || result.dockerSizePreset != "" {
+		t.Fatalf("presets = %+v %+v %+v", result.cpuPreset, result.memoryPreset, result.dockerSizePreset)
+	}
 }
 
 func TestFinalizeCreateFormResultAPIParseErrors(t *testing.T) {
@@ -455,5 +519,168 @@ func TestValidateCreatePublicOKWhenNotRunning(t *testing.T) {
 	r := &createFormResult{Running: false, API: false}
 	if err := validateCreatePublic(true, r); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestValidateCreateCPUInput(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		raw string
+		ok  bool
+	}{
+		{"", true},
+		{"1.5", true},
+		{"0", false},
+		{"-1", false},
+		{"x", false},
+	} {
+		err := validateCreateCPUInput(tt.raw)
+		if tt.ok && err != nil {
+			t.Fatalf("%q: %v", tt.raw, err)
+		}
+		if !tt.ok && err == nil {
+			t.Fatalf("%q: want error", tt.raw)
+		}
+	}
+}
+
+func TestValidateCreateMemoryInput(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		raw string
+		ok  bool
+	}{
+		{"", true},
+		{"1024", true},
+		{"0", false},
+		{"-1", false},
+		{"1.5", false},
+	} {
+		err := validateCreateMemoryInput(tt.raw)
+		if tt.ok && err != nil {
+			t.Fatalf("%q: %v", tt.raw, err)
+		}
+		if !tt.ok && err == nil {
+			t.Fatalf("%q: want error", tt.raw)
+		}
+	}
+}
+
+func TestParsedCreateCompute(t *testing.T) {
+	t.Parallel()
+	cpu, mem, err := parsedCreateCompute("2", "4096")
+	if err != nil || cpu != 2 || mem != 4096 {
+		t.Fatalf("got %v, %d, %v", cpu, mem, err)
+	}
+	if _, _, err := parsedCreateCompute("0", ""); err == nil {
+		t.Fatal("zero cpu should fail")
+	}
+	if _, _, err := parsedCreateCompute("", "0"); err == nil {
+		t.Fatal("zero memory should fail")
+	}
+}
+
+func TestValidateCreateComputeFlags(t *testing.T) {
+	t.Parallel()
+	if err := validateCreateComputeFlags(0, 0); err != nil {
+		t.Fatal(err)
+	}
+	if validateCreateComputeFlags(-0.5, 0) == nil {
+		t.Fatal("negative cpu")
+	}
+	if validateCreateComputeFlags(0, -1) == nil {
+		t.Fatal("negative memory")
+	}
+}
+
+func TestCreateFormDockerAccessibleSizeMedium(t *testing.T) {
+	// docker=4, name, sync=n, template="", api=n, size medium (option 4: default=1 … medium=4)
+	in := strings.NewReader(strings.Join([]string{
+		"4", fixtureDemo, "n", "", "n", "4",
+	}, "\n"))
+	out := new(bytes.Buffer)
+	got, err := collectCreateForm(in, out, formProviders(), spritesProviderName, formWizardLookup, createFlags{}, false)
+	if err != nil {
+		t.Fatalf("form: %v", err)
+	}
+	if got.Provider != formDockerProvider || got.CPU != 4 || got.MemoryMiB != 8192 {
+		t.Fatalf("result = %+v", got)
+	}
+}
+
+func TestCreateFormBlaxelAccessibleMemoryPreset(t *testing.T) {
+	// blaxel=5, name, sync=n, template="", api=n, memory 4096 MiB (option 4)
+	in := strings.NewReader(strings.Join([]string{
+		"5", fixtureDemo, "n", "", "n", "4",
+	}, "\n"))
+	out := new(bytes.Buffer)
+	got, err := collectCreateForm(in, out, formProviders(), spritesProviderName, formWizardLookup, createFlags{}, false)
+	if err != nil {
+		t.Fatalf("form: %v", err)
+	}
+	if got.Provider != formBlaxelProvider || got.CPU != 0 || got.MemoryMiB != 4096 {
+		t.Fatalf("result = %+v", got)
+	}
+}
+
+func TestCheckCreateFormFlagsDockerRejectsBadPair(t *testing.T) {
+	p := formDockerFake{formBareProvider{name: formDockerProvider}}
+	if err := checkCreateFormFlags(p, createFlags{CPU: 3, MemoryMiB: 4096}); err == nil {
+		t.Fatal("expected error for invalid docker pair")
+	}
+}
+
+func TestResolveWizardComputeDockerCustomPair(t *testing.T) {
+	r := createFormResult{
+		Provider:         formDockerProvider,
+		dockerSizePreset: formPresetDockerCustom,
+		cpuInput:         "1",
+		memoryInput:      "2048",
+	}
+	if err := resolveWizardCompute(formDockerProvider, &r); err != nil {
+		t.Fatal(err)
+	}
+	if r.CPU != 1 || r.MemoryMiB != 2048 {
+		t.Fatalf("got %+v", r)
+	}
+}
+
+func TestResolveWizardComputeModalOther(t *testing.T) {
+	r := createFormResult{
+		Provider:     formModalProvider,
+		cpuPreset:    formPresetCPUOther,
+		cpuInput:     "1.25",
+		memoryPreset: formPresetMemOther,
+		memoryInput:  "3072",
+	}
+	if err := resolveWizardCompute(formModalProvider, &r); err != nil {
+		t.Fatal(err)
+	}
+	if r.CPU != 1.25 || r.MemoryMiB != 3072 {
+		t.Fatalf("got %+v", r)
+	}
+}
+
+func TestResolveWizardComputeBlaxelFlagValueOutsideList(t *testing.T) {
+	r := createFormResult{
+		Provider:     formBlaxelProvider,
+		memoryPreset: "5120",
+	}
+	if err := resolveWizardCompute(formBlaxelProvider, &r); err != nil {
+		t.Fatal(err)
+	}
+	if r.MemoryMiB != 5120 || r.CPU != 0 {
+		t.Fatalf("got %+v", r)
+	}
+}
+
+func TestBlaxelMemorySelectOptionsAddsExtraForNonListFlagValue(t *testing.T) {
+	base := len(blaxelMemorySelectOptions(nil))
+	withExtra := len(blaxelMemorySelectOptions(&createFormResult{memoryPreset: "5120"}))
+	if withExtra != base+1 {
+		t.Fatalf("base=%d withExtra=%d", base, withExtra)
+	}
+	if len(blaxelMemorySelectOptions(&createFormResult{memoryPreset: "4096"})) != base {
+		t.Fatal("preset value in list should not add duplicate option")
 	}
 }
