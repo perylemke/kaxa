@@ -170,7 +170,7 @@ On a sandbox created with `--sync`, `exec` and `console` start in `/home/sprite/
 
 ### sync
 
-`sync` adds another Git repository to a sandbox created with `--sync`, then installs its dependencies like `create --sync`. A sandbox created without `--sync` is rejected, and so is a repository that is already in the sandbox; `sync` never replaces a directory. A failed copy or install keeps the sandbox. See [sync](docs/sync.md).
+`sync` adds one or more Git repositories to a sandbox created with `--sync`, then installs their dependencies like `create --sync`. `--dir` is a comma-separated list; a path that does not exist is rejected before anything is copied. A sandbox created without `--sync` is rejected, and so is a repository that is already in the sandbox; `sync` never replaces a directory. A failed copy or install keeps the sandbox. See [sync](docs/sync.md).
 
 ### list
 

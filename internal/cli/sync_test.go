@@ -78,6 +78,40 @@ func TestSyncCopiesRepositoryAndInstalls(t *testing.T) {
 	}
 }
 
+func TestSyncDirCopiesTwoRepositories(t *testing.T) {
+	r1 := initGitRepo(t)
+	r2 := initGitRepo(t)
+	t.Chdir(t.TempDir())
+
+	fp := newRepoSyncProvider("kaxa", sandbox.SyncLabel)
+	_, out, err := runSync(t, fp, testBoxName, testDirFlag, r1+","+r2)
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if fp.syncCount != 2 {
+		t.Fatalf("sync count = %d", fp.syncCount)
+	}
+	text := out.String()
+	if !strings.Contains(text, filepath.Base(r1)) || !strings.Contains(text, filepath.Base(r2)) {
+		t.Fatalf("output = %q", text)
+	}
+}
+
+func TestSyncDirMissingInListDoesNotCopy(t *testing.T) {
+	repo := initGitRepo(t)
+	t.Chdir(t.TempDir())
+	missing := filepath.Join(t.TempDir(), "missing")
+
+	fp := newRepoSyncProvider("kaxa", sandbox.SyncLabel)
+	_, _, err := runSync(t, fp, testBoxName, testDirFlag, repo+","+missing)
+	if err == nil || !strings.Contains(err.Error(), "does not exist") {
+		t.Fatalf("err = %v", err)
+	}
+	if fp.synced {
+		t.Fatal("repository was copied")
+	}
+}
+
 func TestSyncDirCopiesNamedRepository(t *testing.T) {
 	repo := initGitRepo(t)
 	t.Chdir(t.TempDir())
