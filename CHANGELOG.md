@@ -10,6 +10,7 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 
 ### Changed
 
+- The `kaxa create` wizard lists Daytona's active platform snapshots in a Template dropdown. Provider default leaves the Daytona image. A `--template` value outside that list is added as an extra option. If the list cannot be loaded, the field stays a text input. The flag and MCP still take a snapshot name.
 - `kaxa create --sync` and the create wizard accept comma-separated `--dir` paths so multiple Git repositories copy into the workspace; the first is still used for `--api` and the reported work directory. In the wizard, choosing Sync opens the Directories field on the same step. Duplicate paths or two repos with the same workspace name are rejected before create.
 - `kaxa sync --dir` accepts the same comma-separated list and copies each repository. A path that does not exist fails with `directory "<path>" does not exist` before anything is copied.
 - The `kaxa create` wizard lists only providers that have credentials; the default option is the first available when `KAXA_DEFAULT_PROVIDER` is unset or does not match a configured backend. With `--provider`, the wizard lists only that provider when it is configured, with that provider selected, and shows the name field under it.

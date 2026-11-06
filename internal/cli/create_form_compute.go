@@ -15,9 +15,10 @@ import (
 // Wizard-only presets for CPU, memory, and Docker size. Flags and MCP stay numeric.
 
 const (
-	formProviderModal  = "modal"
-	formProviderDocker = "docker"
-	formProviderBlaxel = "blaxel"
+	formProviderModal   = "modal"
+	formProviderDocker  = "docker"
+	formProviderBlaxel  = "blaxel"
+	formProviderDaytona = "daytona"
 
 	formPresetDefault = "default"
 

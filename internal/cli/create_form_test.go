@@ -108,7 +108,7 @@ func TestCreateFormModalAccessible(t *testing.T) {
 	in := strings.NewReader(strings.Join([]string{"1", fixtureDemo, "n", "1", "1"}, "\n"))
 	out := new(bytes.Buffer)
 
-	got, err := collectCreateForm(in, out, formProviders(), spritesProviderName, formWizardLookup, createFlags{}, false)
+	got, err := collectCreateForm(context.Background(), in, out, formProviders(), spritesProviderName, formWizardLookup, createFlags{}, false)
 	if err != nil {
 		t.Fatalf("form: %v", err)
 	}
@@ -132,7 +132,7 @@ func TestCreateFormSpritesAccessibleDefaults(t *testing.T) {
 	in := strings.NewReader(strings.Join([]string{"", fixturePery, "", "", "", "", "", ""}, "\n"))
 	out := new(bytes.Buffer)
 
-	got, err := collectCreateForm(in, out, formProviders(), spritesProviderName, formWizardLookup, createFlags{Running: true, Sync: true}, false)
+	got, err := collectCreateForm(context.Background(), in, out, formProviders(), spritesProviderName, formWizardLookup, createFlags{Running: true, Sync: true}, false)
 	if err != nil {
 		t.Fatalf("form: %v", err)
 	}
@@ -155,7 +155,7 @@ func TestCreateFormE2BAccessible(t *testing.T) {
 	}, "\n"))
 	out := new(bytes.Buffer)
 
-	got, err := collectCreateForm(in, out, formProviders(), spritesProviderName, formWizardLookup, createFlags{}, false)
+	got, err := collectCreateForm(context.Background(), in, out, formProviders(), spritesProviderName, formWizardLookup, createFlags{}, false)
 	if err != nil {
 		t.Fatalf("form: %v", err)
 	}
@@ -191,7 +191,7 @@ func TestCreateFormSpritesSyncPage(t *testing.T) {
 	}, "\n"))
 	out := new(bytes.Buffer)
 
-	got, err := collectCreateForm(in, out, formProviders(), spritesProviderName, formWizardLookup, createFlags{}, false)
+	got, err := collectCreateForm(context.Background(), in, out, formProviders(), spritesProviderName, formWizardLookup, createFlags{}, false)
 	if err != nil {
 		t.Fatalf("form: %v", err)
 	}
@@ -217,7 +217,7 @@ func TestCreateFormPublicRunningWithoutAPIFails(t *testing.T) {
 	}, "\n"))
 	out := new(bytes.Buffer)
 
-	_, err := collectCreateForm(in, out, formProviders(), spritesProviderName, formWizardLookup, createFlags{}, false)
+	_, err := collectCreateForm(context.Background(), in, out, formProviders(), spritesProviderName, formWizardLookup, createFlags{}, false)
 	if err == nil || !strings.Contains(err.Error(), "tmux terminal") {
 		t.Fatalf("err = %v", err)
 	}
@@ -261,7 +261,7 @@ func TestApplyCreateFormCapabilitiesClearsOnProviderChange(t *testing.T) {
 func TestCollectCreateFormNoProviders(t *testing.T) {
 	t.Parallel()
 
-	_, err := collectCreateForm(strings.NewReader(""), new(bytes.Buffer), nil, "", formWizardLookup, createFlags{}, false)
+	_, err := collectCreateForm(context.Background(), strings.NewReader(""), new(bytes.Buffer), nil, "", formWizardLookup, createFlags{}, false)
 	if err == nil || !strings.Contains(err.Error(), "no sandbox providers registered") {
 		t.Fatalf("err = %v", err)
 	}
@@ -297,6 +297,7 @@ func TestCreateFormPreFormFailsBeforeWizard(t *testing.T) {
 	t.Parallel()
 
 	_, err := collectCreateForm(
+		context.Background(),
 		strings.NewReader(""),
 		new(bytes.Buffer),
 		formProviders(),
@@ -599,7 +600,7 @@ func TestCreateFormDockerAccessibleSizeMedium(t *testing.T) {
 		"4", fixtureDemo, "n", "", "n", "4",
 	}, "\n"))
 	out := new(bytes.Buffer)
-	got, err := collectCreateForm(in, out, formProviders(), spritesProviderName, formWizardLookup, createFlags{}, false)
+	got, err := collectCreateForm(context.Background(), in, out, formProviders(), spritesProviderName, formWizardLookup, createFlags{}, false)
 	if err != nil {
 		t.Fatalf("form: %v", err)
 	}
@@ -614,7 +615,7 @@ func TestCreateFormBlaxelAccessibleMemoryPreset(t *testing.T) {
 		"5", fixtureDemo, "n", "", "n", "4",
 	}, "\n"))
 	out := new(bytes.Buffer)
-	got, err := collectCreateForm(in, out, formProviders(), spritesProviderName, formWizardLookup, createFlags{}, false)
+	got, err := collectCreateForm(context.Background(), in, out, formProviders(), spritesProviderName, formWizardLookup, createFlags{}, false)
 	if err != nil {
 		t.Fatalf("form: %v", err)
 	}
@@ -682,5 +683,103 @@ func TestBlaxelMemorySelectOptionsAddsExtraForNonListFlagValue(t *testing.T) {
 	}
 	if len(blaxelMemorySelectOptions(&createFormResult{memoryPreset: "4096"})) != base {
 		t.Fatal("preset value in list should not add duplicate option")
+	}
+}
+
+type formDaytonaFake struct{ formBareProvider }
+
+func (formDaytonaFake) SupportsTemplate() {}
+
+func (formDaytonaFake) ListTemplates(context.Context) ([]sandbox.TemplateOption, error) {
+	return []sandbox.TemplateOption{
+		{Name: "daytona-medium", Label: "daytona-medium (2 CPUs, 4 GB memory, 8 GB disk)"},
+		{Name: "daytona-small", Label: "daytona-small (1 CPU, 1 GB memory, 3 GB disk)"},
+	}, nil
+}
+
+type formDaytonaCatalogError struct{ formBareProvider }
+
+func (formDaytonaCatalogError) SupportsTemplate() {}
+
+func (formDaytonaCatalogError) ListTemplates(context.Context) ([]sandbox.TemplateOption, error) {
+	return nil, errors.New("offline")
+}
+
+func daytonaFormLookup(p sandbox.Provider) func(string) (sandbox.Provider, error) {
+	return func(name string) (sandbox.Provider, error) {
+		if name != formProviderDaytona {
+			return nil, errors.New("unknown provider")
+		}
+		return p, nil
+	}
+}
+
+func TestCreateFormDaytonaTemplateSelect(t *testing.T) {
+	in := strings.NewReader(strings.Join([]string{"1", fixturePery, "3"}, "\n"))
+	out := new(bytes.Buffer)
+	p := formDaytonaFake{formBareProvider{name: formProviderDaytona}}
+
+	got, err := collectCreateForm(context.Background(), in, out, []string{formProviderDaytona}, formProviderDaytona, daytonaFormLookup(p), createFlags{}, false)
+	if err != nil {
+		t.Fatalf("form: %v", err)
+	}
+	if got.Provider != formProviderDaytona || got.Name != fixturePery || got.Template != "daytona-small" {
+		t.Fatalf("result = %+v", got)
+	}
+	view := out.String()
+	if !strings.Contains(view, "Provider default") || !strings.Contains(view, "daytona-small (1 CPU, 1 GB memory, 3 GB disk)") {
+		t.Fatalf("prompts = %q", view)
+	}
+	if strings.Contains(view, "Empty means the provider default.") {
+		t.Fatalf("text template field should stay hidden: %q", view)
+	}
+}
+
+func TestCreateFormDaytonaTemplateDefaultIsEmpty(t *testing.T) {
+	in := strings.NewReader(strings.Join([]string{"1", fixturePery, "1"}, "\n"))
+	out := new(bytes.Buffer)
+	p := formDaytonaFake{formBareProvider{name: formProviderDaytona}}
+
+	got, err := collectCreateForm(context.Background(), in, out, []string{formProviderDaytona}, formProviderDaytona, daytonaFormLookup(p), createFlags{}, false)
+	if err != nil {
+		t.Fatalf("form: %v", err)
+	}
+	if got.Template != "" {
+		t.Fatalf("template = %q, want empty", got.Template)
+	}
+}
+
+func TestCreateFormDaytonaTemplateFlagOutsideCatalog(t *testing.T) {
+	in := strings.NewReader(strings.Join([]string{"1", fixturePery, "4"}, "\n"))
+	out := new(bytes.Buffer)
+	p := formDaytonaFake{formBareProvider{name: formProviderDaytona}}
+
+	got, err := collectCreateForm(context.Background(), in, out, []string{formProviderDaytona}, formProviderDaytona, daytonaFormLookup(p), createFlags{Template: "custom-snap"}, false)
+	if err != nil {
+		t.Fatalf("form: %v", err)
+	}
+	if got.Template != "custom-snap" {
+		t.Fatalf("template = %q", got.Template)
+	}
+	if !strings.Contains(out.String(), "custom-snap") {
+		t.Fatalf("prompts = %q", out.String())
+	}
+}
+
+func TestCreateFormDaytonaTemplateFallsBackToText(t *testing.T) {
+	in := strings.NewReader(strings.Join([]string{"1", fixturePery, "my-snap"}, "\n"))
+	out := new(bytes.Buffer)
+	p := formDaytonaCatalogError{formBareProvider{name: formProviderDaytona}}
+
+	got, err := collectCreateForm(context.Background(), in, out, []string{formProviderDaytona}, formProviderDaytona, daytonaFormLookup(p), createFlags{}, false)
+	if err != nil {
+		t.Fatalf("form: %v", err)
+	}
+	if got.Template != "my-snap" {
+		t.Fatalf("template = %q", got.Template)
+	}
+	view := out.String()
+	if !strings.Contains(view, "Template") || strings.Contains(view, "daytona-small") || strings.Contains(view, "Provider default uses the Daytona image") {
+		t.Fatalf("prompts = %q", view)
 	}
 }

@@ -190,6 +190,20 @@ type TemplateSupport interface {
 	SupportsTemplate()
 }
 
+// TemplateOption is one ready-made template a create form can offer.
+type TemplateOption struct {
+	// Name is the value passed to create as Spec.Template.
+	Name string
+	// Label is the text shown for that template.
+	Label string
+}
+
+// TemplateCatalog lists ready-made templates for the create form.
+// A provider that does not implement it keeps the free-text template field.
+type TemplateCatalog interface {
+	ListTemplates(ctx context.Context) ([]TemplateOption, error)
+}
+
 // CPUSupport marks a provider that honors Spec.CPU when non-zero.
 type CPUSupport interface {
 	SupportsCPU()

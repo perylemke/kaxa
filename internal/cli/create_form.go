@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -41,6 +42,11 @@ type createFormResult struct {
 	cpuPreset        string
 	memoryPreset     string
 	dockerSizePreset string
+	// templatePreset is the Daytona dropdown value. formPresetDefault means
+	// the platform image. Other providers leave it empty and use Template.
+	templatePreset   string
+	daytonaTemplates []sandbox.TemplateOption
+	daytonaCatalogOK bool
 	CPU              float64
 	MemoryMiB        int
 }
@@ -52,6 +58,7 @@ type createFormAPIRaw struct {
 }
 
 func collectCreateForm(
+	ctx context.Context,
 	in io.Reader,
 	out io.Writer,
 	providers []string,
@@ -68,6 +75,7 @@ func collectCreateForm(
 	}
 
 	result, apiRaw := seedCreateFormResult(defaultProvider, flags)
+	loadDaytonaTemplates(ctx, providers, lookup, &result)
 	if len(providers) == 1 {
 		result.Provider = providers[0]
 		if err := validateCreateProvider(result.Provider, lookup, flags, &result); err != nil {
@@ -163,7 +171,12 @@ func buildCreateFormPages(
 				Description("Comma-separated paths. Empty uses the current directory. Each path must be inside a git repo.").
 				Value(&result.Dir).
 				Validate(validateCreateSyncDir)),
-		conditionalField(capsOf, sandbox.FeatureTemplate,
+		presetConditionalField(result, daytonaTemplateSelectVisible(),
+			huh.NewSelect[string]().Title("Template").
+				Description("Provider default uses the Daytona image.").
+				Options(daytonaTemplateSelectOptions(result.daytonaTemplates)...).
+				Value(&result.templatePreset)),
+		presetConditionalField(result, templateTextVisible(capsOf),
 			huh.NewInput().Title("Template").Description("Empty means the provider default.").Value(&result.Template)),
 		conditionalField(capsOf, sandbox.FeatureAPIPublish,
 			huh.NewConfirm().Title("API").Affirmative("Yes").Negative("No").Value(&result.API).
@@ -383,6 +396,7 @@ func finalizeCreateFormResult(
 
 	result.Name = strings.TrimSpace(result.Name)
 	result.Template = strings.TrimSpace(result.Template)
+	applyDaytonaTemplatePreset(&result)
 	if trimmed := strings.TrimSpace(result.Dir); trimmed != "" {
 		result.Dir = trimmed
 		result.DirSet = true
@@ -839,6 +853,79 @@ func (c *presetField) WithPosition(p huh.FieldPosition) huh.Field {
 func (c *presetField) GetKey() string { return c.inner.GetKey() }
 
 func (c *presetField) GetValue() any { return c.inner.GetValue() }
+
+func loadDaytonaTemplates(ctx context.Context, providers []string, lookup func(string) (sandbox.Provider, error), result *createFormResult) {
+	if !slices.Contains(providers, formProviderDaytona) {
+		return
+	}
+	p, err := lookup(formProviderDaytona)
+	if err != nil {
+		return
+	}
+	catalog, ok := p.(sandbox.TemplateCatalog)
+	if !ok {
+		return
+	}
+	opts, err := catalog.ListTemplates(ctx)
+	if err != nil {
+		return
+	}
+	result.daytonaTemplates = opts
+	result.daytonaCatalogOK = true
+	name := strings.TrimSpace(result.Template)
+	if name == "" {
+		result.templatePreset = formPresetDefault
+		return
+	}
+	for _, opt := range opts {
+		if opt.Name == name {
+			result.templatePreset = name
+			return
+		}
+	}
+	result.daytonaTemplates = append(result.daytonaTemplates, sandbox.TemplateOption{Name: name, Label: name})
+	result.templatePreset = name
+}
+
+func daytonaTemplateSelectOptions(opts []sandbox.TemplateOption) []huh.Option[string] {
+	out := []huh.Option[string]{huh.NewOption("Provider default", formPresetDefault)}
+	for _, opt := range opts {
+		label := opt.Label
+		if label == "" {
+			label = opt.Name
+		}
+		out = append(out, huh.NewOption(label, opt.Name))
+	}
+	return out
+}
+
+func applyDaytonaTemplatePreset(result *createFormResult) {
+	if result.Provider == formProviderDaytona && result.daytonaCatalogOK {
+		result.Template = daytonaTemplateFromPreset(result.templatePreset)
+	}
+}
+
+func daytonaTemplateFromPreset(preset string) string {
+	if preset == "" || preset == formPresetDefault {
+		return ""
+	}
+	return preset
+}
+
+func daytonaTemplateSelectVisible() func(*createFormResult) bool {
+	return func(r *createFormResult) bool {
+		return r.Provider == formProviderDaytona && r.daytonaCatalogOK
+	}
+}
+
+func templateTextVisible(capsOf func() sandbox.Capabilities) func(*createFormResult) bool {
+	return func(r *createFormResult) bool {
+		if r.Provider == formProviderDaytona && r.daytonaCatalogOK {
+			return false
+		}
+		return capsOf().Has(sandbox.FeatureTemplate)
+	}
+}
 
 func dockerComputeVisible(capsOf func() sandbox.Capabilities) func(*createFormResult) bool {
 	return func(r *createFormResult) bool {

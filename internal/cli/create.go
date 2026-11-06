@@ -148,7 +148,7 @@ func resolveCreateRequest(cmd *cobra.Command, reg *registry.Registry, args []str
 	if cmd.Flags().Changed("provider") && slices.Contains(providerNames, cfg.Provider) {
 		wizardProviders = []string{cfg.Provider}
 	}
-	form, err := collectCreateForm(cmd.InOrStdin(), cmd.ErrOrStderr(), wizardProviders, defaultProvider, reg.Get, flags, portSet)
+	form, err := collectCreateForm(cmd.Context(), cmd.InOrStdin(), cmd.ErrOrStderr(), wizardProviders, defaultProvider, reg.Get, flags, portSet)
 	if err != nil {
 		return createRequest{}, err
 	}
