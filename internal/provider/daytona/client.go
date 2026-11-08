@@ -49,6 +49,8 @@ type CreateParams struct {
 	Template string
 	// APIPort is the port of the API that will be published. Zero means none.
 	APIPort int
+	// NetworkBlockAll blocks every outbound connection from the sandbox.
+	NetworkBlockAll bool
 }
 
 // Record is one Daytona sandbox as kaxa sees it.
@@ -207,9 +209,10 @@ func (s *sdkClient) Create(ctx context.Context, p CreateParams) (Record, error) 
 		labels[labelTemplate] = p.Template
 	}
 	sb, err := s.c.Create(ctx, types.SnapshotParams{
-		Snapshot: p.Template,
-		Name:     p.Name,
-		Labels:   labels,
+		Snapshot:        p.Template,
+		Name:            p.Name,
+		Labels:          labels,
+		NetworkBlockAll: p.NetworkBlockAll,
 	}, options.WithTimeout(createTimeout), options.WithWaitForStart(false))
 	if err != nil {
 		return Record{}, conflict(convertErr(err))

@@ -85,6 +85,9 @@ func (p *Provider) Configure(apiKey string) error {
 // SupportsTemplate marks Daytona as a provider that starts sandboxes from an image.
 func (*Provider) SupportsTemplate() {}
 
+// SupportsNetworkBlock marks Daytona as a provider that can block outbound network access.
+func (*Provider) SupportsNetworkBlock() {}
+
 // SetDefaultTemplate sets the image used when a create names none. An empty
 // name restores the platform default image.
 func (p *Provider) SetDefaultTemplate(name string) error {
@@ -157,7 +160,10 @@ func (p *Provider) Create(ctx context.Context, spec sandbox.Spec) (sandbox.ID, e
 	} else if !errors.Is(err, ErrNotFound) {
 		return "", userErr(err, spec.Name, secrets...)
 	}
-	params := CreateParams{Name: spec.Name, Labels: spec.Labels, Template: p.templateFor(spec.Template)}
+	params := CreateParams{
+		Name: spec.Name, Labels: spec.Labels, Template: p.templateFor(spec.Template),
+		NetworkBlockAll: spec.NetworkBlockAll,
+	}
 	if spec.ExposeAPI {
 		params.APIPort = spec.APIPort
 	}

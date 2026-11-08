@@ -26,6 +26,7 @@ func newCreateCmd(reg *registry.Registry) *cobra.Command {
 	var template string
 	var cpu float64
 	var memoryMiB int
+	var networkBlockAll bool
 
 	cmd := &cobra.Command{
 		Use:     "create [name]",
@@ -62,9 +63,10 @@ Without a name, a wizard asks for the provider and name, then only the options t
 				APIEnv:    apiEnv,
 				Public:    publicURL,
 
-				Template:  template,
-				CPU:       cpu,
-				MemoryMiB: memoryMiB,
+				Template:        template,
+				CPU:             cpu,
+				MemoryMiB:       memoryMiB,
+				NetworkBlockAll: networkBlockAll,
 			})
 		},
 	}
@@ -80,7 +82,8 @@ Without a name, a wizard asks for the provider and name, then only the options t
 	cmd.Flags().BoolVar(&publicURL, "public", false, "make the Sprites URL reachable without authentication")
 	cmd.Flags().Float64Var(&cpu, "cpu", 0, "CPU cores for the sandbox (Modal and Docker; fractional on Modal; omit for the provider default)")
 	cmd.Flags().IntVar(&memoryMiB, "memory", 0, "memory for the sandbox in MiB (Modal, Docker, Blaxel; omit for the provider default)")
-	markProviderFlags(cmd, "running", "api", "api-cmd", "api-port", "api-env", "template", "public", "cpu", "memory")
+	cmd.Flags().BoolVar(&networkBlockAll, "block-all-network-access", false, "block all outbound network access from the sandbox (Daytona)")
+	markProviderFlags(cmd, "running", "api", "api-cmd", "api-port", "api-env", "template", "public", "cpu", "memory", "block-all-network-access")
 	return cmd
 }
 
@@ -118,7 +121,7 @@ func resolveCreateRequest(cmd *cobra.Command, reg *registry.Registry, args []str
 		}
 		req := createRequest{
 			Name: args[0], Running: flags.Running, Sync: flags.Sync, Template: flags.Template, NoInstall: flags.NoInstall,
-			CPU: flags.CPU, MemoryMiB: flags.MemoryMiB,
+			CPU: flags.CPU, MemoryMiB: flags.MemoryMiB, NetworkBlockAll: flags.NetworkBlockAll,
 		}
 		if err := applyAPIFlags(&req, flags, portSet); err != nil {
 			return createRequest{}, err
@@ -153,18 +156,19 @@ func resolveCreateRequest(cmd *cobra.Command, reg *registry.Registry, args []str
 		return createRequest{}, err
 	}
 	req := createRequest{
-		Name:      form.Name,
-		Running:   form.Running,
-		Sync:      form.Sync,
-		API:       form.API,
-		APIPort:   form.APIPort,
-		APICmd:    form.APICmd,
-		APIEnv:    form.APIEnv,
-		Public:    form.Public,
-		Template:  form.Template,
-		NoInstall: form.NoInstall,
-		CPU:       form.CPU,
-		MemoryMiB: form.MemoryMiB,
+		Name:            form.Name,
+		Running:         form.Running,
+		Sync:            form.Sync,
+		API:             form.API,
+		APIPort:         form.APIPort,
+		APICmd:          form.APICmd,
+		APIEnv:          form.APIEnv,
+		Public:          form.Public,
+		Template:        form.Template,
+		NoInstall:       form.NoInstall,
+		CPU:             form.CPU,
+		MemoryMiB:       form.MemoryMiB,
+		NetworkBlockAll: form.NetworkBlockAll,
 	}
 	cfg.Provider = form.Provider
 	cmd.SetContext(withConfig(cmd.Context(), cfg))

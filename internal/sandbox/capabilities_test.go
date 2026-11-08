@@ -107,6 +107,7 @@ func TestCapabilitiesHas(t *testing.T) {
 		{sandbox.FeatureTemplate, true},
 		{sandbox.FeatureCPU, true},
 		{sandbox.FeatureMemory, true},
+		{sandbox.FeatureNetworkBlock, false},
 		{sandbox.FeatureUpgrade, false},
 		{sandbox.FeatureRunning, false},
 		{sandbox.FeatureSync, false},

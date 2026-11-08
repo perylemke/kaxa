@@ -16,20 +16,21 @@ type listProvidersOut struct {
 }
 
 type createIn struct {
-	Provider  string   `json:"provider,omitempty" jsonschema:"Provider name from list_providers. Defaults to KAXA_DEFAULT_PROVIDER."`
-	Name      string   `json:"name" jsonschema:"Sandbox name. Lowercase letters, digits and hyphens."`
-	Sync      bool     `json:"sync,omitempty" jsonschema:"Copy a local Git repository into the sandbox and install its dependencies."`
-	NoInstall bool     `json:"no_install,omitempty" jsonschema:"With sync, copy the repository and skip the toolchain and the dependency commands. The response lists the dependency commands in skipped_commands."`
-	Dir       string   `json:"dir,omitempty" jsonschema:"Directory inside the Git repository to copy. Requires sync. Defaults to the server working directory. Must be related to the server working directory."`
-	Running   bool     `json:"running,omitempty" jsonschema:"Keep the sandbox running for one hour and serve a tmux terminal on its URL."`
-	API       bool     `json:"api,omitempty" jsonschema:"Publish one HTTP service on the sandbox URL. Requires api_cmd."`
-	APICmd    []string `json:"api_cmd,omitempty" jsonschema:"Argv of the HTTP service. The first item is the binary. The process must listen on 0.0.0.0 and on api_port."`
-	APIPort   int      `json:"api_port,omitempty" jsonschema:"Port the HTTP service listens on. Defaults to 8000. Port 8080 is reserved when running is true."`
-	APIEnv    []string `json:"api_env,omitempty" jsonschema:"Environment of the HTTP service. Each item is KEY=VALUE, or KEY to copy the value from the server environment so secrets stay out of the conversation. Values cannot contain commas. HOME, USER, PATH and KAXA_ names are reserved. Requires api."`
-	Public    bool     `json:"public,omitempty" jsonschema:"Make the sandbox URL reachable without a provider account."`
-	Template  string   `json:"template,omitempty" jsonschema:"Template to start the sandbox from. Only for providers whose capabilities report template (E2B, docker, daytona). Defaults to KAXA_E2B_TEMPLATE, KAXA_DOCKER_TEMPLATE or KAXA_DAYTONA_TEMPLATE, then base. A custom template must have the same user and home as base (E2B: user, /home/user; docker: agent, /home/agent; daytona: daytona, /home/daytona)."`
-	CPU       float64  `json:"cpu,omitempty" jsonschema:"CPU cores for the sandbox (Modal and Docker; fractional on Modal). Omit for the provider default. Requires capabilities.cpu."`
-	MemoryMiB int      `json:"memory_mib,omitempty" jsonschema:"Memory in MiB (Modal, Docker, Blaxel). Omit for the provider default. Requires capabilities.memory."`
+	Provider        string   `json:"provider,omitempty" jsonschema:"Provider name from list_providers. Defaults to KAXA_DEFAULT_PROVIDER."`
+	Name            string   `json:"name" jsonschema:"Sandbox name. Lowercase letters, digits and hyphens."`
+	Sync            bool     `json:"sync,omitempty" jsonschema:"Copy a local Git repository into the sandbox and install its dependencies."`
+	NoInstall       bool     `json:"no_install,omitempty" jsonschema:"With sync, copy the repository and skip the toolchain and the dependency commands. The response lists the dependency commands in skipped_commands."`
+	Dir             string   `json:"dir,omitempty" jsonschema:"Directory inside the Git repository to copy. Requires sync. Defaults to the server working directory. Must be related to the server working directory."`
+	Running         bool     `json:"running,omitempty" jsonschema:"Keep the sandbox running for one hour and serve a tmux terminal on its URL."`
+	API             bool     `json:"api,omitempty" jsonschema:"Publish one HTTP service on the sandbox URL. Requires api_cmd."`
+	APICmd          []string `json:"api_cmd,omitempty" jsonschema:"Argv of the HTTP service. The first item is the binary. The process must listen on 0.0.0.0 and on api_port."`
+	APIPort         int      `json:"api_port,omitempty" jsonschema:"Port the HTTP service listens on. Defaults to 8000. Port 8080 is reserved when running is true."`
+	APIEnv          []string `json:"api_env,omitempty" jsonschema:"Environment of the HTTP service. Each item is KEY=VALUE, or KEY to copy the value from the server environment so secrets stay out of the conversation. Values cannot contain commas. HOME, USER, PATH and KAXA_ names are reserved. Requires api."`
+	Public          bool     `json:"public,omitempty" jsonschema:"Make the sandbox URL reachable without a provider account."`
+	Template        string   `json:"template,omitempty" jsonschema:"Template to start the sandbox from. Only for providers whose capabilities report template (E2B, docker, daytona). Defaults to KAXA_E2B_TEMPLATE, KAXA_DOCKER_TEMPLATE or KAXA_DAYTONA_TEMPLATE, then base. A custom template must have the same user and home as base (E2B: user, /home/user; docker: agent, /home/agent; daytona: daytona, /home/daytona)."`
+	CPU             float64  `json:"cpu,omitempty" jsonschema:"CPU cores for the sandbox (Modal and Docker; fractional on Modal). Omit for the provider default. Requires capabilities.cpu."`
+	MemoryMiB       int      `json:"memory_mib,omitempty" jsonschema:"Memory in MiB (Modal, Docker, Blaxel). Omit for the provider default. Requires capabilities.memory."`
+	NetworkBlockAll bool     `json:"block_all_network_access,omitempty" jsonschema:"Block all outbound network access from the sandbox. Daytona only. Requires capabilities.network_block. Toolchain downloads fail while it is on."`
 }
 
 type createOut struct {

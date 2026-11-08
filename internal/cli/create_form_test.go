@@ -121,7 +121,7 @@ func TestCreateFormModalAccessible(t *testing.T) {
 			t.Fatalf("prompts missing %q: %q", title, view)
 		}
 	}
-	for _, title := range []string{"Running", "Public", "API", "Template"} {
+	for _, title := range []string{"Running", "Public", "API", "Template", "Block all network"} {
 		if strings.Contains(view, title) {
 			t.Fatalf("prompts should not contain %q: %q", title, view)
 		}
@@ -145,6 +145,9 @@ func TestCreateFormSpritesAccessibleDefaults(t *testing.T) {
 			t.Fatalf("prompts missing %q: %q", title, view)
 		}
 	}
+	if strings.Contains(view, "Block all network") {
+		t.Fatalf("prompts should not contain network block: %q", view)
+	}
 }
 
 func TestCreateFormE2BAccessible(t *testing.T) {
@@ -167,7 +170,7 @@ func TestCreateFormE2BAccessible(t *testing.T) {
 	}
 	assertFormPrompts(t, out.String(),
 		[]string{"Template", "Sync", "API", "Directories", "Skip install", "API command", "API port", "API env"},
-		[]string{"Running", "Public", "Size"},
+		[]string{"Running", "Public", "Size", "Block all network"},
 	)
 }
 
@@ -468,6 +471,9 @@ func TestCheckCreateFormFlagsEachUnsupported(t *testing.T) {
 	if err := checkCreateFormFlags(modalP, createFlags{MemoryMiB: 1024}); err != nil {
 		t.Fatalf("modal supports memory: %v", err)
 	}
+	if err := checkCreateFormFlags(modalP, createFlags{NetworkBlockAll: true}); err == nil {
+		t.Fatal("expected network block unsupported on modal")
+	}
 }
 
 func TestApplyCreateFormCapabilitiesClearsCPUOnUnsupportedProvider(t *testing.T) {
@@ -688,7 +694,8 @@ func TestBlaxelMemorySelectOptionsAddsExtraForNonListFlagValue(t *testing.T) {
 
 type formDaytonaFake struct{ formBareProvider }
 
-func (formDaytonaFake) SupportsTemplate() {}
+func (formDaytonaFake) SupportsTemplate()     {}
+func (formDaytonaFake) SupportsNetworkBlock() {}
 
 func (formDaytonaFake) ListTemplates(context.Context) ([]sandbox.TemplateOption, error) {
 	return []sandbox.TemplateOption{
@@ -715,7 +722,7 @@ func daytonaFormLookup(p sandbox.Provider) func(string) (sandbox.Provider, error
 }
 
 func TestCreateFormDaytonaTemplateSelect(t *testing.T) {
-	in := strings.NewReader(strings.Join([]string{"1", fixturePery, "3"}, "\n"))
+	in := strings.NewReader(strings.Join([]string{"1", fixturePery, "3", "n"}, "\n"))
 	out := new(bytes.Buffer)
 	p := formDaytonaFake{formBareProvider{name: formProviderDaytona}}
 
@@ -723,7 +730,7 @@ func TestCreateFormDaytonaTemplateSelect(t *testing.T) {
 	if err != nil {
 		t.Fatalf("form: %v", err)
 	}
-	if got.Provider != formProviderDaytona || got.Name != fixturePery || got.Template != "daytona-small" {
+	if got.Provider != formProviderDaytona || got.Name != fixturePery || got.Template != "daytona-small" || got.NetworkBlockAll {
 		t.Fatalf("result = %+v", got)
 	}
 	view := out.String()
@@ -736,7 +743,7 @@ func TestCreateFormDaytonaTemplateSelect(t *testing.T) {
 }
 
 func TestCreateFormDaytonaTemplateDefaultIsEmpty(t *testing.T) {
-	in := strings.NewReader(strings.Join([]string{"1", fixturePery, "1"}, "\n"))
+	in := strings.NewReader(strings.Join([]string{"1", fixturePery, "1", "n"}, "\n"))
 	out := new(bytes.Buffer)
 	p := formDaytonaFake{formBareProvider{name: formProviderDaytona}}
 
@@ -750,7 +757,7 @@ func TestCreateFormDaytonaTemplateDefaultIsEmpty(t *testing.T) {
 }
 
 func TestCreateFormDaytonaTemplateFlagOutsideCatalog(t *testing.T) {
-	in := strings.NewReader(strings.Join([]string{"1", fixturePery, "4"}, "\n"))
+	in := strings.NewReader(strings.Join([]string{"1", fixturePery, "4", "n"}, "\n"))
 	out := new(bytes.Buffer)
 	p := formDaytonaFake{formBareProvider{name: formProviderDaytona}}
 
@@ -781,5 +788,39 @@ func TestCreateFormDaytonaTemplateFallsBackToText(t *testing.T) {
 	view := out.String()
 	if !strings.Contains(view, "Template") || strings.Contains(view, "daytona-small") || strings.Contains(view, "Provider default uses the Daytona image") {
 		t.Fatalf("prompts = %q", view)
+	}
+	if strings.Contains(view, "Block all network") {
+		t.Fatalf("prompts should not contain network block: %q", view)
+	}
+}
+
+func TestCreateFormDaytonaNetworkBlockYes(t *testing.T) {
+	in := strings.NewReader(strings.Join([]string{"1", fixturePery, "1", "y"}, "\n"))
+	out := new(bytes.Buffer)
+	p := formDaytonaFake{formBareProvider{name: formProviderDaytona}}
+
+	got, err := collectCreateForm(context.Background(), in, out, []string{formProviderDaytona}, formProviderDaytona, daytonaFormLookup(p), createFlags{}, false)
+	if err != nil {
+		t.Fatalf("form: %v", err)
+	}
+	if got.Template != "" || !got.NetworkBlockAll {
+		t.Fatalf("result = %+v", got)
+	}
+	if !strings.Contains(out.String(), "Block all network") {
+		t.Fatalf("prompts = %q", out.String())
+	}
+}
+
+func TestCreateFormDaytonaNetworkBlockFlagSeedsYes(t *testing.T) {
+	in := strings.NewReader(strings.Join([]string{"1", fixturePery, "1", ""}, "\n"))
+	out := new(bytes.Buffer)
+	p := formDaytonaFake{formBareProvider{name: formProviderDaytona}}
+
+	got, err := collectCreateForm(context.Background(), in, out, []string{formProviderDaytona}, formProviderDaytona, daytonaFormLookup(p), createFlags{NetworkBlockAll: true}, false)
+	if err != nil {
+		t.Fatalf("form: %v", err)
+	}
+	if !got.NetworkBlockAll {
+		t.Fatalf("result = %+v", got)
 	}
 }

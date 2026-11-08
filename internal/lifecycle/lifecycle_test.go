@@ -361,6 +361,7 @@ func TestCheckRejectsMissingCapabilities(t *testing.T) {
 		{name: "template", req: lifecycle.Request{Name: boxName, Template: bigTpl}, want: "template"},
 		{name: "cpu", req: lifecycle.Request{Name: boxName, CPU: 1}, want: "cpu"},
 		{name: "memory", req: lifecycle.Request{Name: boxName, MemoryMiB: 1024}, want: "memory"},
+		{name: "network block", req: lifecycle.Request{Name: boxName, NetworkBlockAll: true}, want: "network block"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

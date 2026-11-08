@@ -22,21 +22,22 @@ import (
 var errCreateCancelled = errors.New("create cancelled")
 
 type createFormResult struct {
-	Name        string
-	Provider    string
-	Running     bool
-	Sync        bool
-	API         bool
-	Public      bool
-	Template    string
-	NoInstall   bool
-	Dir         string
-	DirSet      bool
-	APIPort     int
-	APICmd      []string
-	APIEnv      []string
-	cpuInput    string
-	memoryInput string
+	Name            string
+	Provider        string
+	Running         bool
+	Sync            bool
+	API             bool
+	Public          bool
+	Template        string
+	NetworkBlockAll bool
+	NoInstall       bool
+	Dir             string
+	DirSet          bool
+	APIPort         int
+	APICmd          []string
+	APIEnv          []string
+	cpuInput        string
+	memoryInput     string
 	// Wizard-only presets (flags stay numeric). Modal: cpu_preset / memory_preset.
 	// Docker: docker_size. Blaxel: memory_preset only.
 	cpuPreset        string
@@ -106,6 +107,7 @@ func seedCreateFormResult(defaultProvider string, flags createFlags) (createForm
 	result.API = flags.API
 	result.Public = flags.Public
 	result.Template = flags.Template
+	result.NetworkBlockAll = flags.NetworkBlockAll
 	result.NoInstall = flags.NoInstall
 	if flags.DirSet {
 		result.Dir = flags.Dir
@@ -178,6 +180,10 @@ func buildCreateFormPages(
 				Value(&result.templatePreset)),
 		presetConditionalField(result, templateTextVisible(capsOf),
 			huh.NewInput().Title("Template").Description("Empty means the provider default.").Value(&result.Template)),
+		conditionalField(capsOf, sandbox.FeatureNetworkBlock,
+			huh.NewConfirm().Title("Block all network").
+				Description("Block all outbound network access from the sandbox.").
+				Affirmative("Yes").Negative("No").Value(&result.NetworkBlockAll)),
 		conditionalField(capsOf, sandbox.FeatureAPIPublish,
 			huh.NewConfirm().Title("API").Affirmative("Yes").Negative("No").Value(&result.API).
 				Validate(func(v bool) error { return validateCreateAPIAnswer(v, apiRaw) })),
@@ -527,6 +533,13 @@ func checkCreateFormFeatureFlags(p sandbox.Provider, caps sandbox.Capabilities, 
 	if flags.MemoryMiB != 0 && !caps.Has(sandbox.FeatureMemory) {
 		return lifecycle.Unsupported(p, sandbox.FeatureMemory)
 	}
+	return checkCreateFormNetworkBlockFlag(p, caps, flags)
+}
+
+func checkCreateFormNetworkBlockFlag(p sandbox.Provider, caps sandbox.Capabilities, flags createFlags) error {
+	if flags.NetworkBlockAll && !caps.Has(sandbox.FeatureNetworkBlock) {
+		return lifecycle.Unsupported(p, sandbox.FeatureNetworkBlock)
+	}
 	return nil
 }
 
@@ -576,6 +589,9 @@ func applyCreateFormBooleanCaps(result *createFormResult, caps sandbox.Capabilit
 	}
 	if !caps.Has(sandbox.FeaturePublicURLs) {
 		result.Public = false
+	}
+	if !caps.Has(sandbox.FeatureNetworkBlock) {
+		result.NetworkBlockAll = false
 	}
 }
 

@@ -169,7 +169,7 @@ func (s *service) createRequest(name string, in createIn) (lifecycle.Request, er
 	}
 	req := lifecycle.Request{
 		Name: name, Running: in.Running, Sync: in.Sync, Public: in.Public, Template: in.Template, NoInstall: in.NoInstall,
-		CPU: in.CPU, MemoryMiB: in.MemoryMiB,
+		CPU: in.CPU, MemoryMiB: in.MemoryMiB, NetworkBlockAll: in.NetworkBlockAll,
 	}
 	if err := s.applyAPI(&req, in); err != nil {
 		return lifecycle.Request{}, err

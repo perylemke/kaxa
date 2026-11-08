@@ -55,6 +55,9 @@ type Spec struct {
 	// MemoryMiB is memory for the sandbox in MiB. Zero means the provider default.
 	// Only providers that implement MemorySupport read it.
 	MemoryMiB int
+	// NetworkBlockAll blocks every outbound connection from the sandbox.
+	// Only a provider that implements NetworkBlockSupport accepts it.
+	NetworkBlockAll bool
 }
 
 // Info summarizes an existing sandbox.
@@ -212,6 +215,12 @@ type CPUSupport interface {
 // MemorySupport marks a provider that honors Spec.MemoryMiB when non-zero.
 type MemorySupport interface {
 	SupportsMemory()
+}
+
+// NetworkBlockSupport marks a provider that can block all outbound network
+// access when Spec.NetworkBlockAll is set.
+type NetworkBlockSupport interface {
+	SupportsNetworkBlock()
 }
 
 // Provider is a sandbox backend (Sprites, Modal, etc.).

@@ -359,6 +359,35 @@ func TestCreatePassesCPUAndMemoryMCP(t *testing.T) {
 	}
 }
 
+type networkBlockFake struct{ *fakeProvider }
+
+func (networkBlockFake) SupportsNetworkBlock() {}
+
+func TestCreatePassesNetworkBlockMCP(t *testing.T) {
+	t.Parallel()
+
+	fp := &fakeProvider{name: testSprites}
+	svc := newTestService(t, t.TempDir(), testSprites, networkBlockFake{fp})
+	if _, err := svc.create(context.Background(), createIn{Name: testBox, NetworkBlockAll: true}); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if len(fp.created) != 1 || !fp.created[0].NetworkBlockAll {
+		t.Fatalf("created = %+v", fp.created)
+	}
+}
+
+func TestCreateRejectsNetworkBlockWithoutCapability(t *testing.T) {
+	t.Parallel()
+
+	fp := &fakeProvider{name: testSprites}
+	svc := newTestService(t, t.TempDir(), testSprites, fp)
+	_, err := svc.create(context.Background(), createIn{Name: testBox, NetworkBlockAll: true})
+	wantErr(t, err, "network block is not available for "+testSprites)
+	if len(fp.created) != 0 {
+		t.Fatalf("created %v", fp.created)
+	}
+}
+
 func TestCreateRejectsCPUWithoutCapability(t *testing.T) {
 	t.Parallel()
 

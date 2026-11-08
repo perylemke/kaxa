@@ -48,6 +48,8 @@ type Request struct {
 	CPU float64
 	// MemoryMiB is memory for the sandbox in MiB. Zero means the provider default.
 	MemoryMiB int
+	// NetworkBlockAll blocks every outbound connection from the sandbox.
+	NetworkBlockAll bool
 }
 
 // Labels returns the provider labels for the sandbox.
@@ -103,7 +105,20 @@ func Check(p sandbox.Provider, req Request) error {
 	if err := checkPublicRequest(p, req); err != nil {
 		return err
 	}
+	if err := checkNetworkBlockRequest(p, req); err != nil {
+		return err
+	}
 	return checkComputeRequest(p, req)
+}
+
+func checkNetworkBlockRequest(p sandbox.Provider, req Request) error {
+	if !req.NetworkBlockAll {
+		return nil
+	}
+	if _, ok := p.(sandbox.NetworkBlockSupport); !ok {
+		return Unsupported(p, sandbox.FeatureNetworkBlock)
+	}
+	return nil
 }
 
 func checkPublicRequest(p sandbox.Provider, req Request) error {
@@ -198,14 +213,15 @@ func createSandbox(ctx context.Context, p sandbox.Provider, req Request, run Run
 	err := run(ctx, "creating "+req.Name+" on "+p.Name()+"…", func(ctx context.Context) error {
 		var createErr error
 		id, createErr = p.Create(ctx, sandbox.Spec{
-			Name:      req.Name,
-			Labels:    req.Labels(),
-			Running:   req.Running,
-			ExposeAPI: req.API,
-			APIPort:   apiPortOf(req),
-			Template:  req.Template,
-			CPU:       req.CPU,
-			MemoryMiB: req.MemoryMiB,
+			Name:            req.Name,
+			Labels:          req.Labels(),
+			Running:         req.Running,
+			ExposeAPI:       req.API,
+			APIPort:         apiPortOf(req),
+			Template:        req.Template,
+			CPU:             req.CPU,
+			MemoryMiB:       req.MemoryMiB,
+			NetworkBlockAll: req.NetworkBlockAll,
 		})
 		if createErr != nil {
 			return createErr

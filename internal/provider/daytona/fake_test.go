@@ -72,6 +72,7 @@ func (f *fakeAPI) Create(_ context.Context, p CreateParams) (Record, error) {
 	rec := &Record{
 		ID: "sb-" + strconv.Itoa(f.seq), Name: p.Name, Labels: slices.Clone(p.Labels), Status: f.createStatus,
 		CreatedAt: time.Unix(int64(1000+f.seq), 0), Template: p.Template, APIPort: p.APIPort,
+		NetworkBlockAll: p.NetworkBlockAll,
 	}
 	f.sandboxes[rec.ID] = rec
 	return *rec, nil

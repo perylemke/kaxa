@@ -34,6 +34,8 @@ type createFlags struct {
 	CPU float64
 	// MemoryMiB is memory in MiB. Zero means the provider default.
 	MemoryMiB int
+	// NetworkBlockAll blocks every outbound connection from the sandbox.
+	NetworkBlockAll bool
 }
 
 func applyAPIFlags(req *createRequest, flags createFlags, portSet bool) error {

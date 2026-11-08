@@ -179,8 +179,9 @@ Código: [`internal/provider/docker/docker.go`](internal/provider/docker/docker.
 | `Name` | `spec.Name` |
 | `Snapshot` | `spec.Template` → `KAXA_DAYTONA_TEMPLATE`; se vazio, string vazia (snapshot/imagem default da plataforma Daytona) |
 | `Labels` | Ver tabela |
+| `NetworkBlockAll` | `spec.NetworkBlockAll` (`--block-all-network-access`). Desligado por padrão. Bloqueia só a saída |
 
-Demais campos de `SandboxBaseParams` (`User`, `EnvVars`, `Public`, intervalos auto-stop/pause/archive/delete, `TtlMinutes`, etc.) ficam no zero value — o kaxa não os preenche.
+Demais campos de `SandboxBaseParams` (`User`, `EnvVars`, `Public`, intervalos auto-stop/pause/archive/delete, `TtlMinutes`, etc.) ficam no zero value — o kaxa não os preenche. O restore de snapshot também deixa `NetworkBlockAll` desligado.
 
 ### Labels
 
@@ -204,6 +205,7 @@ Com `--api`, `CreateParams.APIPort` = `spec.APIPort` antes do SDK.
 | `ExposeAPI` | Indireto → label `kaxa.api_port` |
 | `APIPort` | Sim → label |
 | `Template` | Sim → `Snapshot` + label opcional |
+| `NetworkBlockAll` | Sim → `NetworkBlockAll` |
 
 Código: [`internal/provider/daytona/daytona.go`](internal/provider/daytona/daytona.go), [`internal/provider/daytona/client.go`](internal/provider/daytona/client.go).
 
