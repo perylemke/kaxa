@@ -13,6 +13,7 @@ import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/huh/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/perylemke/kaxa/internal/lifecycle"
 	"github.com/perylemke/kaxa/internal/sandbox"
@@ -183,7 +184,9 @@ func buildCreateFormPages(
 		conditionalField(capsOf, sandbox.FeatureNetworkBlock,
 			huh.NewConfirm().Title("Block all network").
 				Description("Block all outbound network access from the sandbox.").
-				Affirmative("Yes").Negative("No").Value(&result.NetworkBlockAll)),
+				Affirmative("Yes").Negative("No").
+				WithButtonAlignment(lipgloss.Left).
+				Value(&result.NetworkBlockAll)),
 		conditionalField(capsOf, sandbox.FeatureAPIPublish,
 			huh.NewConfirm().Title("API").Affirmative("Yes").Negative("No").Value(&result.API).
 				Validate(func(v bool) error { return validateCreateAPIAnswer(v, apiRaw) })),
