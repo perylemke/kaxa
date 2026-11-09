@@ -56,6 +56,8 @@ type Provider struct {
 	wait          time.Duration
 	readyTimeout  time.Duration
 	readyInterval time.Duration
+	// tags lists Docker Hub tags for the create form. Nil uses the public Hub.
+	tags tagLister
 }
 
 // New returns a provider that is not yet configured; ConfigureCredentials

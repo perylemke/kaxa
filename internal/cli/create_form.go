@@ -54,6 +54,11 @@ type createFormResult struct {
 	blaxelTemplatePreset string
 	blaxelTemplates      []sandbox.TemplateOption
 	blaxelCatalogOK      bool
+	// dockerTemplatePreset is the Docker Hub dropdown value. formPresetDefault
+	// means KAXA_DOCKER_TEMPLATE or docker/sandbox-templates:shell.
+	dockerTemplatePreset string
+	dockerTemplates      []sandbox.TemplateOption
+	dockerCatalogOK      bool
 	CPU                  float64
 	MemoryMiB            int
 }
@@ -84,6 +89,7 @@ func collectCreateForm(
 	result, apiRaw := seedCreateFormResult(defaultProvider, flags)
 	loadDaytonaTemplates(ctx, providers, lookup, &result)
 	loadBlaxelTemplates(ctx, providers, lookup, &result)
+	loadDockerTemplates(ctx, providers, lookup, &result)
 	if len(providers) == 1 {
 		result.Provider = providers[0]
 		if err := validateCreateProvider(result.Provider, lookup, flags, &result); err != nil {
@@ -182,6 +188,7 @@ func buildCreateFormPages(
 				Validate(validateCreateSyncDir)),
 		presetConditionalField(result, daytonaTemplateSelectVisible(), daytonaTemplateSelect(result)),
 		presetConditionalField(result, blaxelTemplateSelectVisible(), blaxelTemplateSelect(result)),
+		presetConditionalField(result, dockerTemplateSelectVisible(), dockerTemplateSelect(result)),
 		presetConditionalField(result, templateTextVisible(capsOf),
 			huh.NewInput().Title("Template").Description("Empty means the provider default.").Value(&result.Template)),
 		conditionalField(capsOf, sandbox.FeatureNetworkBlock,
@@ -410,6 +417,7 @@ func finalizeCreateFormResult(
 	result.Template = strings.TrimSpace(result.Template)
 	applyDaytonaTemplatePreset(&result)
 	applyBlaxelTemplatePreset(&result)
+	applyDockerTemplatePreset(&result)
 	if trimmed := strings.TrimSpace(result.Dir); trimmed != "" {
 		result.Dir = trimmed
 		result.DirSet = true
@@ -897,6 +905,16 @@ func loadBlaxelTemplates(ctx context.Context, providers []string, lookup func(st
 	result.blaxelTemplatePreset = preset
 }
 
+func loadDockerTemplates(ctx context.Context, providers []string, lookup func(string) (sandbox.Provider, error), result *createFormResult) {
+	opts, preset, ok := loadCatalogTemplates(ctx, providers, formProviderDocker, lookup, result.Template)
+	if !ok {
+		return
+	}
+	result.dockerTemplates = opts
+	result.dockerCatalogOK = true
+	result.dockerTemplatePreset = preset
+}
+
 // loadCatalogTemplates lists templates when provider is on the form and implements
 // the catalog. ok is false when the list is skipped or fails, so the text field stays.
 func loadCatalogTemplates(
@@ -962,6 +980,12 @@ func applyBlaxelTemplatePreset(result *createFormResult) {
 	}
 }
 
+func applyDockerTemplatePreset(result *createFormResult) {
+	if result.Provider == formProviderDocker && result.dockerCatalogOK {
+		result.Template = templateFromPreset(result.dockerTemplatePreset)
+	}
+}
+
 func templateFromPreset(preset string) string {
 	if preset == "" || preset == formPresetDefault {
 		return ""
@@ -995,12 +1019,28 @@ func blaxelTemplateSelectVisible() func(*createFormResult) bool {
 	}
 }
 
+func dockerTemplateSelect(result *createFormResult) huh.Field {
+	return huh.NewSelect[string]().Title("Template").
+		Description("Provider default uses KAXA_DOCKER_TEMPLATE or docker/sandbox-templates:shell.").
+		Options(templateSelectOptions(result.dockerTemplates)...).
+		Value(&result.dockerTemplatePreset)
+}
+
+func dockerTemplateSelectVisible() func(*createFormResult) bool {
+	return func(r *createFormResult) bool {
+		return r.Provider == formProviderDocker && r.dockerCatalogOK
+	}
+}
+
 func templateTextVisible(capsOf func() sandbox.Capabilities) func(*createFormResult) bool {
 	return func(r *createFormResult) bool {
 		if r.Provider == formProviderDaytona && r.daytonaCatalogOK {
 			return false
 		}
 		if r.Provider == formProviderBlaxel && r.blaxelCatalogOK {
+			return false
+		}
+		if r.Provider == formProviderDocker && r.dockerCatalogOK {
 			return false
 		}
 		return capsOf().Has(sandbox.FeatureTemplate)

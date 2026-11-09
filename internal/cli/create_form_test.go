@@ -950,3 +950,102 @@ func TestCreateFormBlaxelTemplateFallsBackToText(t *testing.T) {
 		t.Fatalf("prompts = %q", view)
 	}
 }
+
+const formDockerCustomImage = "ghcr.io/me/img:v1"
+
+type formDockerCatalogFake struct{ formBareProvider }
+
+func (formDockerCatalogFake) SupportsTemplate() {}
+
+func (formDockerCatalogFake) ListTemplates(context.Context) ([]sandbox.TemplateOption, error) {
+	return []sandbox.TemplateOption{
+		{Name: "docker/sandbox-templates:claude-code", Label: "claude-code"},
+		{Name: "docker/sandbox-templates:shell", Label: "shell"},
+	}, nil
+}
+
+type formDockerEmptyCatalog struct{ formBareProvider }
+
+func (formDockerEmptyCatalog) SupportsTemplate() {}
+
+func (formDockerEmptyCatalog) ListTemplates(context.Context) ([]sandbox.TemplateOption, error) {
+	return nil, nil
+}
+
+type formDockerCatalogError struct{ formBareProvider }
+
+func (formDockerCatalogError) SupportsTemplate() {}
+
+func (formDockerCatalogError) ListTemplates(context.Context) ([]sandbox.TemplateOption, error) {
+	return nil, errors.New("offline")
+}
+
+func dockerFormLookup(p sandbox.Provider) func(string) (sandbox.Provider, error) {
+	return func(name string) (sandbox.Provider, error) {
+		if name != formProviderDocker {
+			return nil, errors.New("unknown provider")
+		}
+		return p, nil
+	}
+}
+
+func TestCreateFormDockerTemplateCatalog(t *testing.T) {
+	catalog := formDockerCatalogFake{formBareProvider{name: formProviderDocker}}
+	tests := []struct {
+		name    string
+		p       sandbox.Provider
+		flags   createFlags
+		answers []string
+		want    string
+		has     []string
+		omit    []string
+	}{
+		{
+			name: "select", p: catalog, answers: []string{"1", fixturePery, "3"},
+			want: "docker/sandbox-templates:shell",
+			has:  []string{"Provider default", "shell"}, omit: []string{"Empty means the provider default."},
+		},
+		{
+			name: "default", p: catalog, answers: []string{"1", fixturePery, "1"},
+		},
+		{
+			name: "empty catalog", p: formDockerEmptyCatalog{formBareProvider{name: formProviderDocker}},
+			answers: []string{"1", fixturePery, "1"},
+			has:     []string{"Provider default"}, omit: []string{"Empty means the provider default."},
+		},
+		{
+			name: "flag outside catalog", p: catalog, flags: createFlags{Template: formDockerCustomImage},
+			answers: []string{"1", fixturePery, "4"}, want: formDockerCustomImage, has: []string{formDockerCustomImage},
+		},
+		{
+			name: "catalog error", p: formDockerCatalogError{formBareProvider{name: formProviderDocker}},
+			answers: []string{"1", fixturePery, formDockerCustomImage}, want: formDockerCustomImage,
+			has:  []string{"Template"},
+			omit: []string{"docker/sandbox-templates:shell", "Provider default uses KAXA_DOCKER_TEMPLATE"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			in := strings.NewReader(strings.Join(tt.answers, "\n"))
+			out := new(bytes.Buffer)
+			got, err := collectCreateForm(context.Background(), in, out, []string{formProviderDocker}, formProviderDocker, dockerFormLookup(tt.p), tt.flags, false)
+			if err != nil {
+				t.Fatalf("form: %v", err)
+			}
+			if got.Template != tt.want {
+				t.Fatalf("template = %q, want %q", got.Template, tt.want)
+			}
+			view := out.String()
+			for _, text := range tt.has {
+				if !strings.Contains(view, text) {
+					t.Fatalf("prompts missing %q: %q", text, view)
+				}
+			}
+			for _, text := range tt.omit {
+				if strings.Contains(view, text) {
+					t.Fatalf("prompts contain %q: %q", text, view)
+				}
+			}
+		})
+	}
+}

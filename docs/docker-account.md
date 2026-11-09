@@ -47,6 +47,6 @@ Without `--provider`, `kaxa list` includes Docker when both variables are set. A
 
 ## Templates
 
-By default kaxa starts sandboxes from `docker/sandbox-templates:shell`, the image of the shell agent. Set `KAXA_DOCKER_TEMPLATE` (or pass `--template` to `create`) to use another image that Docker can pull. It must keep the layout of the Docker agent images: user `agent`, home `/home/agent`, and `tail` on `PATH`. See [create](create.md#templates-on-docker).
+By default kaxa starts sandboxes from `docker/sandbox-templates:shell`, the image of the shell agent. Set `KAXA_DOCKER_TEMPLATE` (or pass `--template` to `create`) to use another image that Docker can pull. It must keep the layout of the Docker agent images: user `agent`, home `/home/agent`, and `tail` on `PATH`. The create wizard lists the stable tags of `docker/sandbox-templates`; Provider default leaves the image empty. See [create](create.md#templates-on-docker).
 
 Command manuals are in the [docs index](README.md).
