@@ -46,6 +46,7 @@ type fakeAPI struct {
 	terms                []termCall
 	termOut              string
 	termErr              error
+	hub                  []hubTemplate
 }
 
 type termCall struct {
@@ -67,6 +68,12 @@ func newTestProvider(t *testing.T, api *fakeAPI) *Provider {
 	p.SetPolling(time.Second, time.Millisecond)
 	p.SetReadiness(time.Second, time.Millisecond)
 	return p
+}
+
+func (f *fakeAPI) ListHub(context.Context) ([]hubTemplate, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.hub), nil
 }
 
 func (f *fakeAPI) Create(_ context.Context, p CreateParams) (Record, error) {

@@ -46,7 +46,7 @@ Without `--provider`, `kaxa list` includes Blaxel once the key and workspace are
 
 ## Templates
 
-Set `KAXA_BLAXEL_TEMPLATE` (or pass `--template` to `create`) to start sandboxes from another image. It must keep the layout of `blaxel/base-image:latest`: user `root`, home `/root`. Another user breaks `exec` and `--sync`, and kaxa does not detect that.
+Set `KAXA_BLAXEL_TEMPLATE` (or pass `--template` to `create`) to start sandboxes from another image. It must keep the layout of `blaxel/base-image:latest`: user `root`, home `/root`. Another user breaks `exec` and `--sync`, and kaxa does not detect that. The create wizard lists the visible Hub images; Provider default leaves the image empty.
 
 ## How sandboxes live
 

@@ -10,6 +10,7 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 
 ### Changed
 
+- The `kaxa create` wizard lists Blaxel's visible Hub images in a Template dropdown. Provider default uses `KAXA_BLAXEL_TEMPLATE` or `blaxel/base-image:latest`. A `--template` value outside that list is added as an extra option. If the list cannot be loaded, the field stays a text input. The flag and MCP still take an image reference.
 - `kaxa create --block-all-network-access` and the Daytona create wizard block all outbound network from a new sandbox. The default stays off. Other providers reject the flag. Toolchain downloads and `go mod download` fail while it is on; `--no-install` or a create without `--sync` still works. The MCP field is `block_all_network_access`.
 - The `kaxa create` wizard lists Daytona's active platform snapshots in a Template dropdown. Provider default leaves the Daytona image. A `--template` value outside that list is added as an extra option. If the list cannot be loaded, the field stays a text input. The flag and MCP still take a snapshot name.
 - `kaxa create --sync` and the create wizard accept comma-separated `--dir` paths so multiple Git repositories copy into the workspace; the first is still used for `--api` and the reported work directory. In the wizard, choosing Sync opens the Directories field on the same step. Duplicate paths or two repos with the same workspace name are rejected before create.

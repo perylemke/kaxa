@@ -49,8 +49,13 @@ type createFormResult struct {
 	templatePreset   string
 	daytonaTemplates []sandbox.TemplateOption
 	daytonaCatalogOK bool
-	CPU              float64
-	MemoryMiB        int
+	// blaxelTemplatePreset is the Blaxel Hub dropdown value. formPresetDefault
+	// means KAXA_BLAXEL_TEMPLATE or blaxel/base-image:latest.
+	blaxelTemplatePreset string
+	blaxelTemplates      []sandbox.TemplateOption
+	blaxelCatalogOK      bool
+	CPU                  float64
+	MemoryMiB            int
 }
 
 type createFormAPIRaw struct {
@@ -78,6 +83,7 @@ func collectCreateForm(
 
 	result, apiRaw := seedCreateFormResult(defaultProvider, flags)
 	loadDaytonaTemplates(ctx, providers, lookup, &result)
+	loadBlaxelTemplates(ctx, providers, lookup, &result)
 	if len(providers) == 1 {
 		result.Provider = providers[0]
 		if err := validateCreateProvider(result.Provider, lookup, flags, &result); err != nil {
@@ -174,11 +180,8 @@ func buildCreateFormPages(
 				Description("Comma-separated paths. Empty uses the current directory. Each path must be inside a git repo.").
 				Value(&result.Dir).
 				Validate(validateCreateSyncDir)),
-		presetConditionalField(result, daytonaTemplateSelectVisible(),
-			huh.NewSelect[string]().Title("Template").
-				Description("Provider default uses the Daytona image.").
-				Options(daytonaTemplateSelectOptions(result.daytonaTemplates)...).
-				Value(&result.templatePreset)),
+		presetConditionalField(result, daytonaTemplateSelectVisible(), daytonaTemplateSelect(result)),
+		presetConditionalField(result, blaxelTemplateSelectVisible(), blaxelTemplateSelect(result)),
 		presetConditionalField(result, templateTextVisible(capsOf),
 			huh.NewInput().Title("Template").Description("Empty means the provider default.").Value(&result.Template)),
 		conditionalField(capsOf, sandbox.FeatureNetworkBlock,
@@ -406,6 +409,7 @@ func finalizeCreateFormResult(
 	result.Name = strings.TrimSpace(result.Name)
 	result.Template = strings.TrimSpace(result.Template)
 	applyDaytonaTemplatePreset(&result)
+	applyBlaxelTemplatePreset(&result)
 	if trimmed := strings.TrimSpace(result.Dir); trimmed != "" {
 		result.Dir = trimmed
 		result.DirSet = true
@@ -874,39 +878,67 @@ func (c *presetField) GetKey() string { return c.inner.GetKey() }
 func (c *presetField) GetValue() any { return c.inner.GetValue() }
 
 func loadDaytonaTemplates(ctx context.Context, providers []string, lookup func(string) (sandbox.Provider, error), result *createFormResult) {
-	if !slices.Contains(providers, formProviderDaytona) {
-		return
-	}
-	p, err := lookup(formProviderDaytona)
-	if err != nil {
-		return
-	}
-	catalog, ok := p.(sandbox.TemplateCatalog)
+	opts, preset, ok := loadCatalogTemplates(ctx, providers, formProviderDaytona, lookup, result.Template)
 	if !ok {
-		return
-	}
-	opts, err := catalog.ListTemplates(ctx)
-	if err != nil {
 		return
 	}
 	result.daytonaTemplates = opts
 	result.daytonaCatalogOK = true
-	name := strings.TrimSpace(result.Template)
-	if name == "" {
-		result.templatePreset = formPresetDefault
+	result.templatePreset = preset
+}
+
+func loadBlaxelTemplates(ctx context.Context, providers []string, lookup func(string) (sandbox.Provider, error), result *createFormResult) {
+	opts, preset, ok := loadCatalogTemplates(ctx, providers, formProviderBlaxel, lookup, result.Template)
+	if !ok {
 		return
+	}
+	result.blaxelTemplates = opts
+	result.blaxelCatalogOK = true
+	result.blaxelTemplatePreset = preset
+}
+
+// loadCatalogTemplates lists templates when provider is on the form and implements
+// the catalog. ok is false when the list is skipped or fails, so the text field stays.
+func loadCatalogTemplates(
+	ctx context.Context,
+	providers []string,
+	provider string,
+	lookup func(string) (sandbox.Provider, error),
+	current string,
+) (opts []sandbox.TemplateOption, preset string, ok bool) {
+	if !slices.Contains(providers, provider) {
+		return nil, "", false
+	}
+	p, err := lookup(provider)
+	if err != nil {
+		return nil, "", false
+	}
+	catalog, isCatalog := p.(sandbox.TemplateCatalog)
+	if !isCatalog {
+		return nil, "", false
+	}
+	listed, err := catalog.ListTemplates(ctx)
+	if err != nil {
+		return nil, "", false
+	}
+	opts, preset = seedTemplatePreset(listed, current)
+	return opts, preset, true
+}
+
+func seedTemplatePreset(opts []sandbox.TemplateOption, current string) ([]sandbox.TemplateOption, string) {
+	name := strings.TrimSpace(current)
+	if name == "" {
+		return opts, formPresetDefault
 	}
 	for _, opt := range opts {
 		if opt.Name == name {
-			result.templatePreset = name
-			return
+			return opts, name
 		}
 	}
-	result.daytonaTemplates = append(result.daytonaTemplates, sandbox.TemplateOption{Name: name, Label: name})
-	result.templatePreset = name
+	return append(opts, sandbox.TemplateOption{Name: name, Label: name}), name
 }
 
-func daytonaTemplateSelectOptions(opts []sandbox.TemplateOption) []huh.Option[string] {
+func templateSelectOptions(opts []sandbox.TemplateOption) []huh.Option[string] {
 	out := []huh.Option[string]{huh.NewOption("Provider default", formPresetDefault)}
 	for _, opt := range opts {
 		label := opt.Label
@@ -920,11 +952,17 @@ func daytonaTemplateSelectOptions(opts []sandbox.TemplateOption) []huh.Option[st
 
 func applyDaytonaTemplatePreset(result *createFormResult) {
 	if result.Provider == formProviderDaytona && result.daytonaCatalogOK {
-		result.Template = daytonaTemplateFromPreset(result.templatePreset)
+		result.Template = templateFromPreset(result.templatePreset)
 	}
 }
 
-func daytonaTemplateFromPreset(preset string) string {
+func applyBlaxelTemplatePreset(result *createFormResult) {
+	if result.Provider == formProviderBlaxel && result.blaxelCatalogOK {
+		result.Template = templateFromPreset(result.blaxelTemplatePreset)
+	}
+}
+
+func templateFromPreset(preset string) string {
 	if preset == "" || preset == formPresetDefault {
 		return ""
 	}
@@ -937,9 +975,32 @@ func daytonaTemplateSelectVisible() func(*createFormResult) bool {
 	}
 }
 
+func daytonaTemplateSelect(result *createFormResult) huh.Field {
+	return huh.NewSelect[string]().Title("Template").
+		Description("Provider default uses the Daytona image.").
+		Options(templateSelectOptions(result.daytonaTemplates)...).
+		Value(&result.templatePreset)
+}
+
+func blaxelTemplateSelect(result *createFormResult) huh.Field {
+	return huh.NewSelect[string]().Title("Template").
+		Description("Provider default uses KAXA_BLAXEL_TEMPLATE or blaxel/base-image:latest.").
+		Options(templateSelectOptions(result.blaxelTemplates)...).
+		Value(&result.blaxelTemplatePreset)
+}
+
+func blaxelTemplateSelectVisible() func(*createFormResult) bool {
+	return func(r *createFormResult) bool {
+		return r.Provider == formProviderBlaxel && r.blaxelCatalogOK
+	}
+}
+
 func templateTextVisible(capsOf func() sandbox.Capabilities) func(*createFormResult) bool {
 	return func(r *createFormResult) bool {
 		if r.Provider == formProviderDaytona && r.daytonaCatalogOK {
+			return false
+		}
+		if r.Provider == formProviderBlaxel && r.blaxelCatalogOK {
 			return false
 		}
 		return capsOf().Has(sandbox.FeatureTemplate)

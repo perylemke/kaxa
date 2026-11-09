@@ -50,6 +50,24 @@ func refuseRedirect(*http.Request, []*http.Request) error {
 	return http.ErrUseLastResponse
 }
 
+func (s *sdkClient) ListHub(ctx context.Context) ([]hubTemplate, error) {
+	got, err := s.sandboxes.GetHub(ctx)
+	if err != nil {
+		return nil, convertErr(err)
+	}
+	if got == nil {
+		return nil, nil
+	}
+	out := make([]hubTemplate, 0, len(*got))
+	for _, row := range *got {
+		out = append(out, hubTemplate{
+			Image: row.Image, DisplayName: row.DisplayName, Memory: int(row.Memory),
+			Hidden: row.Hidden, ComingSoon: row.ComingSoon,
+		})
+	}
+	return out, nil
+}
+
 func (s *sdkClient) Create(ctx context.Context, p CreateParams) (Record, error) {
 	body := sdk.SandboxNewParams{Sandbox: sdk.SandboxParam{
 		Metadata: sdk.MetadataParam{Name: p.Name, Labels: kaxaLabels(p)},

@@ -824,3 +824,129 @@ func TestCreateFormDaytonaNetworkBlockFlagSeedsYes(t *testing.T) {
 		t.Fatalf("result = %+v", got)
 	}
 }
+
+const formBlaxelCustomImage = "custom/img:v1"
+
+type formBlaxelCatalogFake struct{ formBareProvider }
+
+func (formBlaxelCatalogFake) SupportsTemplate() {}
+
+func (formBlaxelCatalogFake) ListTemplates(context.Context) ([]sandbox.TemplateOption, error) {
+	return []sandbox.TemplateOption{
+		{Name: "blaxel/base-image:latest", Label: "Base (blaxel/base-image:latest, 4096 MB)"},
+		{Name: "blaxel/py-app:latest", Label: "Python (blaxel/py-app:latest, 4096 MB)"},
+	}, nil
+}
+
+type formBlaxelEmptyCatalog struct{ formBareProvider }
+
+func (formBlaxelEmptyCatalog) SupportsTemplate() {}
+
+func (formBlaxelEmptyCatalog) ListTemplates(context.Context) ([]sandbox.TemplateOption, error) {
+	return nil, nil
+}
+
+type formBlaxelCatalogError struct{ formBareProvider }
+
+func (formBlaxelCatalogError) SupportsTemplate() {}
+
+func (formBlaxelCatalogError) ListTemplates(context.Context) ([]sandbox.TemplateOption, error) {
+	return nil, errors.New("offline")
+}
+
+func blaxelFormLookup(p sandbox.Provider) func(string) (sandbox.Provider, error) {
+	return func(name string) (sandbox.Provider, error) {
+		if name != formProviderBlaxel {
+			return nil, errors.New("unknown provider")
+		}
+		return p, nil
+	}
+}
+
+func TestCreateFormBlaxelTemplateSelect(t *testing.T) {
+	in := strings.NewReader(strings.Join([]string{"1", fixturePery, "3"}, "\n"))
+	out := new(bytes.Buffer)
+	p := formBlaxelCatalogFake{formBareProvider{name: formProviderBlaxel}}
+
+	got, err := collectCreateForm(context.Background(), in, out, []string{formProviderBlaxel}, formProviderBlaxel, blaxelFormLookup(p), createFlags{}, false)
+	if err != nil {
+		t.Fatalf("form: %v", err)
+	}
+	if got.Provider != formProviderBlaxel || got.Name != fixturePery || got.Template != "blaxel/py-app:latest" {
+		t.Fatalf("result = %+v", got)
+	}
+	view := out.String()
+	if !strings.Contains(view, "Provider default") || !strings.Contains(view, "Python (blaxel/py-app:latest, 4096 MB)") {
+		t.Fatalf("prompts = %q", view)
+	}
+	if strings.Contains(view, "Empty means the provider default.") {
+		t.Fatalf("text template field should stay hidden: %q", view)
+	}
+}
+
+func TestCreateFormBlaxelTemplateDefaultIsEmpty(t *testing.T) {
+	in := strings.NewReader(strings.Join([]string{"1", fixturePery, "1"}, "\n"))
+	out := new(bytes.Buffer)
+	p := formBlaxelCatalogFake{formBareProvider{name: formProviderBlaxel}}
+
+	got, err := collectCreateForm(context.Background(), in, out, []string{formProviderBlaxel}, formProviderBlaxel, blaxelFormLookup(p), createFlags{}, false)
+	if err != nil {
+		t.Fatalf("form: %v", err)
+	}
+	if got.Template != "" {
+		t.Fatalf("template = %q, want empty", got.Template)
+	}
+}
+
+func TestCreateFormBlaxelTemplateEmptyCatalogStillSelects(t *testing.T) {
+	in := strings.NewReader(strings.Join([]string{"1", fixturePery, "1"}, "\n"))
+	out := new(bytes.Buffer)
+	p := formBlaxelEmptyCatalog{formBareProvider{name: formProviderBlaxel}}
+
+	got, err := collectCreateForm(context.Background(), in, out, []string{formProviderBlaxel}, formProviderBlaxel, blaxelFormLookup(p), createFlags{}, false)
+	if err != nil {
+		t.Fatalf("form: %v", err)
+	}
+	if got.Template != "" {
+		t.Fatalf("template = %q, want empty", got.Template)
+	}
+	view := out.String()
+	if !strings.Contains(view, "Provider default") || strings.Contains(view, "Empty means the provider default.") {
+		t.Fatalf("prompts = %q", view)
+	}
+}
+
+func TestCreateFormBlaxelTemplateFlagOutsideCatalog(t *testing.T) {
+	in := strings.NewReader(strings.Join([]string{"1", fixturePery, "4"}, "\n"))
+	out := new(bytes.Buffer)
+	p := formBlaxelCatalogFake{formBareProvider{name: formProviderBlaxel}}
+
+	got, err := collectCreateForm(context.Background(), in, out, []string{formProviderBlaxel}, formProviderBlaxel, blaxelFormLookup(p), createFlags{Template: formBlaxelCustomImage}, false)
+	if err != nil {
+		t.Fatalf("form: %v", err)
+	}
+	if got.Template != formBlaxelCustomImage {
+		t.Fatalf("template = %q", got.Template)
+	}
+	if !strings.Contains(out.String(), formBlaxelCustomImage) {
+		t.Fatalf("prompts = %q", out.String())
+	}
+}
+
+func TestCreateFormBlaxelTemplateFallsBackToText(t *testing.T) {
+	in := strings.NewReader(strings.Join([]string{"1", fixturePery, formBlaxelCustomImage}, "\n"))
+	out := new(bytes.Buffer)
+	p := formBlaxelCatalogError{formBareProvider{name: formProviderBlaxel}}
+
+	got, err := collectCreateForm(context.Background(), in, out, []string{formProviderBlaxel}, formProviderBlaxel, blaxelFormLookup(p), createFlags{}, false)
+	if err != nil {
+		t.Fatalf("form: %v", err)
+	}
+	if got.Template != formBlaxelCustomImage {
+		t.Fatalf("template = %q", got.Template)
+	}
+	view := out.String()
+	if !strings.Contains(view, "Template") || strings.Contains(view, "blaxel/py-app:latest") || strings.Contains(view, "Provider default uses KAXA_BLAXEL_TEMPLATE") {
+		t.Fatalf("prompts = %q", view)
+	}
+}
