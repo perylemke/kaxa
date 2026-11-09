@@ -7,7 +7,7 @@ kaxa create [name]
 kaxa new [name]
 ```
 
-Without a name, a form asks for the name, provider, and the same yes/no choices as the flags. When API is yes, the form asks for the command and the port. The form uses the Dracula theme. It does not ask for `--dir`; pass that flag if you need it.
+Without a name, a wizard asks for the provider and name, then only the options that provider supports. The provider list includes only backends that have credentials set (`KAXA_*`); if none are configured, the command fails like `kaxa list`. When you pass `--provider` and that backend has credentials, the wizard lists only that provider, already selected, and shows the name field under it. Modal uses dropdowns for CPU and memory (with an **Other** line for custom values); Docker uses one **Size** dropdown for the fixed CPU and memory pairs that the Cloud Sandboxes API allows and lists the stable `docker/sandbox-templates` tags in a **Template** dropdown (Provider default uses `KAXA_DOCKER_TEMPLATE` or `docker/sandbox-templates:shell`; a `--template` value outside that list is an extra option). If that list cannot be loaded, the field stays a text input. Blaxel uses a memory dropdown with preset MiB sizes and lists the visible Hub images in a **Template** dropdown (Provider default uses `KAXA_BLAXEL_TEMPLATE` or `blaxel/base-image:latest`; a `--template` value outside that list is an extra option). If that list cannot be loaded, the field stays a text input. Daytona lists its active platform snapshots in a **Template** dropdown (Provider default leaves the Daytona image; a `--template` value outside that list is an extra option). If that list cannot be loaded, the field stays a text input. When the provider can block outbound network, the wizard also asks **Block all network**. A value you already passed with `--memory` that is not in the list appears as an extra option so the wizard matches the flag. When Sync is Yes, a Directories field opens on that same step (comma-separated paths; empty uses the current directory once). The next step asks whether to skip install. With API enabled it asks for the command, the port, and optional environment variables. The wizard uses the Dracula theme. In a terminal it occupies the alternate screen and returns a clean prompt when it finishes; only the result is printed in your scrollback. Ctrl+C cancels; the footer shows that shortcut. Flags you already passed stay as the initial answer; an empty line keeps that default.
 
 Sprites, Modal, E2B, Docker, Daytona, and Blaxel implement create. `--running` and public URLs exist only for Sprites; the others reject them with a message that names the providers that have them. API publish works on Sprites, E2B, Docker, Daytona, and Blaxel. `--sync` works on all six; see [Sync](#sync).
 
@@ -27,15 +27,22 @@ Docker sandboxes run in Docker's cloud, created through the Docker Sandboxes API
 | --- | --- |
 | `--running` | Keep the sandbox up for one hour, serve tmux on its URL, and open that URL in a browser |
 | `--sync` | Copy the current Git repository into `/home/sprite/workspace/<repo>` (Sprites) `/home/modal/workspace/<repo>` (Modal), `/home/user/workspace/<repo>` (E2B), `/home/agent/workspace/<repo>` (Docker), `/home/daytona/workspace/<repo>` (Daytona), or `/root/workspace/<repo>` (Blaxel) |
-| `--dir` | Git repository to copy. Requires `--sync`. Default: the current directory |
+| `--dir` | Comma-separated Git repositories to copy. Requires `--sync`. Default: the current directory once |
 | `--api` | Publish one HTTP service on the Sprites URL, on the E2B sandbox URL for the API port, on the Docker URL that Docker gives the published port, on the public preview URL of the API port on Daytona, or on a public preview named `kaxa-api` on Blaxel. Requires `--api-cmd` |
 | `--api-cmd` | Comma-separated argv. The first item is the binary |
 | `--api-port` | Port the process listens on. Default `8000`. `8080` is reserved when `--running` is also set |
 | `--api-env` | Environment variable for the service: `KEY=VALUE`, or `KEY` to copy the value from your shell. Repeat for more. Requires `--api` |
 | `--public` | Make the Sprites URL reachable without an account. Refused with `--running` unless `--api` is set |
 | `--template` | E2B, Docker, Daytona, and Blaxel: the template to start the sandbox from. Default: `KAXA_E2B_TEMPLATE`, `KAXA_DOCKER_TEMPLATE`, `KAXA_DAYTONA_TEMPLATE`, or `KAXA_BLAXEL_TEMPLATE`, then the base image. See [Templates on E2B](#templates-on-e2b) and [Templates on Docker](#templates-on-docker) |
+| `--cpu` | CPU cores for the sandbox (Modal and Docker; fractional values are allowed on Modal; integer-only on Docker). Omit for the provider default. Unsupported providers reject the flag |
+| `--memory` | Memory in MiB (Modal, Docker, Blaxel). Overrides `KAXA_BLAXEL_MEMORY` for that Blaxel create only. Omit for the provider default |
+| `--block-all-network-access` | Block all outbound network access from the sandbox. Daytona only. The default is off |
 
 `--api-cmd`, `--api-env`, and a changed `--api-port` require `--api`. `--dir` requires `--sync`.
+
+With `--block-all-network-access`, the sandbox cannot reach the network, so a toolchain download and `go mod download` fail. `--no-install`, or a create without `--sync`, still works. The public preview from `--api` is unchanged: the block is outbound only.
+
+`list_providers` reports `cpu`, `memory`, and `network_block` in each provider's capabilities when the backend can honor `--cpu`, `--memory`, or `--block-all-network-access`. The MCP `create_sandbox` tool accepts optional `cpu`, `memory_mib`, and `block_all_network_access` with the same rules.
 
 ## Sync
 
@@ -43,7 +50,7 @@ Docker sandboxes run in Docker's cloud, created through the Docker Sandboxes API
 
 The copy leaves out credentials: untracked files such as `.env` or `id_rsa` stop the sync with an error, and `.git/config` is stripped of URL credentials and `http.extraHeader`. See [sync](sync.md#limits).
 
-`--dir` must exist and be a directory. A relative path is resolved from the current directory. A missing path, a file, or a directory outside a Git repository fails before create.
+`--dir` lists one or more paths separated by commas (no space-only segments). Each path must exist and be a directory inside a Git repository. A relative path is resolved from the current directory. Listing the same repository twice, or two repos whose directory name would collide in `workspace/<repo>`, fails before create.
 
 ```bash
 kaxa create --sync my-sprite
@@ -95,7 +102,7 @@ kaxa expects the same layout as `base`: user `user`, home `/home/user`, workspac
 
 `--api` starts one service named `kaxa-api` after the copy. `--api-cmd` is comma-separated argv. The process must listen on `0.0.0.0` and on `--api-port`.
 
-With `--sync`, the repository must look like an HTTP API. A CLI project is rejected before the sandbox is created. `--api` without `--sync` does not inspect a local project.
+With `--sync`, every listed repository must look like an HTTP API. A CLI project is rejected before the sandbox is created. `--api` without `--sync` does not inspect a local project. The API service and reported `WorkDir` use the first repository.
 
 Create waits until `sprite-env services get kaxa-api` reports `running`, for up to 90 seconds, because Rails and the JVM start slowly. `failed` stops immediately. If the service does not become `running`, the sandbox is deleted.
 
@@ -138,7 +145,7 @@ kaxa create --provider docker --template ghcr.io/me/img:v1 --sync my-box
 export KAXA_DOCKER_TEMPLATE=ghcr.io/me/img:v1   # default for every Docker create
 ```
 
-A template is an image reference that Docker can pull. The `--template` flag wins over `KAXA_DOCKER_TEMPLATE`; without either, kaxa uses `docker/sandbox-templates:shell`, the image of the shell agent. kaxa expects the layout of the Docker agent images: user `agent`, home `/home/agent`, workspace `/home/agent/workspace`, and `tail` on `PATH`; kaxa starts the sandbox with `tail -f /dev/null` so it stays up. Another user breaks `exec`, `console`, and `--sync`, and kaxa does not detect that.
+A template is an image reference that Docker can pull. The `--template` flag wins over `KAXA_DOCKER_TEMPLATE`; without either, kaxa uses `docker/sandbox-templates:shell`, the image of the shell agent. In the wizard the Template field is a dropdown of the stable tags of `docker/sandbox-templates` (nightly builds, `latest`, and pinned versions are left out). Provider default leaves the name empty so `KAXA_DOCKER_TEMPLATE` or `docker/sandbox-templates:shell` is used. A name you already passed that is not in that list is added as an extra option. If the tag list cannot be loaded, the field is a text input. kaxa expects the layout of the Docker agent images: user `agent`, home `/home/agent`, workspace `/home/agent/workspace`, and `tail` on `PATH`; kaxa starts the sandbox with `tail -f /dev/null` so it stays up. Another user breaks `exec`, `console`, and `--sync`, and kaxa does not detect that.
 
 ### Templates on Daytona
 
@@ -147,7 +154,7 @@ kaxa create --provider daytona --template my-image --sync my-box
 export KAXA_DAYTONA_TEMPLATE=my-image   # default for every Daytona create
 ```
 
-A template is the name of a Daytona snapshot. The `--template` flag wins over `KAXA_DAYTONA_TEMPLATE`; without either, kaxa uses the Daytona default image. kaxa expects its layout: user `daytona`, home `/home/daytona`, workspace `/home/daytona/workspace`. Another user breaks `exec`, `console`, and `--sync`, and kaxa does not detect that.
+A template is the name of a Daytona snapshot. The `--template` flag wins over `KAXA_DAYTONA_TEMPLATE`; without either, kaxa uses the Daytona default image. In the wizard the Template field is a dropdown of the active platform snapshots (`general` and active). Provider default leaves the name empty so Daytona picks its image. A name you already passed that is not in that list is added as an extra option. If the snapshot list cannot be loaded, the field is a text input. kaxa expects its layout: user `daytona`, home `/home/daytona`, workspace `/home/daytona/workspace`. Another user breaks `exec`, `console`, and `--sync`, and kaxa does not detect that.
 
 ### Templates on Blaxel
 
@@ -156,7 +163,7 @@ kaxa create --provider blaxel --template blaxel/py-app:latest --sync my-box
 export KAXA_BLAXEL_TEMPLATE=blaxel/py-app:latest   # default for every Blaxel create
 ```
 
-A template is an image reference: letters, digits, and `. _ : / -`. The `--template` flag wins over `KAXA_BLAXEL_TEMPLATE`; without either, kaxa uses `blaxel/base-image:latest`. kaxa expects that image's layout: user `root`, home `/root`, workspace `/root/workspace`. Another user breaks `exec` and `--sync`, and kaxa does not detect that.
+A template is an image reference: letters, digits, and `. _ : / -`. The `--template` flag wins over `KAXA_BLAXEL_TEMPLATE`; without either, kaxa uses `blaxel/base-image:latest`. In the wizard the Template field is a dropdown of the visible Hub images (not hidden and not coming soon). Provider default leaves the name empty so `KAXA_BLAXEL_TEMPLATE` or `blaxel/base-image:latest` is used. A name you already passed that is not in that list is added as an extra option. If the Hub list cannot be loaded, the field is a text input. kaxa expects that image's layout: user `root`, home `/root`, workspace `/root/workspace`. Another user breaks `exec` and `--sync`, and kaxa does not detect that.
 
 ### API on E2B
 

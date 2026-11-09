@@ -32,7 +32,7 @@ func TestProviderIdentityAndCapabilities(t *testing.T) {
 		t.Fatal("configured provider is unavailable")
 	}
 	caps := sandbox.CapabilitiesOf(p)
-	want := sandbox.Capabilities{Sync: true, Setup: true, API: true, Layout: true, Template: true}
+	want := sandbox.Capabilities{Sync: true, Setup: true, API: true, Layout: true, Template: true, Memory: true}
 	if caps != want {
 		t.Fatalf("capabilities = %+v, want %+v", caps, want)
 	}
@@ -160,6 +160,21 @@ func TestCreateTemplateRegionAndMemory(t *testing.T) {
 	}
 	if err := p.SetMemory(-1); err == nil {
 		t.Fatal("negative memory accepted")
+	}
+}
+
+func TestCreateSpecMemoryOverridesConfiguredDefault(t *testing.T) {
+	t.Parallel()
+	api := newFakeAPI()
+	p := newTestProvider(t, api)
+	if err := p.SetMemory(8192); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.Create(t.Context(), sandbox.Spec{Name: "with-spec", MemoryMiB: 2048}); err != nil {
+		t.Fatal(err)
+	}
+	if api.lastCreate.Memory != 2048 {
+		t.Fatalf("create memory = %d, want 2048", api.lastCreate.Memory)
 	}
 }
 

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"errors"
+	"os/exec"
 	"slices"
 	"testing"
 )
@@ -45,5 +46,23 @@ func TestBrowserCommand(t *testing.T) {
 				t.Fatalf("got %q %v %v", name, args, err)
 			}
 		})
+	}
+}
+
+func TestOpenBrowserURLInvokesLauncher(t *testing.T) {
+	restore := SetBrowserExecCommandForTest(func(string, ...string) *exec.Cmd {
+		// #nosec G204 -- test double for openBrowserURL; fixed argv from browserCommand
+		return exec.Command("true")
+	})
+	t.Cleanup(restore)
+
+	if err := openBrowserURL("https://example.com/path"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestOpenBrowserURLEmptyNoOp(t *testing.T) {
+	if err := openBrowserURL(""); err != nil {
+		t.Fatal(err)
 	}
 }

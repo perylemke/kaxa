@@ -102,7 +102,7 @@ kaxa version
 export KAXA_DEFAULT_PROVIDER=sprites
 export KAXA_SPRITES_TOKEN=...   # never commit real tokens
 
-kaxa create                     # form for name, provider, running, sync, and API
+kaxa create                     # wizard for name, provider, and supported options
 kaxa create my-sprite
 kaxa create --running my-sprite  # stay up for 1 hour and open a tmux terminal in the browser
 kaxa create --sync my-sprite     # copy this git repository into /home/sprite/workspace/<repo>
@@ -112,6 +112,7 @@ kaxa create --provider e2b --template big --sync my-box   # E2B: start from your
 kaxa create --provider docker --sync my-box   # same, on Docker's cloud, into /home/agent/workspace/<repo>
 kaxa create --provider daytona --sync my-box  # same, on Daytona, into /home/daytona/workspace/<repo>
 kaxa create --provider blaxel --sync my-box   # same, on Blaxel, into /root/workspace/<repo>
+kaxa create --provider modal --cpu 2 --memory 8192 my-box   # optional CPU and memory (MiB); omit for defaults
 kaxa create --sync --dir ~/projects/api-python my-sprite
 kaxa create --sync --api --public --api-cmd .venv/bin/uvicorn,app.main:app,--host,0.0.0.0,--port,8000 my-sprite
 kaxa new my-sprite               # alias of create
@@ -158,9 +159,10 @@ You can pass `--provider sprites` instead of `KAXA_DEFAULT_PROVIDER`.
 `create` labels the sandbox `kaxa`.
 
 - `--running` keeps the sandbox up for one hour, serves tmux on its URL, and opens that URL.
-- `--sync` copies the Git repository, including `.git` and excluding ignored files, into `/home/sprite/workspace/<repo>` (Sprites) `/home/modal/workspace/<repo>` (Modal, as the `modal` user), `/home/user/workspace/<repo>` (E2B, as `user`), `/home/agent/workspace/<repo>` (Docker, as `agent`), `/home/daytona/workspace/<repo>` (Daytona, as `daytona`), or `/root/workspace/<repo>` (Blaxel, as `root`). `--dir` selects another repository. A subdirectory still copies the whole repository. Credentials in `.git/config` are removed, and untracked secret files such as `.env` or `*.pem` stop the copy; see [sync](docs/sync.md). The root selects Go (`go mod download`), Rust, Python, Node, Ruby (`Gemfile`), and Clojure (`deps.edn`); missing tools are installed, then project dependencies. `--no-install` copies the repository and skips the toolchain and the dependency commands. A failed copy or install deletes the sandbox.
+- `--sync` copies one or more Git repositories, each including `.git` and excluding ignored files, into `/home/sprite/workspace/<repo>` (Sprites) `/home/modal/workspace/<repo>` (Modal, as the `modal` user), `/home/user/workspace/<repo>` (E2B, as `user`), `/home/agent/workspace/<repo>` (Docker, as `agent`), `/home/daytona/workspace/<repo>` (Daytona, as `daytona`), or `/root/workspace/<repo>` (Blaxel, as `root`). `--dir` is a comma-separated list of repo paths (default: current directory once). A subdirectory still copies the whole repository. Duplicates or two repos with the same directory name are rejected. Credentials in `.git/config` are removed, and untracked secret files such as `.env` or `*.pem` stop the copy; see [sync](docs/sync.md). The root selects Go (`go mod download`), Rust, Python, Node, Ruby (`Gemfile`), and Clojure (`deps.edn`); missing tools are installed, then project dependencies. `--no-install` copies the repository and skips the toolchain and the dependency commands. A failed copy or install deletes the sandbox.
 - `--api` publishes one HTTP service on the Sprites URL, on `https://<port>-<id>.e2b.app` on E2B, where `--api` is what makes that port public, on the URL that Docker gives the published port on Docker, on the public preview URL of the API port on Daytona, or on a public preview named `kaxa-api` on Blaxel. `--api-cmd` is comma-separated argv, and the process must listen on `0.0.0.0` and on `--api-port` (8000 by default). With `--sync`, the repository must be an HTTP API; a CLI project is rejected before create. Create waits until the service is running, for up to 90 seconds, and deletes the sandbox if it does not. With `--running`, port `8080` stays with tmux and the URL forwards to the API. `--api-env KEY=VALUE` or `--api-env KEY` (value copied from your shell) sets service variables; see [create](docs/create.md). Names starting with `KAXA_`, `MODAL_TOKEN_`, `FLY_`, or `SPRITES_` are rejected.
-- `--template` (E2B, Docker, Daytona, and Blaxel) starts the sandbox from a template. On E2B it is one you built with the E2B CLI or SDK and must keep the `base` layout (user `user`); `KAXA_E2B_TEMPLATE` sets a default. On Docker it is an image reference that keeps the agent layout (user `agent`); `KAXA_DOCKER_TEMPLATE` sets a default. On Daytona it is a snapshot name that keeps the `daytona` user layout; `KAXA_DAYTONA_TEMPLATE` sets a default. On Blaxel it is an image reference that keeps user `root` and home `/root`; `KAXA_BLAXEL_TEMPLATE` sets a default. See [docs/create.md](docs/create.md#templates-on-e2b).
+- `--block-all-network-access` (Daytona) blocks all outbound network from the sandbox. A toolchain download and `go mod download` fail while it is on; `--no-install` or a create without `--sync` still works. Other providers reject the flag.
+- `--template` (E2B, Docker, Daytona, and Blaxel) starts the sandbox from a template. On E2B it is one you built with the E2B CLI or SDK and must keep the `base` layout (user `user`); `KAXA_E2B_TEMPLATE` sets a default. On Docker it is an image reference that keeps the agent layout (user `agent`); `KAXA_DOCKER_TEMPLATE` sets a default, and the create wizard lists the stable `docker/sandbox-templates` tags in a dropdown. On Daytona it is a snapshot name that keeps the `daytona` user layout; `KAXA_DAYTONA_TEMPLATE` sets a default, and the create wizard lists the active platform snapshots in a dropdown. On Blaxel it is an image reference that keeps user `root` and home `/root`; `KAXA_BLAXEL_TEMPLATE` sets a default, and the create wizard lists the visible Hub images in a dropdown. See [docs/create.md](docs/create.md#templates-on-e2b).
 - `--public` makes that URL reachable without a Sprites account. A failed auth change leaves the sandbox in place. Change it later with `kaxa url <name> public` or `kaxa url <name> sprite`. Only the sprites provider accepts `url`. `--public` is refused with `--running` and no `--api`, because that URL serves a tmux terminal with no login.
 
 ### exec and console
@@ -169,7 +171,7 @@ On a sandbox created with `--sync`, `exec` and `console` start in `/home/sprite/
 
 ### sync
 
-`sync` adds another Git repository to a sandbox created with `--sync`, then installs its dependencies like `create --sync`. A sandbox created without `--sync` is rejected, and so is a repository that is already in the sandbox; `sync` never replaces a directory. A failed copy or install keeps the sandbox. See [sync](docs/sync.md).
+`sync` adds one or more Git repositories to a sandbox created with `--sync`, then installs their dependencies like `create --sync`. `--dir` is a comma-separated list; a path that does not exist is rejected before anything is copied. A sandbox created without `--sync` is rejected, and so is a repository that is already in the sandbox; `sync` never replaces a directory. A failed copy or install keeps the sandbox. See [sync](docs/sync.md).
 
 ### list
 

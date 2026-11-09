@@ -28,7 +28,7 @@ func TestProviderIdentityAndCapabilities(t *testing.T) {
 	caps := sandbox.CapabilitiesOf(p)
 	want := sandbox.Capabilities{
 		Sync: true, Setup: true, API: true, Layout: true, Restart: true, Template: true,
-		Snapshot: true, SnapshotRestore: string(sandbox.RestoreNewSandbox),
+		NetworkBlock: true, Snapshot: true, SnapshotRestore: string(sandbox.RestoreNewSandbox),
 	}
 	if caps != want {
 		t.Fatalf("capabilities = %+v, want %+v", caps, want)
@@ -140,6 +140,22 @@ func TestCreateAPIPortOnlyWithExposeAPI(t *testing.T) {
 	withAPI, _ := api.Find(t.Context(), "api")
 	if plain.APIPort != 0 || withAPI.APIPort != 8000 {
 		t.Fatalf("ports = %d, %d", plain.APIPort, withAPI.APIPort)
+	}
+}
+
+func TestCreatePassesNetworkBlock(t *testing.T) {
+	t.Parallel()
+	p, api := newTestProvider(t, newFakeToolbox(okHandler))
+	if _, err := p.Create(t.Context(), sandbox.Spec{Name: "open"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.Create(t.Context(), sandbox.Spec{Name: "closed", NetworkBlockAll: true}); err != nil {
+		t.Fatal(err)
+	}
+	open, _ := api.Find(t.Context(), "open")
+	closed, _ := api.Find(t.Context(), "closed")
+	if open.NetworkBlockAll || !closed.NetworkBlockAll {
+		t.Fatalf("network block = %v, %v", open.NetworkBlockAll, closed.NetworkBlockAll)
 	}
 }
 

@@ -23,6 +23,9 @@ const (
 	FeatureRunning           Feature = "running"
 	FeatureTemplate          Feature = "template"
 	FeatureSnapshot          Feature = "snapshot"
+	FeatureCPU               Feature = "cpu"
+	FeatureMemory            Feature = "memory"
+	FeatureNetworkBlock      Feature = "network block"
 )
 
 // UnsupportedError reports that a provider does not offer a feature.
@@ -71,16 +74,19 @@ func IsAvailable(p Provider) bool {
 
 // Capabilities lists the optional features a provider implements.
 type Capabilities struct {
-	Sync      bool `json:"sync"`
-	Setup     bool `json:"setup"`
-	API       bool `json:"api"`
-	PublicURL bool `json:"public_url"`
-	Layout    bool `json:"workspace_layout"`
-	Restart   bool `json:"restart"`
-	Upgrade   bool `json:"upgrade"`
-	Running   bool `json:"running"`
-	Template  bool `json:"template"`
-	Snapshot  bool `json:"snapshot"`
+	Sync         bool `json:"sync"`
+	Setup        bool `json:"setup"`
+	API          bool `json:"api"`
+	PublicURL    bool `json:"public_url"`
+	Layout       bool `json:"workspace_layout"`
+	Restart      bool `json:"restart"`
+	Upgrade      bool `json:"upgrade"`
+	Running      bool `json:"running"`
+	Template     bool `json:"template"`
+	CPU          bool `json:"cpu"`
+	Memory       bool `json:"memory"`
+	NetworkBlock bool `json:"network_block"`
+	Snapshot     bool `json:"snapshot"`
 	// SnapshotRestore is the RestoreMode of a provider that has Snapshot.
 	SnapshotRestore string `json:"snapshot_restore,omitempty"`
 }
@@ -98,6 +104,12 @@ func (c Capabilities) Has(feature Feature) bool {
 		return c.Template
 	case FeatureSnapshot:
 		return c.Snapshot
+	case FeatureCPU:
+		return c.CPU
+	case FeatureMemory:
+		return c.Memory
+	case FeatureNetworkBlock:
+		return c.NetworkBlock
 	case FeatureSync:
 		return c.Sync
 	case FeatureDependencyInstall:
@@ -122,9 +134,13 @@ func CapabilitiesOf(p Provider) Capabilities {
 	_, upgrade := p.(Upgrader)
 	_, running := p.(RunningSupport)
 	_, template := p.(TemplateSupport)
+	_, cpu := p.(CPUSupport)
+	_, memory := p.(MemorySupport)
+	_, networkBlock := p.(NetworkBlockSupport)
 	caps := Capabilities{
 		Sync: sync, Setup: setup, API: api, PublicURL: public, Layout: layout,
 		Restart: restart, Upgrade: upgrade, Running: running, Template: template,
+		CPU: cpu, Memory: memory, NetworkBlock: networkBlock,
 	}
 	if s, ok := p.(Snapshotter); ok {
 		caps.Snapshot = true

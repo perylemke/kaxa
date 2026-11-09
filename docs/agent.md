@@ -68,14 +68,14 @@ After the server is connected, ask the agent to call `list_providers`. Sprites, 
 | Modal | create (with `sync`), list, inspect, exec, snapshots, destroy | `sync`, `setup`, `workspace_layout`, `snapshot` |
 | E2B | create (with `sync` and `api`), list, inspect, exec, restart, destroy | `sync`, `setup`, `api`, `workspace_layout`, `restart` |
 | Docker | create (with `sync`, `template`, and `api`), list, inspect, exec, restart, snapshots, destroy | `sync`, `setup`, `api`, `workspace_layout`, `restart`, `template`, `snapshot` |
-| Daytona | create (with `sync`, `template`, and `api`), list, inspect, exec, restart, snapshots, destroy | `sync`, `setup`, `api`, `workspace_layout`, `restart`, `template`, `snapshot` |
+| Daytona | create (with `sync`, `template`, `api`, and `block_all_network_access`), list, inspect, exec, restart, snapshots, destroy | `sync`, `setup`, `api`, `workspace_layout`, `restart`, `template`, `network_block`, `snapshot` |
 | Blaxel | create (with `sync`, `template`, and `api`), list, inspect, exec, console, sync, destroy | `sync`, `setup`, `api`, `workspace_layout`, `template` |
 
 What to expect from `exec` and the other tools on each provider:
 
 - **Modal:** commands start in the image root. A sandbox created with `sync` runs them as the `modal` user in `/home/modal/workspace`.
 - **E2B:** commands run as `user`, starting in `/home/user`, or in `/home/user/workspace` when the sandbox was created with `sync`. The toolchain `PATH` is set either way, and every sandbox has a workspace, so `sync_repository` works without `sync` at create time.
-- **Daytona:** it works through the Daytona API. Set `KAXA_DAYTONA_API_KEY` in the environment of `kaxa mcp`, and `KAXA_DAYTONA_TEMPLATE` for a default template. Commands run as `daytona`, starting where the image starts, or in `/home/daytona/workspace` when the sandbox was created with `sync`. The toolchain `PATH` is set either way, and every sandbox has a workspace. `api` makes one port public on a preview URL, and anyone with the URL can call it. A Daytona sandbox is billed to your Daytona account while it runs.
+- **Daytona:** it works through the Daytona API. Set `KAXA_DAYTONA_API_KEY` in the environment of `kaxa mcp`, and `KAXA_DAYTONA_TEMPLATE` for a default template. Commands run as `daytona`, starting where the image starts, or in `/home/daytona/workspace` when the sandbox was created with `sync`. The toolchain `PATH` is set either way, and every sandbox has a workspace. `api` makes one port public on a preview URL, and anyone with the URL can call it. `block_all_network_access` blocks every outbound connection; toolchain downloads then fail, while a public preview URL still accepts inbound calls. A Daytona sandbox is billed to your Daytona account while it runs.
 - **Blaxel:** it works through the Blaxel API. Set `KAXA_BLAXEL_API_KEY` and `KAXA_BLAXEL_WORKSPACE` in the environment of `kaxa mcp`. `KAXA_BLAXEL_TEMPLATE`, `KAXA_BLAXEL_REGION`, and `KAXA_BLAXEL_MEMORY` are optional. Commands run as `root`, starting in `/root`, or in `/root/workspace` when the sandbox was created with `sync`. The toolchain `PATH` is set either way, and every sandbox has a workspace. `console` attaches to the terminal the sandbox starts, in that same directory. `api` opens a public preview named `kaxa-api`, and anyone with the URL can call it. A Blaxel sandbox is billed to your workspace while it runs.
 - **Docker:** it works through the Docker Sandboxes API. Set `KAXA_DOCKER_ID` and `KAXA_DOCKER_PAT` in the environment of `kaxa mcp`, and `KAXA_DOCKER_TEMPLATE` for a default template. Commands run as `agent`, starting where the image starts, or in `/home/agent/workspace` when the sandbox was created with `sync`. The toolchain `PATH` is set either way, and every sandbox has a workspace. `api` publishes one HTTP service on a URL that Docker chooses, and anyone with the URL can call it. A Docker sandbox is billed to your Docker subscription while it runs.
 
@@ -240,6 +240,7 @@ Call this first. A provider is `available: false` when it cannot serve requests 
 | `upgrade` | `upgrade` |
 | `running` | `create_sandbox` with `running` |
 | `template` | `create_sandbox` with `template` (E2B) |
+| `network_block` | `create_sandbox` with `block_all_network_access` (Daytona) |
 | `workspace_layout` | `work_dir` in the result, and the default directory of `publish_api` |
 | `snapshot` | `create_snapshot`, `list_snapshots`, `restore_snapshot`, and `delete_snapshot` |
 | `snapshot_restore` | Not a flag: `in_place` or `new_sandbox`, set when `snapshot` is true. It decides how `restore_snapshot` behaves |
@@ -260,6 +261,7 @@ A request that needs a missing capability fails before anything is created, with
 | `api_port` | Port the service listens on. Default `8000`. `8080` is reserved with `running` |
 | `api_env` | Service environment as a list. Each item is `KEY=VALUE`, or `KEY` to copy the value from the server environment, but only for names the user listed in `KAXA_MCP_API_ENV`. No commas in values. `HOME`, `USER`, `PATH`, and names that start with `KAXA_`, `MODAL_TOKEN_`, `FLY_`, or `SPRITES_` are reserved. Requires `api` |
 | `public` | Make the URL reachable without a provider account. Refused with `running` unless `api` is set, because the tmux terminal has no login |
+| `block_all_network_access` | Block all outbound network access. Daytona only. Toolchain downloads fail while it is on |
 
 The result has `id`, `provider`, `work_dir`, `url` and `auth`. `work_dir` is where the repository lives inside the sandbox and is set only with `sync`. Use it instead of assuming a path.
 

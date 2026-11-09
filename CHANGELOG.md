@@ -10,11 +10,22 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 
 ### Changed
 
+- `kaxa create --help` names Blaxel for `--api` and `--template`, with the other providers that accept those flags.
+- The `kaxa create` wizard lists the stable tags of `docker/sandbox-templates` in a Template dropdown. Nightly builds, `latest`, and pinned versions are left out. Provider default uses `KAXA_DOCKER_TEMPLATE` or `docker/sandbox-templates:shell`. A `--template` value outside that list is added as an extra option. If the list cannot be loaded, the field stays a text input. The flag and MCP still take an image reference.
+- The `kaxa create` wizard lists Blaxel's visible Hub images in a Template dropdown. Provider default uses `KAXA_BLAXEL_TEMPLATE` or `blaxel/base-image:latest`. A `--template` value outside that list is added as an extra option. If the list cannot be loaded, the field stays a text input. The flag and MCP still take an image reference.
+- `kaxa create --block-all-network-access` and the Daytona create wizard block all outbound network from a new sandbox. The default stays off. Other providers reject the flag. Toolchain downloads and `go mod download` fail while it is on; `--no-install` or a create without `--sync` still works. The MCP field is `block_all_network_access`.
+- The `kaxa create` wizard lists Daytona's active platform snapshots in a Template dropdown. Provider default leaves the Daytona image. A `--template` value outside that list is added as an extra option. If the list cannot be loaded, the field stays a text input. The flag and MCP still take a snapshot name.
+- `kaxa create --sync` and the create wizard accept comma-separated `--dir` paths so multiple Git repositories copy into the workspace; the first is still used for `--api` and the reported work directory. In the wizard, choosing Sync opens the Directories field on the same step. Duplicate paths or two repos with the same workspace name are rejected before create.
+- `kaxa sync --dir` accepts the same comma-separated list and copies each repository. A path that does not exist fails with `directory "<path>" does not exist` before anything is copied.
+- The `kaxa create` wizard lists only providers that have credentials; the default option is the first available when `KAXA_DEFAULT_PROVIDER` is unset or does not match a configured backend. With `--provider`, the wizard lists only that provider when it is configured, with that provider selected, and shows the name field under it.
+- Agent and contributor docs (`.cursor/rules`, `.claude/rules`, `CLAUDE.md`) now state that `make test` and `make coverage` must pass before commit or push, and that Go packages touched in a change should keep at least 90% statement coverage.
+- `kaxa create` without a name uses a provider-aware wizard: after you choose the provider, the form only asks for options that provider supports, then sync and API details when those are enabled. In a terminal it runs on the alternate screen so the wizard does not mix with scrollback. Ctrl+C cancels, and the footer shows that shortcut. Where the provider supports it, CPU and memory are chosen from preset lists (Modal includes **Other** for custom values; Docker uses one size for the API’s fixed pairs; Blaxel lists preset memory sizes and adds an extra option when `--memory` is outside that list).
 - `kaxa list` detail view shows provider-specific fields from each backend's GET, and the help line lists only the keys that provider supports. An unsupported key stays on the detail screen with the same message as the standalone command.
 - `--no-install` on `kaxa sync` and `kaxa create --sync`, and `no_install` on the MCP `sync_repository` and `create_sandbox`, copies the repository and skips the toolchain install as well as the dependency commands. The dependency commands are still printed for you to run.
 
 ### Fixed
 
+- `kaxa create` wizard no longer inserts large blank gaps between visible fields when other provider-specific fields are hidden.
 - `kaxa list` on Docker accepts `memoryMib` in list responses as a number or a string, so listing no longer fails when the API returns quoted values.
 - Toolchain downloads install `curl` when the sandbox image does not have it, using `apt-get` or `apk`. An image that already has `curl` skips that step.
 - `kaxa exec` on Blaxel prints the command output. A short command no longer finishes before the log stream attaches, and a streamed line keeps its newline.
@@ -22,6 +33,7 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 
 ### Added
 
+- `kaxa create --cpu` and `--memory` (MiB), optional fields in the create wizard, and MCP `create_sandbox` fields `cpu` and `memory_mib` request compute for Modal (fractional CPU), Docker (integer CPU; rejected pairs surface as provider errors), and memory for Blaxel (overrides `KAXA_BLAXEL_MEMORY` for that create). `list_providers` capabilities include `cpu` and `memory` when supported.
 - `kaxa list` detail view: press `c` to open the same interactive shell as `kaxa console` for that row; when the shell closes, list returns to the table on that sandbox.
 - `KAXA_MCP_ROOT` bounds which repositories `kaxa mcp` may copy. `kaxa mcp init --root` and `kaxa mcp config --root` write it into the client entry for every agent. Without `--root`, the command uses its current directory and refuses your home directory and `/`.
 - Blaxel sandboxes as the `blaxel` provider, through the official Blaxel Go SDK, with `KAXA_BLAXEL_API_KEY` and `KAXA_BLAXEL_WORKSPACE`. It supports create (with `--sync`, `--template`, and `--api`), list, exec, console, sync, and destroy. The default image is `blaxel/base-image:latest` (user `root`, workspace `/root/workspace/<repo>`), the default region is `us-pdx-1`, and the default memory is 4096 MB. `create --api` starts an HTTP service and publishes a public preview named `kaxa-api`. `console` attaches to the terminal the sandbox starts, follows window resizing, and ends after 15 minutes without input. Restart, upgrade, snapshots, and `--running` are not available.

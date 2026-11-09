@@ -61,7 +61,7 @@ type Process interface {
 type sdkClient interface {
 	// Create starts a sandbox. withTools picks the image with a build toolchain and
 	// the modal user, used by --sync; Modal builds it once and caches it.
-	Create(ctx context.Context, name string, labels []string, withTools bool) (Record, error)
+	Create(ctx context.Context, name string, labels []string, withTools bool, cpu float64, memoryMiB int) (Record, error)
 	List(ctx context.Context) ([]Record, error)
 	Get(ctx context.Context, name string) (Record, error)
 	Terminate(ctx context.Context, name string) error
@@ -102,22 +102,29 @@ func newSDKClient(tokenID, tokenSecret string) (*realSDKClient, error) {
 
 func (r *realSDKClient) Close() { r.c.Close() }
 
-func (r *realSDKClient) Create(ctx context.Context, name string, labels []string, withTools bool) (Record, error) {
-	return r.create(ctx, name, labels, r.image(withTools))
+func (r *realSDKClient) Create(ctx context.Context, name string, labels []string, withTools bool, cpu float64, memoryMiB int) (Record, error) {
+	return r.create(ctx, name, labels, r.image(withTools), cpu, memoryMiB)
 }
 
-func (r *realSDKClient) create(ctx context.Context, name string, labels []string, image *sdk.Image) (Record, error) {
+func (r *realSDKClient) create(ctx context.Context, name string, labels []string, image *sdk.Image, cpu float64, memoryMiB int) (Record, error) {
 	app, err := r.c.Apps.FromName(ctx, appName, &sdk.AppFromNameParams{CreateIfMissing: true})
 	if err != nil {
 		return Record{}, err
 	}
-	sb, err := r.c.Sandboxes.Create(ctx, app, image, &sdk.SandboxCreateParams{
+	params := &sdk.SandboxCreateParams{
 		Name:        name,
 		Tags:        tagsFor(name, labels),
 		Command:     []string{"sleep", "infinity"},
 		Timeout:     sandboxTimeout,
 		IdleTimeout: idleTimeout,
-	})
+	}
+	if cpu != 0 {
+		params.CPU = cpu
+	}
+	if memoryMiB != 0 {
+		params.MemoryMiB = memoryMiB
+	}
+	sb, err := r.c.Sandboxes.Create(ctx, app, image, params)
 	if err != nil {
 		if _, exists := errors.AsType[sdk.AlreadyExistsError](err); exists {
 			return Record{}, ErrAlreadyExists

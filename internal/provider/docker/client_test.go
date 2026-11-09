@@ -419,4 +419,11 @@ func TestNewCreateBodyKeepsLabelsApart(t *testing.T) {
 	if len(b.Labels) != 2 || b.Labels[managedLabel] != labelTrue || b.Labels[labelPrefix+"a"] != labelTrue {
 		t.Fatalf("labels = %v", b.Labels)
 	}
+	if b.Resources.CPUs != 2 || b.Resources.MemoryMiB != 4096 {
+		t.Fatalf("defaults = %+v", b.Resources)
+	}
+	b2 := newCreateBody(CreateParams{Name: testSandbox, Image: "img", CPUs: 8, MemoryMiB: 16384})
+	if b2.Resources.CPUs != 8 || b2.Resources.MemoryMiB != 16384 {
+		t.Fatalf("override = %+v", b2.Resources)
+	}
 }

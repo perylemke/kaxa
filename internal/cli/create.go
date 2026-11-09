@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
+	"slices"
 
 	"github.com/spf13/cobra"
 
@@ -24,6 +24,9 @@ func newCreateCmd(reg *registry.Registry) *cobra.Command {
 	var apiEnv []string
 	var publicURL bool
 	var template string
+	var cpu float64
+	var memoryMiB int
+	var networkBlockAll bool
 
 	cmd := &cobra.Command{
 		Use:     "create [name]",
@@ -31,13 +34,14 @@ func newCreateCmd(reg *registry.Registry) *cobra.Command {
 		Short:   "Create a sandbox",
 		Long: `Create a sandbox on the selected provider.
 
---sync copies this Git repository into /home/sprite/workspace/<repo> on Sprites, /home/modal/workspace/<repo> on Modal, /home/user/workspace/<repo> on E2B, /home/agent/workspace/<repo> on Docker, or /home/daytona/workspace/<repo> on Daytona, and installs Go, Rust, Python, Node, Ruby (Gemfile), or Clojure (deps.edn) dependencies found at the root. --dir selects that repository; without it, sync uses the current directory. A subdirectory still copies the whole Git repository. A failed copy or install deletes the sandbox.
+--sync copies one or more Git repositories into workspace/<repo> on the provider and installs Go, Rust, Python, Node, Ruby (Gemfile), or Clojure (deps.edn) dependencies found at each root. --dir is comma-separated paths; without it, sync uses the current directory once. A subdirectory still copies the whole Git repository. Duplicates or two repos with the same directory name are rejected. A failed copy or install deletes the sandbox.
 --running keeps the sandbox up for one hour and opens a tmux session on its URL.
---api publishes one HTTP service on that URL after the copy. It requires --api-cmd and works with Sprites, E2B, Docker, and Daytona. With --sync, the repository must be an HTTP API; a CLI project is rejected before the sandbox is created. The process must listen on 0.0.0.0 and on --api-port (8000 unless you change it). Together with --running, port 8080 stays with tmux and the URL forwards to the API. A failed publish deletes the sandbox. Create waits until the service is running. If it fails or does not become running within 90s, the sandbox is deleted.
+--api publishes one HTTP service on that URL after the copy. It requires --api-cmd and works with Sprites, E2B, Docker, Daytona, and Blaxel. With --sync, the repository must be an HTTP API; a CLI project is rejected before the sandbox is created. The process must listen on 0.0.0.0 and on --api-port (8000 unless you change it). Together with --running, port 8080 stays with tmux and the URL forwards to the API. A failed publish deletes the sandbox. Create waits until the service is running. If it fails or does not become running within 90s, the sandbox is deleted.
 --api-env sets a variable for that service: KEY=VALUE, or KEY to copy the value from your shell so a secret stays out of the command line. Repeat it for more variables. Values cannot contain commas. HOME, USER, PATH, and KAXA_ names are reserved.
 --public makes the Sprites URL reachable without an account. A failed auth change leaves the sandbox in place.
---template starts a sandbox from a template. On E2B it is a template you built with the E2B CLI or SDK, for example one with more memory, and it must have the same user and home as the base template (user, /home/user); without it, kaxa uses KAXA_E2B_TEMPLATE, then base. On Docker it is an image reference that Docker can pull, and it must have the same user and home as the Docker agent images (agent, /home/agent); without it, kaxa uses KAXA_DOCKER_TEMPLATE, then the image of the shell agent. On Daytona it is an image (or snapshot name) that Daytona can start, and it must have the same user and home as the Daytona default image (daytona, /home/daytona); without it, kaxa uses KAXA_DAYTONA_TEMPLATE, then the Daytona default.
-Without a name, the form asks for the same choices. When API is yes, it asks for the command and the port.`,
+--template starts a sandbox from a template. On E2B it is a template you built with the E2B CLI or SDK, for example one with more memory, and it must have the same user and home as the base template (user, /home/user); without it, kaxa uses KAXA_E2B_TEMPLATE, then base. On Docker it is an image reference that Docker can pull, and it must have the same user and home as the Docker agent images (agent, /home/agent); without it, kaxa uses KAXA_DOCKER_TEMPLATE, then the image of the shell agent. On Daytona it is an image (or snapshot name) that Daytona can start, and it must have the same user and home as the Daytona default image (daytona, /home/daytona); without it, kaxa uses KAXA_DAYTONA_TEMPLATE, then the Daytona default. On Blaxel it is an image reference that must keep the same user and home as blaxel/base-image:latest (root, /root); without it, kaxa uses KAXA_BLAXEL_TEMPLATE, then blaxel/base-image:latest.
+--cpu and --memory request compute for the sandbox (empty means the provider default). Modal accepts fractional CPU and memory in MiB; Docker accepts both with integer CPU only; Blaxel accepts memory only. Other providers reject these flags.
+Without a name, a wizard asks for the provider and name, then only the options that provider supports, then sync and API details when those are enabled. In a terminal it uses the alternate screen so the form does not mix with your scrollback; only the result is printed when it finishes.`,
 		Example: `  kaxa create --sync my-sprite
   kaxa create --sync --dir ~/projects/api-python my-sprite
   kaxa create --sync --api --public --api-cmd .venv/bin/uvicorn,app.main:app,--host,0.0.0.0,--port,8000 my-sprite
@@ -59,21 +63,27 @@ Without a name, the form asks for the same choices. When API is yes, it asks for
 				APIEnv:    apiEnv,
 				Public:    publicURL,
 
-				Template: template,
+				Template:        template,
+				CPU:             cpu,
+				MemoryMiB:       memoryMiB,
+				NetworkBlockAll: networkBlockAll,
 			})
 		},
 	}
 	cmd.Flags().BoolVar(&keepRunning, "running", false, "keep the sandbox running for 1 hour and open a tmux terminal in the browser")
 	cmd.Flags().BoolVar(&syncWorkspace, "sync", false, "copy the local git repository into the sandbox workspace")
 	cmd.Flags().BoolVar(&noInstall, "no-install", false, "with --sync, copy the repository and skip the toolchain and dependency installs")
-	cmd.Flags().StringVar(&syncDir, "dir", "", "git repository to copy with --sync (default: current directory)")
-	cmd.Flags().BoolVar(&exposeAPI, "api", false, "publish an HTTP service on the sandbox URL (requires --api-cmd; Sprites, E2B, Docker and Daytona)")
+	cmd.Flags().StringVar(&syncDir, "dir", "", "comma-separated git repo paths to copy with --sync (default: current directory once)")
+	cmd.Flags().BoolVar(&exposeAPI, "api", false, "publish an HTTP service on the sandbox URL (requires --api-cmd; Sprites, E2B, Docker, Daytona, and Blaxel)")
 	cmd.Flags().StringVar(&apiCmd, "api-cmd", "", "comma-separated argv; first item is the binary (example: .venv/bin/uvicorn,app.main:app,--host,0.0.0.0,--port,8000)")
 	cmd.Flags().IntVar(&apiPort, "api-port", defaultAPIPort, "port for --api; the process must listen on 0.0.0.0 (8080 is reserved with --running)")
 	cmd.Flags().StringArrayVar(&apiEnv, "api-env", nil, "environment variable for the --api service: KEY=VALUE, or KEY to copy it from this shell; repeat for more (no commas in values)")
-	cmd.Flags().StringVar(&template, "template", "", "template to start the sandbox from (E2B, Docker and Daytona; default: KAXA_E2B_TEMPLATE, KAXA_DOCKER_TEMPLATE or KAXA_DAYTONA_TEMPLATE, then base)")
+	cmd.Flags().StringVar(&template, "template", "", "template to start the sandbox from (E2B, Docker, Daytona, and Blaxel; default: KAXA_E2B_TEMPLATE, KAXA_DOCKER_TEMPLATE, KAXA_DAYTONA_TEMPLATE, or KAXA_BLAXEL_TEMPLATE, then the base image)")
 	cmd.Flags().BoolVar(&publicURL, "public", false, "make the Sprites URL reachable without authentication")
-	markProviderFlags(cmd, "running", "api", "api-cmd", "api-port", "api-env", "template", "public")
+	cmd.Flags().Float64Var(&cpu, "cpu", 0, "CPU cores for the sandbox (Modal and Docker; fractional on Modal; omit for the provider default)")
+	cmd.Flags().IntVar(&memoryMiB, "memory", 0, "memory for the sandbox in MiB (Modal, Docker, Blaxel; omit for the provider default)")
+	cmd.Flags().BoolVar(&networkBlockAll, "block-all-network-access", false, "block all outbound network access from the sandbox (Daytona)")
+	markProviderFlags(cmd, "running", "api", "api-cmd", "api-port", "api-env", "template", "public", "cpu", "memory", "block-all-network-access")
 	return cmd
 }
 
@@ -106,7 +116,13 @@ func cancelledOrErr(cmd *cobra.Command, err error) error {
 
 func resolveCreateRequest(cmd *cobra.Command, reg *registry.Registry, args []string, flags createFlags, portSet bool) (createRequest, error) {
 	if len(args) == 1 {
-		req := createRequest{Name: args[0], Running: flags.Running, Sync: flags.Sync, Template: flags.Template, NoInstall: flags.NoInstall}
+		if err := validateCreateComputeFlags(flags.CPU, flags.MemoryMiB); err != nil {
+			return createRequest{}, err
+		}
+		req := createRequest{
+			Name: args[0], Running: flags.Running, Sync: flags.Sync, Template: flags.Template, NoInstall: flags.NoInstall,
+			CPU: flags.CPU, MemoryMiB: flags.MemoryMiB, NetworkBlockAll: flags.NetworkBlockAll,
+		}
 		if err := applyAPIFlags(&req, flags, portSet); err != nil {
 			return createRequest{}, err
 		}
@@ -116,30 +132,50 @@ func resolveCreateRequest(cmd *cobra.Command, reg *registry.Registry, args []str
 	if err != nil {
 		return createRequest{}, err
 	}
-	form, err := collectCreateForm(cmd.InOrStdin(), cmd.ErrOrStderr(), reg.Names(), cfg.Provider, flags)
+	_, providerNames, err := lifecycle.ListTargets(reg, cfg)
+	if err != nil {
+		return createRequest{}, err
+	}
+	if cmd.Flags().Changed("provider") && !slices.Contains(providerNames, cfg.Provider) {
+		if _, err := lifecycle.ResolveProvider(reg, cfg, cfg.Provider); err != nil {
+			return createRequest{}, err
+		}
+	}
+	defaultProvider := cfg.Provider
+	if !slices.Contains(providerNames, defaultProvider) {
+		defaultProvider = providerNames[0]
+		cfg.Provider = defaultProvider
+		cmd.SetContext(withConfig(cmd.Context(), cfg))
+	}
+	wizardProviders := providerNames
+	if cmd.Flags().Changed("provider") && slices.Contains(providerNames, cfg.Provider) {
+		wizardProviders = []string{cfg.Provider}
+	}
+	form, err := collectCreateForm(cmd.Context(), cmd.InOrStdin(), cmd.ErrOrStderr(), wizardProviders, defaultProvider, reg.Get, flags, portSet)
 	if err != nil {
 		return createRequest{}, err
 	}
 	req := createRequest{
-		Name:    form.Name,
-		Running: form.Running,
-		Sync:    form.Sync,
-		API:     form.API,
-		APIPort: form.APIPort,
-		APICmd:  form.APICmd,
-		Public:  form.Public,
-
-		Template:  flags.Template,
-		NoInstall: flags.NoInstall,
-	}
-	if form.API {
-		if req.APIEnv, err = lifecycle.ResolveAPIEnv(flags.APIEnv, os.LookupEnv); err != nil {
-			return createRequest{}, err
-		}
+		Name:            form.Name,
+		Running:         form.Running,
+		Sync:            form.Sync,
+		API:             form.API,
+		APIPort:         form.APIPort,
+		APICmd:          form.APICmd,
+		APIEnv:          form.APIEnv,
+		Public:          form.Public,
+		Template:        form.Template,
+		NoInstall:       form.NoInstall,
+		CPU:             form.CPU,
+		MemoryMiB:       form.MemoryMiB,
+		NetworkBlockAll: form.NetworkBlockAll,
 	}
 	cfg.Provider = form.Provider
 	cmd.SetContext(withConfig(cmd.Context(), cfg))
-	return withRepo(req, flags)
+	merged := flags
+	merged.Dir = form.Dir
+	merged.DirSet = form.DirSet
+	return withRepo(req, merged)
 }
 
 func writeCreated(cmd *cobra.Command, p sandbox.Provider, id sandbox.ID, req createRequest) error {

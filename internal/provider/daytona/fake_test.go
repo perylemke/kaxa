@@ -51,6 +51,8 @@ type fakeAPI struct {
 	// blindFind makes Find miss a sandbox that exists. The Daytona API does this
 	// until the labels of a new sandbox are visible.
 	blindFind bool
+	// catalog is the snapshot list Snapshot.List would return.
+	catalog []snapshotCatalogRow
 }
 
 func newFakeAPI() *fakeAPI {
@@ -70,6 +72,7 @@ func (f *fakeAPI) Create(_ context.Context, p CreateParams) (Record, error) {
 	rec := &Record{
 		ID: "sb-" + strconv.Itoa(f.seq), Name: p.Name, Labels: slices.Clone(p.Labels), Status: f.createStatus,
 		CreatedAt: time.Unix(int64(1000+f.seq), 0), Template: p.Template, APIPort: p.APIPort,
+		NetworkBlockAll: p.NetworkBlockAll,
 	}
 	f.sandboxes[rec.ID] = rec
 	return *rec, nil
@@ -187,6 +190,12 @@ func (f *fakeAPI) CaptureImage(_ context.Context, id, name string) (Image, error
 	}
 	f.images[name] = img
 	return *img, nil
+}
+
+func (f *fakeAPI) ListSnapshotCatalog(context.Context) ([]snapshotCatalogRow, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.catalog), nil
 }
 
 func (f *fakeAPI) ListImages(_ context.Context, prefix string) ([]Image, error) {

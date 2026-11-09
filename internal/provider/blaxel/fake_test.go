@@ -26,6 +26,7 @@ type fakeResult struct {
 type fakeAPI struct {
 	mu           sync.Mutex
 	sandboxes    map[string]*Record
+	lastCreate   CreateParams
 	previews     map[string]string
 	createStatus string
 	createErr    error
@@ -45,6 +46,7 @@ type fakeAPI struct {
 	terms                []termCall
 	termOut              string
 	termErr              error
+	hub                  []hubTemplate
 }
 
 type termCall struct {
@@ -68,6 +70,12 @@ func newTestProvider(t *testing.T, api *fakeAPI) *Provider {
 	return p
 }
 
+func (f *fakeAPI) ListHub(context.Context) ([]hubTemplate, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.hub), nil
+}
+
 func (f *fakeAPI) Create(_ context.Context, p CreateParams) (Record, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -77,6 +85,7 @@ func (f *fakeAPI) Create(_ context.Context, p CreateParams) (Record, error) {
 	if rec, ok := f.sandboxes[p.Name]; ok && !nameFree(*rec) {
 		return Record{}, ErrAlreadyExists
 	}
+	f.lastCreate = p
 	rec := &Record{
 		Name: p.Name, Status: f.createStatus, Labels: slices.Clone(p.Labels),
 		Image: p.Image, Region: p.Region, APIPort: p.APIPort, CreatedAt: time.Unix(1_700_000_000, 0),

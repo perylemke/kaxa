@@ -78,6 +78,18 @@ type apiClient interface {
 	// PreviewURL returns the public preview URL, or ErrNotFound when none exists.
 	PreviewURL(ctx context.Context, name string) (string, error)
 	CreatePreview(ctx context.Context, name string, port int) (string, error)
+	// ListHub returns the pre-built sandbox templates from the Blaxel Hub.
+	ListHub(ctx context.Context) ([]hubTemplate, error)
+}
+
+// hubTemplate is one image the Blaxel Hub offers for a new sandbox.
+type hubTemplate struct {
+	Image       string
+	DisplayName string
+	// Memory is the hub's suggested size, in MB. Zero means the hub did not set one.
+	Memory     int
+	Hidden     bool
+	ComingSoon bool
 }
 
 // runtime runs commands and moves files on the sandbox data plane.

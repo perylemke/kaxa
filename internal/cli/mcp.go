@@ -59,9 +59,12 @@ func runMCP(cmd *cobra.Command, reg *registry.Registry) error {
 	}
 	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	err = mcp.Serve(ctx, reg, cfg, cmd.ErrOrStderr())
+	err = mcpServe(ctx, reg, cfg, cmd.ErrOrStderr())
 	if errors.Is(err, context.Canceled) {
 		return nil
 	}
 	return err
 }
+
+// mcpServe is the MCP server entry; tests may replace it.
+var mcpServe = mcp.Serve

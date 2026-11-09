@@ -29,7 +29,7 @@ func runCreateTemplate(t *testing.T, p sandbox.Provider, args ...string) error {
 	cmd := NewRootCmd(testRegistryWithProvider(t, p))
 	cmd.SetOut(new(bytes.Buffer))
 	cmd.SetErr(new(bytes.Buffer))
-	cmd.SetArgs(append([]string{flagProvider, spritesProviderName, "create", fixtureDemo}, args...))
+	cmd.SetArgs(append([]string{flagProvider, spritesProviderName, commandCreate, fixtureDemo}, args...))
 	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 	return cmd.Execute()
 }

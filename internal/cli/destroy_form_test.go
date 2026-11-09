@@ -78,3 +78,38 @@ func TestDestroyFormEmptySelectionCancelled(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+func TestChooseSandboxByNumberAndID(t *testing.T) {
+	t.Parallel()
+
+	infos := []sandbox.Info{{ID: "first", Provider: spritesProviderName}, {ID: "second", Provider: formModalProvider}}
+	out := new(bytes.Buffer)
+
+	id, err := chooseSandbox(strings.NewReader("2\n"), out, "pick:", infos)
+	if err != nil || id != "second" {
+		t.Fatalf("got %q err %v", id, err)
+	}
+	id, err = chooseSandbox(strings.NewReader("first\n"), out, "pick:", infos)
+	if err != nil || id != "first" {
+		t.Fatalf("got %q err %v", id, err)
+	}
+}
+
+func TestChooseSandboxUnknownChoice(t *testing.T) {
+	t.Parallel()
+
+	infos := []sandbox.Info{{ID: "only", Provider: spritesProviderName}}
+	_, err := chooseSandbox(strings.NewReader("9\n"), new(bytes.Buffer), "pick:", infos)
+	if err == nil || !strings.Contains(err.Error(), "unknown sandbox") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestUnknownSandboxChoiceMessage(t *testing.T) {
+	t.Parallel()
+
+	err := unknownSandboxChoice("bad")
+	if err == nil || !strings.Contains(err.Error(), `unknown sandbox "bad"`) {
+		t.Fatalf("err = %v", err)
+	}
+}

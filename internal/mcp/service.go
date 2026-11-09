@@ -161,7 +161,16 @@ func (s *service) create(ctx context.Context, in createIn) (createOut, error) {
 }
 
 func (s *service) createRequest(name string, in createIn) (lifecycle.Request, error) {
-	req := lifecycle.Request{Name: name, Running: in.Running, Sync: in.Sync, Public: in.Public, Template: in.Template, NoInstall: in.NoInstall}
+	if in.CPU != 0 && in.CPU <= 0 {
+		return lifecycle.Request{}, usererr.New("cpu must be greater than zero", "omit cpu or pass a positive number of cores")
+	}
+	if in.MemoryMiB != 0 && in.MemoryMiB < 1 {
+		return lifecycle.Request{}, usererr.New("memory_mib must be a positive whole number", "omit memory_mib or pass MiB greater than zero")
+	}
+	req := lifecycle.Request{
+		Name: name, Running: in.Running, Sync: in.Sync, Public: in.Public, Template: in.Template, NoInstall: in.NoInstall,
+		CPU: in.CPU, MemoryMiB: in.MemoryMiB, NetworkBlockAll: in.NetworkBlockAll,
+	}
 	if err := s.applyAPI(&req, in); err != nil {
 		return lifecycle.Request{}, err
 	}

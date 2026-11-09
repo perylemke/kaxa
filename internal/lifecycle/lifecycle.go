@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/perylemke/kaxa/internal/project"
@@ -35,12 +36,20 @@ type Request struct {
 	Public bool
 	// Template is the template to start from. Empty means the provider default.
 	Template string
-	// Root and Repo locate the Git repository to copy. Both are set when Sync is true.
-	Root string
-	Repo string
+	// Root and Repo locate the first Git repository to copy (API and WorkDir use this name).
+	// Repos holds every repository when Sync is true; when empty it is filled from Root and Repo.
+	Root  string
+	Repo  string
+	Repos []RepoCopy
 	// NoInstall copies the repository and skips the toolchain and the dependency
 	// commands. It only applies with Sync.
 	NoInstall bool
+	// CPU is a fractional CPU request in physical cores. Zero means the provider default.
+	CPU float64
+	// MemoryMiB is memory for the sandbox in MiB. Zero means the provider default.
+	MemoryMiB int
+	// NetworkBlockAll blocks every outbound connection from the sandbox.
+	NetworkBlockAll bool
 }
 
 // Labels returns the provider labels for the sandbox.
@@ -93,12 +102,47 @@ func Check(p sandbox.Provider, req Request) error {
 			return err
 		}
 	}
-	if req.Public {
-		if _, ok := p.(sandbox.PublicURL); !ok {
-			return Unsupported(p, sandbox.FeaturePublicURLs)
+	if err := checkPublicRequest(p, req); err != nil {
+		return err
+	}
+	if err := checkNetworkBlockRequest(p, req); err != nil {
+		return err
+	}
+	return checkComputeRequest(p, req)
+}
+
+func checkNetworkBlockRequest(p sandbox.Provider, req Request) error {
+	if !req.NetworkBlockAll {
+		return nil
+	}
+	if _, ok := p.(sandbox.NetworkBlockSupport); !ok {
+		return Unsupported(p, sandbox.FeatureNetworkBlock)
+	}
+	return nil
+}
+
+func checkPublicRequest(p sandbox.Provider, req Request) error {
+	if !req.Public {
+		return nil
+	}
+	if _, ok := p.(sandbox.PublicURL); !ok {
+		return Unsupported(p, sandbox.FeaturePublicURLs)
+	}
+	if req.Running && !req.API {
+		return sandbox.PublicTerminalError()
+	}
+	return nil
+}
+
+func checkComputeRequest(p sandbox.Provider, req Request) error {
+	if req.CPU != 0 {
+		if _, ok := p.(sandbox.CPUSupport); !ok {
+			return Unsupported(p, sandbox.FeatureCPU)
 		}
-		if req.Running && !req.API {
-			return sandbox.PublicTerminalError()
+	}
+	if req.MemoryMiB != 0 {
+		if _, ok := p.(sandbox.MemorySupport); !ok {
+			return Unsupported(p, sandbox.FeatureMemory)
 		}
 	}
 	return nil
@@ -114,15 +158,17 @@ func checkAPI(p sandbox.Provider, req Request) error {
 	if !req.Sync {
 		return nil
 	}
-	ok, err := project.IsAPI(req.Root)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return usererr.New(
-			"this repository is not an HTTP API",
-			"omit the api option, or create from an API project",
-		)
+	for _, root := range RepoCopyRoots(req) {
+		ok, err := project.IsAPI(root)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return usererr.New(
+				"a synced repository is not an HTTP API",
+				"omit the api option, or create from API project directories",
+			)
+		}
 	}
 	return nil
 }
@@ -136,6 +182,7 @@ func Create(ctx context.Context, p sandbox.Provider, req Request, run Runner) (R
 	if run == nil {
 		run = Direct
 	}
+	NormalizeRepoList(&req)
 	if err := Check(p, req); err != nil {
 		return Result{}, err
 	}
@@ -166,12 +213,15 @@ func createSandbox(ctx context.Context, p sandbox.Provider, req Request, run Run
 	err := run(ctx, "creating "+req.Name+" on "+p.Name()+"…", func(ctx context.Context) error {
 		var createErr error
 		id, createErr = p.Create(ctx, sandbox.Spec{
-			Name:      req.Name,
-			Labels:    req.Labels(),
-			Running:   req.Running,
-			ExposeAPI: req.API,
-			APIPort:   apiPortOf(req),
-			Template:  req.Template,
+			Name:            req.Name,
+			Labels:          req.Labels(),
+			Running:         req.Running,
+			ExposeAPI:       req.API,
+			APIPort:         apiPortOf(req),
+			Template:        req.Template,
+			CPU:             req.CPU,
+			MemoryMiB:       req.MemoryMiB,
+			NetworkBlockAll: req.NetworkBlockAll,
 		})
 		if createErr != nil {
 			return createErr
@@ -197,32 +247,49 @@ func syncAndInstall(ctx context.Context, p sandbox.Provider, id sandbox.ID, req 
 	if !ok {
 		return destroyAfterFailure(ctx, p, id, Unsupported(p, sandbox.FeatureSync), "sync workspace")
 	}
-	err := run(ctx, "syncing "+req.Repo+"…", func(ctx context.Context) error {
-		return copyWorkspace(ctx, syncer, id, req.Root, req.Repo)
-	})
-	if err != nil {
-		return destroyAfterFailure(ctx, p, id, err, "sync workspace")
+	NormalizeRepoList(&req)
+	for _, rc := range req.Repos {
+		repo := rc.Repo
+		root := rc.Root
+		err := run(ctx, "syncing "+repo+"…", func(ctx context.Context) error {
+			return copyWorkspace(ctx, syncer, id, root, repo)
+		})
+		if err != nil {
+			return destroyAfterFailure(ctx, p, id, err, "sync workspace")
+		}
 	}
 	return installProjects(ctx, p, id, req, run)
 }
 
 func installProjects(ctx context.Context, p sandbox.Provider, id sandbox.ID, req Request, run Runner) error {
-	steps, err := project.Detect(req.Root)
-	if err != nil {
-		return destroyAfterFailure(ctx, p, id, err, "install dependencies")
-	}
-	if len(steps) == 0 || req.NoInstall {
-		return nil
-	}
+	NormalizeRepoList(&req)
 	setup, ok := p.(sandbox.ProjectSetup)
 	if !ok {
-		return destroyAfterFailure(ctx, p, id, Unsupported(p, sandbox.FeatureDependencyInstall), "install dependencies")
+		for _, rc := range req.Repos {
+			steps, err := project.Detect(rc.Root)
+			if err != nil {
+				return destroyAfterFailure(ctx, p, id, err, "install dependencies")
+			}
+			if len(steps) > 0 && !req.NoInstall {
+				return destroyAfterFailure(ctx, p, id, Unsupported(p, sandbox.FeatureDependencyInstall), "install dependencies")
+			}
+		}
+		return nil
 	}
-	err = run(ctx, "installing "+req.Repo+"…", func(ctx context.Context) error {
-		return setup.SetupProjects(ctx, id, req.Repo, steps)
-	})
-	if err != nil {
-		return destroyAfterFailure(ctx, p, id, err, "install dependencies")
+	for _, rc := range req.Repos {
+		steps, err := project.Detect(rc.Root)
+		if err != nil {
+			return destroyAfterFailure(ctx, p, id, err, "install dependencies")
+		}
+		if len(steps) == 0 || req.NoInstall {
+			continue
+		}
+		err = run(ctx, "installing "+rc.Repo+"…", func(ctx context.Context) error {
+			return setup.SetupProjects(ctx, id, rc.Repo, steps)
+		})
+		if err != nil {
+			return destroyAfterFailure(ctx, p, id, err, "install dependencies")
+		}
 	}
 	return nil
 }
@@ -242,11 +309,23 @@ func skippedOf(steps []project.Step, noInstall bool) [][]string {
 // detectedSteps reads the project steps, ignoring an error. Create already
 // reported that error inside installProjects.
 func detectedSteps(req Request) []project.Step {
-	steps, err := project.Detect(req.Root)
-	if err != nil {
-		return nil
+	NormalizeRepoList(&req)
+	var out []project.Step
+	for _, rc := range req.Repos {
+		steps, err := project.Detect(rc.Root)
+		if err != nil {
+			return nil
+		}
+		for _, s := range steps {
+			dup := slices.ContainsFunc(out, func(existing project.Step) bool {
+				return existing.Kind == s.Kind
+			})
+			if !dup {
+				out = append(out, s)
+			}
+		}
 	}
-	return steps
+	return out
 }
 
 // prepareWorkspace creates the workspace directory, so sync works on a sandbox that
