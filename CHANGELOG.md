@@ -10,6 +10,7 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 
 ### Changed
 
+- `kaxa create --help` names Blaxel for `--api` and `--template`, with the other providers that accept those flags.
 - The `kaxa create` wizard lists the stable tags of `docker/sandbox-templates` in a Template dropdown. Nightly builds, `latest`, and pinned versions are left out. Provider default uses `KAXA_DOCKER_TEMPLATE` or `docker/sandbox-templates:shell`. A `--template` value outside that list is added as an extra option. If the list cannot be loaded, the field stays a text input. The flag and MCP still take an image reference.
 - The `kaxa create` wizard lists Blaxel's visible Hub images in a Template dropdown. Provider default uses `KAXA_BLAXEL_TEMPLATE` or `blaxel/base-image:latest`. A `--template` value outside that list is added as an extra option. If the list cannot be loaded, the field stays a text input. The flag and MCP still take an image reference.
 - `kaxa create --block-all-network-access` and the Daytona create wizard block all outbound network from a new sandbox. The default stays off. Other providers reject the flag. Toolchain downloads and `go mod download` fail while it is on; `--no-install` or a create without `--sync` still works. The MCP field is `block_all_network_access`.

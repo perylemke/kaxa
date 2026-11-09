@@ -34,11 +34,11 @@ Without `--provider`, `kaxa list` includes Daytona once the key is set. An empty
 
 ## What works on Daytona
 
-`create` (with `--sync`, `--template`, and `--api`), `list`, `exec`, `console`, `restart`, `sync`, `snapshot`, `destroy`, and the detail view in `list`. `create --sync` copies your repository to `/home/daytona/workspace/<repo>` and installs its toolchain; see [create](create.md#sync-on-daytona). `create --api` publishes one HTTP service; see [create](create.md#api-on-daytona). `snapshot` saves the disk as an image and restores it into a new sandbox; see [snapshot](snapshot.md#daytona). `--running`, public URLs, `url`, and `upgrade` are not available; kaxa names the providers that have them.
+`create` (with `--sync`, `--template`, `--api`, and `--block-all-network-access`), `list`, `exec`, `console`, `restart`, `sync`, `snapshot`, `destroy`, and the detail view in `list`. `create --sync` copies your repository to `/home/daytona/workspace/<repo>` and installs its toolchain; see [create](create.md#sync-on-daytona). `create --api` publishes one HTTP service; see [create](create.md#api-on-daytona). `--block-all-network-access` blocks every outbound connection; a toolchain download and `go mod download` then fail, while `--no-install` or a create without `--sync` still works. `snapshot` saves the disk as an image and restores it into a new sandbox; see [snapshot](snapshot.md#daytona). `--running`, public URLs, `url`, and `upgrade` are not available; kaxa names the providers that have them.
 
 ## Templates
 
-Set `KAXA_DAYTONA_TEMPLATE` (or pass `--template` to `create`) to start sandboxes from a Daytona snapshot you created. It must keep the layout of the Daytona default image: user `daytona`, home `/home/daytona`. Another user breaks `exec`, `console`, and `--sync`, and kaxa does not detect that.
+Set `KAXA_DAYTONA_TEMPLATE` (or pass `--template` to `create`) to start sandboxes from a Daytona snapshot you created. It must keep the layout of the Daytona default image: user `daytona`, home `/home/daytona`. Another user breaks `exec`, `console`, and `--sync`, and kaxa does not detect that. The create wizard lists the active platform snapshots; Provider default leaves the image empty. See [create](create.md#templates-on-daytona).
 
 ## How sandboxes live
 
