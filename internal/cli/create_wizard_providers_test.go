@@ -146,7 +146,9 @@ func TestCreateWizardProviderFlagUnconfiguredFailsBeforeForm(t *testing.T) {
 
 func TestCreateWizardFailsWhenNoProviderConfigured(t *testing.T) {
 	sp := &fakeProvider{name: testSpritesName}
-	// Sprites token unset: ResolveProvider fails Configure with ErrMissingToken wrapping ErrNotConfigured.
+	// A developer shell may already export the token. Clear it so Configure
+	// fails with ErrMissingToken, which wraps ErrNotConfigured.
+	t.Setenv("KAXA_SPRITES_TOKEN", "")
 	reg := wizardRegistry(t, sp)
 
 	cmd := cli.NewRootCmd(reg)
