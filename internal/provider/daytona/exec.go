@@ -72,27 +72,35 @@ type runSpec struct {
 //
 // A sandbox created with --sync runs the command in /home/daytona/workspace
 // with the installed toolchains on PATH; any other runs it in the home
-// directory. Daytona starts a stopped sandbox first.
+// directory. opts.Dir, when set, replaces that directory. Daytona starts a
+// stopped sandbox first.
 func (p *Provider) Exec(ctx context.Context, id sandbox.ID, opts sandbox.ExecOptions) error {
 	if len(opts.Command) == 0 {
 		return errors.New("daytona exec: empty command")
+	}
+	if _, err := sandbox.ResolveExecDir(opts.Dir, ""); err != nil {
+		return err
 	}
 	s, err := p.open(ctx, id)
 	if err != nil {
 		return err
 	}
+	fallback := ""
+	if s.synced() {
+		fallback = workspaceDir
+	}
+	dir, err := sandbox.ResolveExecDir(opts.Dir, fallback)
+	if err != nil {
+		return err
+	}
 	spec := runSpec{
-		argv: opts.Command, stdin: opts.Stdin, stdout: opts.Stdout, stderr: opts.Stderr,
+		argv: opts.Command, dir: dir, stdin: opts.Stdin, stdout: opts.Stdout, stderr: opts.Stderr,
 		tty: opts.TTY, size: opts.Size, resize: opts.Resize,
-		// The toolchains are on PATH in every sandbox. A sandbox created with
-		// --sync also starts in the workspace.
+		// The toolchains are on PATH in every sandbox.
 		env: daytonaLayout.Env(),
 	}
 	if !opts.TTY {
 		spec.stdin = pipedInput(opts.Stdin)
-	}
-	if s.synced() {
-		spec.dir = workspaceDir
 	}
 	return s.run(ctx, spec)
 }

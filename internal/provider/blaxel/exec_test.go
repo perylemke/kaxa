@@ -104,6 +104,46 @@ func TestExecPipesStdin(t *testing.T) {
 	}
 }
 
+func TestExecRequestedDirOverridesWorkspace(t *testing.T) {
+	t.Parallel()
+	api := newFakeAPI()
+	p := newTestProvider(t, api)
+	api.add(boxName, statusRunning, sandbox.SyncLabel)
+	err := p.Exec(t.Context(), boxName, sandbox.ExecOptions{
+		Command: []string{"go", "version"}, Dir: "/root/workspace/app/",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if api.dirs[0] != "/root/workspace/app" {
+		t.Fatalf("dir = %q", api.dirs[0])
+	}
+}
+
+func TestExecRejectsRelativeDir(t *testing.T) {
+	t.Parallel()
+	api := newFakeAPI()
+	p := newTestProvider(t, api)
+	err := p.Exec(t.Context(), boxName, sandbox.ExecOptions{Command: []string{"ls"}, Dir: "app"})
+	if err == nil || len(api.dirs) != 0 {
+		t.Fatalf("err = %v dirs = %d", err, len(api.dirs))
+	}
+}
+
+func TestExecTTYUsesRequestedDir(t *testing.T) {
+	t.Parallel()
+	api := newFakeAPI()
+	p := newTestProvider(t, api)
+	api.add(boxName, statusRunning, sandbox.SyncLabel)
+	err := p.Exec(t.Context(), boxName, sandbox.ExecOptions{TTY: true, Dir: "/root/workspace/app"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(api.terms) != 1 || api.terms[0].dir != "/root/workspace/app" {
+		t.Fatalf("terminal = %+v", api.terms)
+	}
+}
+
 func TestExecInSyncedSandboxUsesWorkspace(t *testing.T) {
 	t.Parallel()
 	api := newFakeAPI()

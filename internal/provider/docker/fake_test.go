@@ -23,6 +23,7 @@ const (
 	testRes     = "sandboxes/abc"
 	cmdCat      = "cat"
 	cmdEnv      = "env"
+	testRepoDir = "/home/agent/workspace/app"
 )
 
 // fakeAPI is an in-memory management API. A sandbox changes status after one

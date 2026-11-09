@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -8,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -36,7 +38,7 @@ func connect(t *testing.T, fp *fakeProvider, extra ...sandbox.Provider) *sdk.Cli
 		t.Fatalf("server connect: %v", err)
 	}
 	t.Cleanup(func() { _ = serverSession.Close() })
-	client := sdk.NewClient(&sdk.Implementation{Name: "test", Version: "v0"}, nil)
+	client := sdk.NewClient(&sdk.Implementation{Name: testClient, Version: "v0"}, nil)
 	session, err := client.Connect(ctx, clientT, nil)
 	if err != nil {
 		t.Fatalf("client connect: %v", err)
@@ -162,9 +164,65 @@ func TestServerExecReturnsNonZeroExitAsResult(t *testing.T) {
 	}}
 	session := connect(t, fp)
 
-	out := decode[execOut](t, call(t, session, "exec", map[string]any{"name": testBox, "command": []string{"sh"}}))
+	out := decode[execOut](t, call(t, session, "exec", map[string]any{argName: testBox, "command": []string{"sh"}}))
 	if out.ExitCode != 3 || out.Stdout != "hello\n" {
 		t.Fatalf("out = %+v", out)
+	}
+}
+
+func TestServerReportsProgress(t *testing.T) {
+	t.Parallel()
+
+	var stderr bytes.Buffer
+	progress := make(chan string, 4)
+	reg := registry.New()
+	fp := &fakeProvider{name: testSprites}
+	if err := reg.Register(fp); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	srv, err := New(reg, config.Config{Provider: fp.name}, Options{Root: t.TempDir(), Stderr: &stderr})
+	if err != nil {
+		t.Fatalf("new: %v", err)
+	}
+	ctx := context.Background()
+	serverT, clientT := sdk.NewInMemoryTransports()
+	serverSession, err := srv.Connect(ctx, serverT, nil)
+	if err != nil {
+		t.Fatalf("server connect: %v", err)
+	}
+	t.Cleanup(func() { _ = serverSession.Close() })
+	client := sdk.NewClient(&sdk.Implementation{Name: testClient, Version: "v0"}, &sdk.ClientOptions{
+		ProgressNotificationHandler: func(_ context.Context, req *sdk.ProgressNotificationClientRequest) {
+			progress <- req.Params.Message
+		},
+	})
+	session, err := client.Connect(ctx, clientT, nil)
+	if err != nil {
+		t.Fatalf("client connect: %v", err)
+	}
+	t.Cleanup(func() { _ = session.Close() })
+
+	res, err := session.CallTool(ctx, &sdk.CallToolParams{
+		Name:      "create_sandbox",
+		Arguments: map[string]any{argName: testBox},
+		Meta:      sdk.Meta{"progressToken": "tok"},
+	})
+	if err != nil {
+		t.Fatalf("call: %v", err)
+	}
+	if res.IsError {
+		t.Fatalf("tool error: %s", text(res))
+	}
+	select {
+	case msg := <-progress:
+		if !strings.Contains(msg, "creating "+testBox) {
+			t.Fatalf("progress = %q", msg)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("no progress notification")
+	}
+	if !strings.Contains(stderr.String(), "creating "+testBox) {
+		t.Fatalf("stderr = %q", stderr.String())
 	}
 }
 
@@ -174,7 +232,7 @@ func TestServerCreateAndListRoundTrip(t *testing.T) {
 	fp := &fakeProvider{name: testSprites, infos: []sandbox.Info{{ID: testBox, Provider: testSprites, Status: testWarm}}}
 	session := connect(t, fp)
 
-	created := decode[createOut](t, call(t, session, "create_sandbox", map[string]any{"name": testBox}))
+	created := decode[createOut](t, call(t, session, "create_sandbox", map[string]any{argName: testBox}))
 	if created.ID != testBox || created.Provider != testSprites {
 		t.Fatalf("created = %+v", created)
 	}
@@ -188,7 +246,7 @@ func TestServerToolErrorCarriesHint(t *testing.T) {
 	t.Parallel()
 
 	session := connect(t, &fakeProvider{name: testSprites}, &fakeProvider{name: testModal, unavailable: true})
-	res := call(t, session, "create_sandbox", map[string]any{"name": testBox, "provider": testModal})
+	res := call(t, session, "create_sandbox", map[string]any{argName: testBox, "provider": testModal})
 	if !res.IsError {
 		t.Fatal("expected a tool error")
 	}

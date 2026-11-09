@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -73,6 +74,7 @@ func nameSet(names []string) map[string]struct{} {
 // progress reports a slow step on stderr. Stdout carries only the protocol.
 func (s *service) progress(ctx context.Context, label string, task func(context.Context) error) error {
 	_, _ = fmt.Fprintln(s.stderr, label)
+	noteProgress(ctx, label)
 	return task(ctx)
 }
 
@@ -348,14 +350,23 @@ func (s *service) exec(ctx context.Context, in execIn) (execOut, error) {
 	if len(in.Command) == 0 || strings.TrimSpace(in.Command[0]) == "" {
 		return execOut{}, usererr.New("command is required", "pass the argv to run; the first item is the binary")
 	}
+	dir, err := sandbox.ResolveExecDir(in.Cwd, "")
+	if err != nil {
+		return execOut{}, usererr.New("cwd must be an absolute path", "pass the work_dir from create_sandbox or sync_repository")
+	}
 	ctx, cancel := context.WithTimeout(ctx, execTimeout(in.Timeout))
 	defer cancel()
 	stdout, stderr := newLimitedBuffer(maxOutputBytes), newLimitedBuffer(maxOutputBytes)
-	err = p.Exec(ctx, id, sandbox.ExecOptions{Command: in.Command, Stdout: stdout, Stderr: stderr})
+	err = p.Exec(ctx, id, sandbox.ExecOptions{Command: in.Command, Dir: dir, Stdout: stdout, Stderr: stderr})
 	out := execOut{
 		Stdout:    stdout.String(),
 		Stderr:    stderr.String(),
 		Truncated: stdout.wasTruncated() || stderr.wasTruncated(),
+	}
+	if err != nil && (errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded)) {
+		out.TimedOut = true
+		out.ExitCode = -1
+		return out, nil
 	}
 	if exitErr, ok := errors.AsType[*sandbox.ExitError](err); ok {
 		out.ExitCode = exitErr.Code
@@ -417,6 +428,7 @@ func (s *service) inspect(ctx context.Context, in nameIn) (inspectOut, error) {
 	if err != nil {
 		return inspectOut{}, err
 	}
+	home, workspace := layoutDirs(p, d.Labels)
 	return inspectOut{
 		ID:           string(d.ID),
 		Provider:     d.Provider,
@@ -425,9 +437,34 @@ func (s *service) inspect(ctx context.Context, in nameIn) (inspectOut, error) {
 		Organization: d.Organization,
 		URL:          d.URL,
 		Auth:         d.Auth,
+		HomeDir:      home,
+		WorkspaceDir: workspace,
 		CreatedAt:    formatTime(d.CreatedAt),
 		UpdatedAt:    formatTime(d.UpdatedAt),
 	}, nil
+}
+
+// layoutDirs reports the provider home and, for a synced sandbox, the workspace
+// that holds copied repositories. The workspace is the parent of RepoDir, so
+// inspect does not list the sandbox disk.
+func layoutDirs(p sandbox.Provider, labels []string) (home, workspace string) {
+	layout, ok := p.(sandbox.WorkspaceLayout)
+	if !ok {
+		return "", ""
+	}
+	home = layout.HomeDir()
+	if !slices.Contains(labels, sandbox.SyncLabel) {
+		return home, ""
+	}
+	dir, err := layout.RepoDir("repo")
+	if err != nil {
+		return home, ""
+	}
+	parent := path.Dir(dir)
+	if parent == "." || parent == "/" {
+		return home, ""
+	}
+	return home, parent
 }
 
 func (s *service) destroy(ctx context.Context, in nameIn) (actionOut, error) {
@@ -503,7 +540,14 @@ func (s *service) publishAPI(ctx context.Context, in publishIn) (actionOut, erro
 	if err != nil {
 		return actionOut{}, err
 	}
-	return actionOut{ID: string(id), Provider: p.Name(), Status: "published"}, nil
+	out := actionOut{ID: string(id), Provider: p.Name(), Status: "published"}
+	detail, err := p.Inspect(ctx, id)
+	if err != nil {
+		s.log.Warn("inspect after publish failed", "sandbox", id, "error", err)
+		return out, nil
+	}
+	out.URL, out.Auth = detail.URL, detail.Auth
+	return out, nil
 }
 
 func publishDir(p sandbox.Provider, dir string) (string, error) {

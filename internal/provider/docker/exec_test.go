@@ -128,6 +128,30 @@ func TestExecUnknownSandbox(t *testing.T) {
 	}
 }
 
+func TestExecRequestedDirOverridesWorkspace(t *testing.T) {
+	t.Parallel()
+	p, _, proc := newTestProvider(t)
+	createBox(t, p, labelKaxa, sandbox.SyncLabel)
+	err := p.Exec(context.Background(), testSandbox, sandbox.ExecOptions{
+		Command: []string{"pwd"}, Dir: testRepoDir + "/",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if proc.lastSpec(t).Dir != testRepoDir {
+		t.Fatalf("spec = %+v", proc.lastSpec(t))
+	}
+}
+
+func TestExecRejectsRelativeDir(t *testing.T) {
+	t.Parallel()
+	p, _, proc := newTestProvider(t)
+	err := p.Exec(context.Background(), testSandbox, sandbox.ExecOptions{Command: []string{"ls"}, Dir: "app"})
+	if err == nil || len(proc.specs) != 0 {
+		t.Fatalf("err = %v specs = %d", err, len(proc.specs))
+	}
+}
+
 func TestExecInSyncedSandbox(t *testing.T) {
 	t.Parallel()
 	p, _, proc := newTestProvider(t)
@@ -285,7 +309,7 @@ func TestRepoDirAndHomeDir(t *testing.T) {
 		t.Fatalf("HomeDir = %q", got)
 	}
 	dir, err := p.RepoDir("app")
-	if err != nil || dir != "/home/agent/workspace/app" {
+	if err != nil || dir != testRepoDir {
 		t.Fatalf("RepoDir = %q, %v", dir, err)
 	}
 	for _, bad := range []string{"", ".", "..", "a/b", `a\b`} {
@@ -317,7 +341,7 @@ func TestRepoExists(t *testing.T) {
 			if got != tt.want || (err != nil) != tt.wantErr {
 				t.Fatalf("got %v, %v", got, err)
 			}
-			if spec := proc.lastSpec(t); !slices.Equal(spec.Argv, []string{"test", "-d", "/home/agent/workspace/app"}) {
+			if spec := proc.lastSpec(t); !slices.Equal(spec.Argv, []string{"test", "-d", testRepoDir}) {
 				t.Fatalf("argv = %v", spec.Argv)
 			}
 		})
@@ -334,7 +358,7 @@ func TestSetupProjects(t *testing.T) {
 		t.Fatal(err)
 	}
 	spec := proc.lastSpec(t)
-	if spec.Dir != "/home/agent/workspace/app" || !slices.Equal(spec.Argv[len(spec.Argv)-3:], []string{"go", "mod", "download"}) {
+	if spec.Dir != testRepoDir || !slices.Equal(spec.Argv[len(spec.Argv)-3:], []string{"go", "mod", "download"}) {
 		t.Fatalf("spec = %+v", spec)
 	}
 	if !slices.Contains(spec.Argv, "HOME=/home/agent") {

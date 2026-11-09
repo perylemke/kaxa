@@ -25,7 +25,7 @@ import (
 const instructions = `Run work in an isolated sandbox instead of on the host.
 1. Call list_providers and pick a provider that is available.
 2. create_sandbox with sync=true copies the local Git repository and installs its dependencies. no_install skips the toolchain and the dependency commands and lists the commands in skipped_commands. The response work_dir is where the code lives inside the sandbox.
-3. Run builds, tests and edits with exec (argv, no shell). exec starts above the repository, so run project commands from work_dir, for example ["bash", "-c", "cd <work_dir> && go test ./..."]. Files you change with local editor tools are not in the sandbox, and files changed in the sandbox are not copied back.
+3. Run builds, tests and edits with exec (argv, no shell). Pass cwd as the work_dir from create_sandbox or sync_repository. Use bash and -c only for pipes, globs and redirection. Files you change with local editor tools are not in the sandbox, and files changed in the sandbox are not copied back.
 4. To add another Git repository, call sync_repository. It works on any sandbox except a Modal sandbox that was not created with sync, and it never replaces a directory. no_install copies the repository and skips the toolchain and the dependency commands.
 5. To save a sandbox state, call create_snapshot; list_snapshots shows the ids, the sandbox and the provider of each snapshot. restore_snapshot either overwrites the sandbox (snapshot_restore in_place) or creates a new one named by target (new_sandbox).
 6. Call destroy, delete_snapshot, or restore_snapshot on an in_place provider only when the user asks for it.`
@@ -116,13 +116,13 @@ func (s *service) register(srv *sdk.Server) {
 		"Copy another local Git repository into a sandbox that was created with sync, then install its dependencies. It never replaces a directory: a repository already in the sandbox is an error. A failure keeps the sandbox. Can take minutes.",
 		additive, s.syncRepository)
 	addTool(s, srv, "exec", "Run a command",
-		"Run an argv in a sandbox and return its stdout, stderr and exit code. A non-zero exit code is a result, not a tool error. Each stream is capped at 256 KiB.",
+		"Run an argv in a sandbox and return its stdout, stderr and exit code. Pass cwd as the absolute work_dir from create_sandbox or sync_repository. A non-zero exit code is a result, not a tool error. A timeout is a result with timed_out set and the output captured so far. Each stream keeps the last 256 KiB.",
 		openEnded, s.exec)
 	addTool(s, srv, "list_sandboxes", "List sandboxes",
 		"List the sandboxes of every configured provider, or only of the provider argument. A provider that fails is reported in warnings while the others are still listed.",
 		readOnly, s.listSandboxes)
 	addTool(s, srv, "inspect", "Inspect a sandbox",
-		"Show status, labels, URL and URL auth of a sandbox.",
+		"Show status, labels, URL and URL auth of a sandbox. When the provider has a workspace layout, the result includes home_dir, and workspace_dir when the sandbox was created with sync.",
 		readOnly, s.inspect)
 	addTool(s, srv, "restart", "Restart a sandbox",
 		"Restart a sandbox.",
@@ -146,7 +146,7 @@ func (s *service) register(srv *sdk.Server) {
 		"Permanently delete a snapshot of a sandbox. There is no undo. Call it only when the user asks.",
 		destructive, s.deleteSnapshot)
 	addTool(s, srv, "publish_api", "Publish an HTTP service",
-		"Start one HTTP service in an existing sandbox and route the sandbox URL to it. Only providers that list api in their capabilities support it.",
+		"Start one HTTP service in an existing sandbox and route the sandbox URL to it. The result includes url and auth when the provider reports them. Only providers that list api in their capabilities support it.",
 		additive, s.publishAPI)
 	addTool(s, srv, "set_url_auth", "Set URL authentication",
 		"Make the sandbox URL public or require a provider account. Only providers that list public_url in their capabilities support it.",
@@ -188,7 +188,8 @@ func addTool[In, Out any](s *service, srv *sdk.Server, name, title, description 
 		Name:        name,
 		Description: description,
 		Annotations: kind.annotations(title),
-	}, func(ctx context.Context, _ *sdk.CallToolRequest, in In) (*sdk.CallToolResult, Out, error) {
+	}, func(ctx context.Context, req *sdk.CallToolRequest, in In) (*sdk.CallToolResult, Out, error) {
+		ctx = withToolProgress(ctx, req)
 		out, err := fn(ctx, in)
 		if err != nil {
 			var zero Out
@@ -215,3 +216,39 @@ type hintedError struct {
 func (h *hintedError) Error() string { return h.err.Error() + " (" + h.hint + ")" }
 
 func (h *hintedError) Unwrap() error { return h.err }
+
+// toolProgress counts progress notifications for one tool call.
+type toolProgress struct {
+	session *sdk.ServerSession
+	token   any
+	n       float64
+}
+
+type progressCtxKey struct{}
+
+// withToolProgress stores the client's progress token so a long tool can report steps.
+// A call without a token, or a nil request, leaves the context unchanged.
+func withToolProgress(ctx context.Context, req *sdk.CallToolRequest) context.Context {
+	if req == nil || req.Params == nil || req.Session == nil {
+		return ctx
+	}
+	token := req.Params.GetProgressToken()
+	if token == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, progressCtxKey{}, &toolProgress{session: req.Session, token: token})
+}
+
+// noteProgress sends one progress notification when the client asked for it.
+func noteProgress(ctx context.Context, label string) {
+	step, ok := ctx.Value(progressCtxKey{}).(*toolProgress)
+	if !ok {
+		return
+	}
+	step.n++
+	_ = step.session.NotifyProgress(ctx, &sdk.ProgressNotificationParams{
+		Message:       label,
+		ProgressToken: step.token,
+		Progress:      step.n,
+	})
+}

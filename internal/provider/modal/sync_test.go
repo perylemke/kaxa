@@ -240,6 +240,36 @@ func TestExecOnSyncedSandboxRunsAsModalInWorkspace(t *testing.T) {
 	}
 }
 
+func TestExecRequestedDirOverridesWorkspace(t *testing.T) {
+	t.Parallel()
+
+	f := syncedFake(t)
+	err := newProvider(t, f).Exec(context.Background(), testName, sandbox.ExecOptions{
+		Command: []string{"go", "test"}, Dir: "/home/modal/workspace/app/",
+	})
+	if err != nil {
+		t.Fatalf("exec: %v", err)
+	}
+	if f.execDir != "/home/modal/workspace/app" {
+		t.Fatalf("dir = %q", f.execDir)
+	}
+	if len(f.execArgv) == 0 || f.execArgv[0] != testRunuser {
+		t.Fatalf("argv = %q", f.execArgv)
+	}
+}
+
+func TestExecRejectsRelativeDir(t *testing.T) {
+	t.Parallel()
+
+	f := runningFake(t)
+	err := newProvider(t, f).Exec(context.Background(), testName, sandbox.ExecOptions{
+		Command: []string{"ls"}, Dir: "app",
+	})
+	if err == nil || f.execArgv != nil {
+		t.Fatalf("err = %v argv = %v", err, f.execArgv)
+	}
+}
+
 func TestExecOnPlainSandboxKeepsRootAndDefaultDir(t *testing.T) {
 	t.Parallel()
 

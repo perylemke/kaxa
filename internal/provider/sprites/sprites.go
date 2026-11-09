@@ -162,8 +162,12 @@ func (p *Provider) Destroy(ctx context.Context, id sandbox.ID) error {
 }
 
 func prepareExecCmd(ctx context.Context, sprite *spritesdk.Sprite, opts sandbox.ExecOptions, labels []string) (*spritesdk.Cmd, error) {
+	dir, err := sandbox.ResolveExecDir(opts.Dir, workspaceExecDir(labels))
+	if err != nil {
+		return nil, err
+	}
 	cmd := sprite.CommandContext(ctx, opts.Command[0], opts.Command[1:]...)
-	cmd.Dir = workspaceExecDir(labels)
+	cmd.Dir = dir
 	// The toolchains are on PATH in every sandbox.
 	cmd.Env = spriteLayout.Env()
 	if opts.TTY {

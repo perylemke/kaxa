@@ -83,6 +83,32 @@ func TestExecPipesStdinAndClosesIt(t *testing.T) {
 	}
 }
 
+func TestExecRequestedDirOverridesWorkspace(t *testing.T) {
+	t.Parallel()
+	tb := newFakeToolbox(okHandler)
+	p, api := newTestProvider(t, tb)
+	api.add(boxName, statusRunning, sandbox.SyncLabel)
+	err := p.Exec(t.Context(), boxName, sandbox.ExecOptions{
+		Command: []string{"go", "test"}, Dir: "/home/daytona/workspace/app/",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tb.reqs[0].dir != "/home/daytona/workspace/app" {
+		t.Fatalf("dir = %q", tb.reqs[0].dir)
+	}
+}
+
+func TestExecRejectsRelativeDir(t *testing.T) {
+	t.Parallel()
+	tb := newFakeToolbox(okHandler)
+	p, _ := newTestProvider(t, tb)
+	err := p.Exec(t.Context(), boxName, sandbox.ExecOptions{Command: []string{"ls"}, Dir: "app"})
+	if err == nil || len(tb.reqs) != 0 {
+		t.Fatalf("err = %v reqs = %d", err, len(tb.reqs))
+	}
+}
+
 func TestExecInSyncedSandboxUsesWorkspaceAndPath(t *testing.T) {
 	t.Parallel()
 	tb := newFakeToolbox(okHandler)

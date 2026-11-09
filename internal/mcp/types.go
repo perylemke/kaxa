@@ -60,7 +60,8 @@ type execIn struct {
 	Provider string   `json:"provider,omitempty" jsonschema:"Provider name from list_providers. Defaults to KAXA_DEFAULT_PROVIDER."`
 	Name     string   `json:"name" jsonschema:"Sandbox name."`
 	Command  []string `json:"command" jsonschema:"Argv to run. The first item is the binary. It is never passed through a shell; use bash and -c explicitly if you need one."`
-	Timeout  int      `json:"timeout_seconds,omitempty" jsonschema:"Seconds before the command is stopped. Defaults to 1800 and cannot exceed 7200."`
+	Cwd      string   `json:"cwd,omitempty" jsonschema:"Absolute directory inside the sandbox to run the command in. Use the work_dir from create_sandbox or sync_repository. Omit to start in the provider workspace or home."`
+	Timeout  int      `json:"timeout_seconds,omitempty" jsonschema:"Seconds before the command is stopped. Defaults to 1800 and cannot exceed 7200. A timeout is a result with timed_out set, and it keeps the output captured so far."`
 }
 
 type execOut struct {
@@ -68,6 +69,7 @@ type execOut struct {
 	Stdout    string `json:"stdout"`
 	Stderr    string `json:"stderr"`
 	Truncated bool   `json:"truncated"`
+	TimedOut  bool   `json:"timed_out,omitempty"`
 }
 
 type listIn struct {
@@ -99,6 +101,8 @@ type inspectOut struct {
 	Organization string   `json:"organization,omitempty"`
 	URL          string   `json:"url,omitempty"`
 	Auth         string   `json:"auth,omitempty"`
+	HomeDir      string   `json:"home_dir,omitempty"`
+	WorkspaceDir string   `json:"workspace_dir,omitempty"`
 	CreatedAt    string   `json:"created_at,omitempty"`
 	UpdatedAt    string   `json:"updated_at,omitempty"`
 }
@@ -107,6 +111,8 @@ type actionOut struct {
 	ID       string `json:"id"`
 	Provider string `json:"provider"`
 	Status   string `json:"status"`
+	URL      string `json:"url,omitempty"`
+	Auth     string `json:"auth,omitempty"`
 }
 
 type publishIn struct {

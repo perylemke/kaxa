@@ -10,6 +10,10 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 
 ### Changed
 
+- MCP `exec` accepts `cwd`, an absolute directory inside the sandbox. Omit it and the command still starts in the provider workspace or home. A timeout returns `timed_out` with the output captured so far. Each stream keeps the last 256 KiB.
+- MCP `inspect` includes `home_dir`, and `workspace_dir` when the sandbox was created with sync and the provider reports a workspace layout.
+- MCP `publish_api` includes `url` and `auth` when the provider reports them. A failed inspect after a successful publish keeps the published service and omits the URL.
+- Long MCP calls send progress notifications when the client supplies a progress token. The same lines still go to stderr.
 - `kaxa create --help` names Blaxel for `--api` and `--template`, with the other providers that accept those flags.
 - The `kaxa create` wizard lists the stable tags of `docker/sandbox-templates` in a Template dropdown. Nightly builds, `latest`, and pinned versions are left out. Provider default uses `KAXA_DOCKER_TEMPLATE` or `docker/sandbox-templates:shell`. A `--template` value outside that list is added as an extra option. If the list cannot be loaded, the field stays a text input. The flag and MCP still take an image reference.
 - The `kaxa create` wizard lists Blaxel's visible Hub images in a Template dropdown. Provider default uses `KAXA_BLAXEL_TEMPLATE` or `blaxel/base-image:latest`. A `--template` value outside that list is added as an extra option. If the list cannot be loaded, the field stays a text input. The flag and MCP still take an image reference.

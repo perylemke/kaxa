@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path"
+	"strings"
 	"time"
 
 	"github.com/perylemke/kaxa/internal/project"
@@ -100,12 +102,28 @@ type TermSize struct {
 // ExecOptions configures remote command execution.
 type ExecOptions struct {
 	Command []string
-	Stdin   io.Reader
-	Stdout  io.Writer
-	Stderr  io.Writer
-	TTY     bool
-	Size    TermSize
-	Resize  <-chan TermSize
+	// Dir is the absolute directory inside the sandbox where the command starts.
+	// Empty keeps the provider default.
+	Dir    string
+	Stdin  io.Reader
+	Stdout io.Writer
+	Stderr io.Writer
+	TTY    bool
+	Size   TermSize
+	Resize <-chan TermSize
+}
+
+// ResolveExecDir returns requested when it is set, otherwise fallback.
+// A set directory must be absolute and must not contain a NUL byte.
+// The result is path.Clean, so a trailing slash and ".." are folded.
+func ResolveExecDir(requested, fallback string) (string, error) {
+	if requested == "" {
+		return fallback, nil
+	}
+	if strings.ContainsRune(requested, 0) || !path.IsAbs(requested) {
+		return "", errors.New("exec dir must be an absolute path")
+	}
+	return path.Clean(requested), nil
 }
 
 // ExitError reports a non-zero exit from a remote command.

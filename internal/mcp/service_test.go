@@ -28,6 +28,7 @@ type fakeProvider struct {
 
 	execDeadline    time.Time
 	execHasDeadline bool
+	inspectErr      error
 
 	created   []sandbox.Spec
 	destroyed []sandbox.ID
@@ -61,7 +62,7 @@ const (
 
 func (f *fakeProvider) Name() string           { return f.name }
 func (f *fakeProvider) Available() bool        { return !f.unavailable }
-func (f *fakeProvider) HomeDir() string        { return "/home/box" }
+func (f *fakeProvider) HomeDir() string        { return testHome }
 func (f *fakeProvider) Configure(string) error { return nil }
 
 func (f *fakeProvider) SupportsRunning() {}
@@ -81,6 +82,9 @@ func (f *fakeProvider) Create(_ context.Context, spec sandbox.Spec) (sandbox.ID,
 func (f *fakeProvider) List(context.Context) ([]sandbox.Info, error) { return f.infos, f.listErr }
 
 func (f *fakeProvider) Inspect(_ context.Context, id sandbox.ID) (sandbox.Detail, error) {
+	if f.inspectErr != nil {
+		return sandbox.Detail{}, f.inspectErr
+	}
 	if f.detail.ID != "" {
 		return f.detail, nil
 	}
@@ -470,7 +474,7 @@ func TestCreateSyncDirInsideServerRoot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
-	if out.WorkDir != "/home/box/ws/app" {
+	if out.WorkDir != testWorkDir {
 		t.Fatalf("work dir = %q", out.WorkDir)
 	}
 }
@@ -607,8 +611,83 @@ func TestExecPassesArgvAndNoStdin(t *testing.T) {
 	if _, err := svc.exec(context.Background(), execIn{Name: testBox, Command: []string{"echo", "a b", ";rm"}}); err != nil {
 		t.Fatalf("exec: %v", err)
 	}
-	if !slices.Equal(got.Command, []string{"echo", "a b", ";rm"}) || got.Stdin != nil || got.TTY {
+	if !slices.Equal(got.Command, []string{"echo", "a b", ";rm"}) || got.Stdin != nil || got.TTY || got.Dir != "" {
 		t.Fatalf("opts = %+v", got)
+	}
+}
+
+func TestExecPassesCwd(t *testing.T) {
+	t.Parallel()
+
+	var got sandbox.ExecOptions
+	fp := &fakeProvider{name: testSprites, execFn: func(opts sandbox.ExecOptions) error {
+		got = opts
+		return nil
+	}}
+	svc := newTestService(t, t.TempDir(), testSprites, fp)
+
+	_, err := svc.exec(context.Background(), execIn{
+		Name: testBox, Command: []string{"go", "test", "./..."}, Cwd: testWorkDir + "/",
+	})
+	if err != nil {
+		t.Fatalf("exec: %v", err)
+	}
+	if got.Dir != testWorkDir {
+		t.Fatalf("dir = %q", got.Dir)
+	}
+}
+
+func TestExecRejectsRelativeCwd(t *testing.T) {
+	t.Parallel()
+
+	fp := &fakeProvider{name: testSprites, execFn: func(sandbox.ExecOptions) error {
+		t.Error("exec reached provider")
+		return nil
+	}}
+	svc := newTestService(t, t.TempDir(), testSprites, fp)
+
+	_, err := svc.exec(context.Background(), execIn{Name: testBox, Command: []string{"pwd"}, Cwd: "app"})
+	wantErr(t, err, "cwd must be an absolute path")
+	_, err = svc.exec(context.Background(), execIn{Name: testBox, Command: []string{"pwd"}, Cwd: "/tmp/\x00app"})
+	wantErr(t, err, "cwd must be an absolute path")
+}
+
+func TestExecTimeoutReturnsCapturedOutput(t *testing.T) {
+	t.Parallel()
+
+	fp := &fakeProvider{name: testSprites, execFn: func(opts sandbox.ExecOptions) error {
+		_, _ = io.WriteString(opts.Stdout, "partial")
+		_, _ = io.WriteString(opts.Stderr, "still running")
+		return context.DeadlineExceeded
+	}}
+	svc := newTestService(t, t.TempDir(), testSprites, fp)
+
+	out, err := svc.exec(context.Background(), execIn{Name: testBox, Command: []string{"sleep", "9"}, Timeout: 1})
+	if err != nil {
+		t.Fatalf("exec: %v", err)
+	}
+	if !out.TimedOut || out.ExitCode != -1 || out.Stdout != "partial" || out.Stderr != "still running" {
+		t.Fatalf("out = %+v", out)
+	}
+}
+
+func TestExecKeepsTailOfLargeOutput(t *testing.T) {
+	t.Parallel()
+
+	fp := &fakeProvider{name: testSprites, execFn: func(opts sandbox.ExecOptions) error {
+		_, _ = io.WriteString(opts.Stdout, "HEAD")
+		_, _ = io.WriteString(opts.Stdout, strings.Repeat("x", maxOutputBytes))
+		_, _ = io.WriteString(opts.Stdout, "TAIL")
+		return nil
+	}}
+	svc := newTestService(t, t.TempDir(), testSprites, fp)
+
+	out, err := svc.exec(context.Background(), execIn{Name: testBox, Command: []string{"yes"}})
+	if err != nil {
+		t.Fatalf("exec: %v", err)
+	}
+	if !out.Truncated || strings.Contains(out.Stdout, "HEAD") || !strings.Contains(out.Stdout, "TAIL") {
+		t.Fatalf("stdout tail = %q", out.Stdout[len(out.Stdout)-80:])
 	}
 }
 
@@ -692,6 +771,42 @@ func TestListAndInspect(t *testing.T) {
 	detail, err := svc.inspect(ctx, nameIn{Name: testBox})
 	if err != nil || detail.CreatedAt != "2026-10-26T12:00:00Z" || detail.UpdatedAt != "" || detail.URL != testURL {
 		t.Fatalf("inspect = %+v err = %v", detail, err)
+	}
+	if detail.HomeDir != testHome || detail.WorkspaceDir != "" {
+		t.Fatalf("dirs = %q %q", detail.HomeDir, detail.WorkspaceDir)
+	}
+}
+
+func TestInspectSyncedReportsWorkspace(t *testing.T) {
+	t.Parallel()
+
+	fp := &fakeProvider{
+		name: testSprites,
+		detail: sandbox.Detail{
+			ID: testBox, Provider: testSprites, Status: testWarm, Labels: []string{sandbox.SyncLabel},
+		},
+	}
+	svc := newTestService(t, t.TempDir(), testSprites, fp)
+
+	detail, err := svc.inspect(context.Background(), nameIn{Name: testBox})
+	if err != nil {
+		t.Fatalf("inspect: %v", err)
+	}
+	if detail.HomeDir != testHome || detail.WorkspaceDir != "/home/box/ws" {
+		t.Fatalf("dirs = %q %q", detail.HomeDir, detail.WorkspaceDir)
+	}
+}
+
+func TestInspectWithoutLayoutOmitsDirs(t *testing.T) {
+	t.Parallel()
+
+	svc := newTestService(t, t.TempDir(), testPlain, plainProvider{name: testPlain})
+	detail, err := svc.inspect(context.Background(), nameIn{Name: testBox})
+	if err != nil {
+		t.Fatalf("inspect: %v", err)
+	}
+	if detail.HomeDir != "" || detail.WorkspaceDir != "" {
+		t.Fatalf("dirs = %q %q", detail.HomeDir, detail.WorkspaceDir)
 	}
 }
 
@@ -793,12 +908,12 @@ func TestPublishAPI(t *testing.T) {
 	if err != nil {
 		t.Fatalf("publish: %v", err)
 	}
-	if out.Status != "published" || fp.pubDir != "/home/box" || fp.pubPort != 8000 {
+	if out.Status != "published" || out.URL != "" || fp.pubDir != testHome || fp.pubPort != 8000 {
 		t.Fatalf("out=%+v dir=%q port=%d", out, fp.pubDir, fp.pubPort)
 	}
 
 	_, err = svc.publishAPI(ctx, publishIn{Name: testBox, APICmd: []string{"x"}, WorkDir: "/home/box/ws/app/../app", APIPort: 9000})
-	if err != nil || fp.pubDir != "/home/box/ws/app" || fp.pubPort != 9000 {
+	if err != nil || fp.pubDir != testWorkDir || fp.pubPort != 9000 {
 		t.Fatalf("err=%v dir=%q port=%d", err, fp.pubDir, fp.pubPort)
 	}
 
@@ -806,6 +921,33 @@ func TestPublishAPI(t *testing.T) {
 	wantErr(t, err, "absolute path")
 	_, err = svc.publishAPI(ctx, publishIn{Name: testBox})
 	wantErr(t, err, "api command is required")
+}
+
+func TestPublishAPIReturnsURL(t *testing.T) {
+	t.Parallel()
+
+	fp := &fakeProvider{
+		name:   testSprites,
+		detail: sandbox.Detail{ID: testBox, URL: testURL, Auth: sandbox.URLAuthPublic},
+	}
+	svc := newTestService(t, t.TempDir(), testSprites, fp)
+
+	out, err := svc.publishAPI(context.Background(), publishIn{Name: testBox, APICmd: []string{"uvicorn", "app:app"}})
+	if err != nil || out.URL != testURL || out.Auth != sandbox.URLAuthPublic || out.Status != "published" {
+		t.Fatalf("out=%+v err=%v", out, err)
+	}
+}
+
+func TestPublishAPIKeepsResultWhenInspectFails(t *testing.T) {
+	t.Parallel()
+
+	fp := &fakeProvider{name: testSprites, inspectErr: errors.New("inspect down")}
+	svc := newTestService(t, t.TempDir(), testSprites, fp)
+
+	out, err := svc.publishAPI(context.Background(), publishIn{Name: testBox, APICmd: []string{"x"}})
+	if err != nil || out.Status != "published" || out.URL != "" || !fp.published {
+		t.Fatalf("out=%+v err=%v published=%v", out, err, fp.published)
+	}
 }
 
 func TestPublishAPIPassesEnv(t *testing.T) {
@@ -881,7 +1023,7 @@ func TestLimitedBuffer(t *testing.T) {
 			t.Fatalf("write %q = %d, %v", s, n, err)
 		}
 	}
-	if !b.wasTruncated() || !strings.HasPrefix(b.String(), "abcde\n[output truncated") {
+	if !b.wasTruncated() || !strings.HasPrefix(b.String(), "efghi\n[output truncated") {
 		t.Fatalf("buffer = %q truncated = %v", b.String(), b.wasTruncated())
 	}
 
@@ -891,10 +1033,16 @@ func TestLimitedBuffer(t *testing.T) {
 		t.Fatalf("exact = %q truncated = %v", exact.String(), exact.wasTruncated())
 	}
 
+	tail := newLimitedBuffer(4)
+	_, _ = tail.Write([]byte("abcdefgh"))
+	if tail.String() != "efgh\n[output truncated at 4 bytes]" {
+		t.Fatalf("tail = %q", tail.String())
+	}
+
 	cut := newLimitedBuffer(2)
-	_, _ = cut.Write([]byte("é!")) // é is two bytes; the cut keeps it whole
+	_, _ = cut.Write([]byte("é!")) // tail keeps the last two bytes, which splits é
 	_, _ = cut.Write([]byte("x"))
-	if !strings.HasPrefix(cut.String(), "é\n[output") {
+	if !strings.HasPrefix(cut.String(), "!x\n[output") {
 		t.Fatalf("cut = %q", cut.String())
 	}
 	broken := newLimitedBuffer(1)
