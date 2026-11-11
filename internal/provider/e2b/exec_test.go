@@ -42,6 +42,31 @@ func TestExecRunsArgvWithoutShell(t *testing.T) {
 	}
 }
 
+func TestExecRequestedDirOverridesWorkspace(t *testing.T) {
+	t.Parallel()
+
+	p, _, envd := newProvider([]string{testKaxa, sandbox.SyncLabel}, 0)
+	err := p.Exec(context.Background(), testBox, sandbox.ExecOptions{
+		Command: []string{"go", "test"}, Dir: "/home/user/workspace/app/",
+	})
+	if err != nil {
+		t.Fatalf("exec: %v", err)
+	}
+	if envd.starts[0].Cwd != "/home/user/workspace/app" {
+		t.Fatalf("cwd = %q", envd.starts[0].Cwd)
+	}
+}
+
+func TestExecRejectsRelativeDir(t *testing.T) {
+	t.Parallel()
+
+	p, api, envd := newProvider([]string{testKaxa}, 0)
+	err := p.Exec(context.Background(), testBox, sandbox.ExecOptions{Command: []string{"ls"}, Dir: "app"})
+	if err == nil || len(envd.starts) != 0 || len(api.connect) != 0 {
+		t.Fatalf("err = %v starts = %d connect = %d", err, len(envd.starts), len(api.connect))
+	}
+}
+
 func TestExecInSyncedSandboxUsesWorkspaceAndToolchainPath(t *testing.T) {
 	t.Parallel()
 

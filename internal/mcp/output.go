@@ -1,7 +1,6 @@
 package mcp
 
 import (
-	"bytes"
 	"fmt"
 	"strings"
 	"sync"
@@ -26,11 +25,13 @@ func execTimeout(seconds int) time.Duration {
 	return min(time.Duration(seconds)*time.Second, maxExecTimeout)
 }
 
-// limitedBuffer keeps the first limit bytes written and drops the rest.
+// limitedBuffer keeps the last limit bytes written and drops the rest.
 // Write always reports success so the remote command is not interrupted.
 type limitedBuffer struct {
 	mu        sync.Mutex
-	buf       bytes.Buffer
+	buf       []byte
+	start     int
+	size      int
 	limit     int
 	truncated bool
 }
@@ -42,17 +43,55 @@ func newLimitedBuffer(limit int) *limitedBuffer {
 func (l *limitedBuffer) Write(p []byte) (int, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	room := l.limit - l.buf.Len()
-	switch {
-	case room <= 0:
-		l.truncated = len(p) > 0 || l.truncated
-	case len(p) > room:
-		l.buf.Write(p[:room])
-		l.truncated = true
-	default:
-		l.buf.Write(p)
+	if len(p) == 0 {
+		return 0, nil
 	}
+	if l.limit <= 0 {
+		l.truncated = true
+		return len(p), nil
+	}
+	if l.buf == nil {
+		l.buf = make([]byte, l.limit)
+	}
+	// A write at least as long as the cap is the whole tail of the stream.
+	// An exact fill of an empty buffer keeps every byte, so it is not truncated.
+	if len(p) >= l.limit {
+		if len(p) > l.limit || l.size > 0 {
+			l.truncated = true
+		}
+		copy(l.buf, p[len(p)-l.limit:])
+		l.start = 0
+		l.size = l.limit
+		return len(p), nil
+	}
+	off := (l.start + l.size) % l.limit
+	first := copy(l.buf[off:], p)
+	if first < len(p) {
+		copy(l.buf, p[first:])
+	}
+	if l.size+len(p) <= l.limit {
+		l.size += len(p)
+		return len(p), nil
+	}
+	l.start = (l.start + l.size + len(p) - l.limit) % l.limit
+	l.size = l.limit
+	l.truncated = true
 	return len(p), nil
+}
+
+// bytes returns the kept bytes in order.
+func (l *limitedBuffer) bytes() []byte {
+	if l.size == 0 {
+		return nil
+	}
+	out := make([]byte, l.size)
+	if l.start+l.size <= l.limit {
+		copy(out, l.buf[l.start:l.start+l.size])
+		return out
+	}
+	n := copy(out, l.buf[l.start:])
+	copy(out[n:], l.buf[:l.size-n])
+	return out
 }
 
 // String returns the captured text with invalid UTF-8 replaced and a marker
@@ -60,7 +99,7 @@ func (l *limitedBuffer) Write(p []byte) (int, error) {
 func (l *limitedBuffer) String() string {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	text := strings.ToValidUTF8(l.buf.String(), "\uFFFD")
+	text := strings.ToValidUTF8(string(l.bytes()), "\uFFFD")
 	if l.truncated {
 		text += fmt.Sprintf("\n[output truncated at %d bytes]", l.limit)
 	}

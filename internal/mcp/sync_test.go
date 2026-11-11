@@ -80,7 +80,7 @@ func TestSyncRepositoryDirInsideServerRoot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sync: %v", err)
 	}
-	if out.WorkDir != "/home/box/ws/app" {
+	if out.WorkDir != testWorkDir {
 		t.Fatalf("work dir = %q", out.WorkDir)
 	}
 }

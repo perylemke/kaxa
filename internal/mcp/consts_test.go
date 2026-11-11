@@ -7,4 +7,8 @@ const (
 	testNoBox   = "nobox"
 	testWarm    = "warm"
 	testURL     = "https://box.example"
+	testHome    = "/home/box"
+	testWorkDir = "/home/box/ws/app"
+	argName     = "name"
+	testClient  = "client"
 )

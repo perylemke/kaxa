@@ -200,11 +200,11 @@ Every tool that works on a sandbox takes an optional `provider`. Without it, the
 | `sync_repository` | Copy another Git repository into a sandbox created with `sync`. Same flow as [sync](sync.md) |
 | `exec` | Run an argv and return `stdout`, `stderr`, `exit_code` and `truncated` |
 | `list_sandboxes` | Sandboxes of every configured provider, or of one with `provider` |
-| `inspect` | Status, labels, URL and URL auth of one sandbox |
+| `inspect` | Status, labels, URL, URL auth, and, when the provider has a workspace layout, `home_dir` and `workspace_dir` |
 | `restart`, `upgrade` | Same as [restart](restart.md) and [upgrade](upgrade.md) |
 | `destroy` | Delete a sandbox. The name is required |
 | `create_snapshot`, `list_snapshots`, `restore_snapshot`, `delete_snapshot` | Save, list, restore, and delete sandbox snapshots. See [snapshot](snapshot.md) and [Snapshots](#snapshots) |
-| `publish_api` | Start one HTTP service in an existing sandbox |
+| `publish_api` | Start one HTTP service in an existing sandbox. The result includes `url` and `auth` when the provider reports them |
 | `set_url_auth` | Same as [url](url.md): `public` or `sprite` |
 
 ### Use E2B
@@ -219,10 +219,10 @@ Set `KAXA_E2B_API_KEY` in the client (and `KAXA_E2B_TEMPLATE` for a default temp
 Set `KAXA_MODAL_TOKEN_ID` and `KAXA_MODAL_TOKEN_SECRET` in the client, reload the server, and the flow is the same as on Sprites. Pass `provider: "modal"`, or set `KAXA_DEFAULT_PROVIDER=modal`:
 
 1. `create_sandbox` with `name`, `provider: "modal"`, and `sync: true`. The result has `work_dir`, for example `/home/modal/workspace/your-repo`. The repository is copied as the `modal` user and its toolchain is installed.
-2. `exec` with `command: ["bash", "-c", "cd <work_dir> && go test ./..."]`. The command runs as `modal` and starts in `/home/modal/workspace`.
+2. `exec` with `command: ["go", "test", "./..."]` and `cwd` set to `work_dir`. The command runs as `modal`.
 3. `destroy` when the work is done.
 
-Edit files in the sandbox with `exec`, for example `["bash", "-c", "cd <work_dir> && sed -i ... file"]`. The agent's local editor does not write there. Modal sandboxes live at most 24 hours and stop after one hour without activity; see [Modal account and token](modal-account.md). `--running`, `publish_api`, and public URLs are not available for Modal, and the error names the providers that have them.
+Edit files in the sandbox with `exec`. Pass `cwd` as `work_dir`, and use `["bash", "-c", "..."]` only when the command needs a pipe, a glob, or redirection. The agent's local editor does not write there. Modal sandboxes live at most 24 hours and stop after one hour without activity; see [Modal account and token](modal-account.md). `--running`, `publish_api`, and public URLs are not available for Modal, and the error names the providers that have them.
 
 ### list_providers
 
@@ -265,7 +265,7 @@ A request that needs a missing capability fails before anything is created, with
 
 The result has `id`, `provider`, `work_dir`, `url` and `auth`. `work_dir` is where the repository lives inside the sandbox and is set only with `sync`. Use it instead of assuming a path.
 
-A failed copy, install or API publish deletes the sandbox. A failed `public` change keeps it, and the error says so. Create can take minutes when `sync` installs toolchains. The server writes each step to stderr while it waits.
+A failed copy, install or API publish deletes the sandbox. A failed `public` change keeps it, and the error says so. Create can take minutes when `sync` installs toolchains. The server writes each step to stderr while it waits. When the client sends a progress token, the same lines are also progress notifications.
 
 ### sync_repository
 
@@ -289,13 +289,13 @@ Without `provider`, the tool lists every provider that has credentials, in provi
 
 `command` is an argv list. It never goes through a shell. To use shell syntax, pass `["bash", "-c", "..."]`.
 
+`cwd` is an absolute directory inside the sandbox. Pass the `work_dir` from `create_sandbox` or `sync_repository`. Omit it and the command starts in the provider workspace when the sandbox was created with `sync`, or in the provider home or image default otherwise.
+
 A command that exits non-zero is a result: the tool succeeds and `exit_code` is set. A tool error means kaxa could not run the command, for example a missing sandbox or a provider failure.
 
-Each of `stdout` and `stderr` keeps the first 256 KiB. When more is produced, the rest is dropped, a marker line ends the text, and `truncated` is true. The command is not interrupted. There is no stdin, so a command that reads input sees end of file.
+Each of `stdout` and `stderr` keeps the last 256 KiB. When more was produced, the earlier bytes are dropped, a marker line ends the text, and `truncated` is true. The command is not interrupted. There is no stdin, so a command that reads input sees end of file.
 
-`timeout_seconds` stops a command that runs too long. It defaults to 1800 (30 minutes) and cannot exceed 7200 (2 hours). A command stopped by the timeout is a tool error.
-
-On a sandbox created with `sync`, the command starts in the provider workspace directory, which contains the repository. For Sprites that is `/home/sprite/workspace` and for Modal `/home/modal/workspace`, and `work_dir` is a subdirectory of it. Run project commands from `work_dir`, for example `["bash", "-c", "cd <work_dir> && go test ./..."]`.
+`timeout_seconds` stops a command that runs too long. It defaults to 1800 (30 minutes) and cannot exceed 7200 (2 hours). A command stopped by the timeout is a result with `timed_out` true and `exit_code` `-1`. The result keeps the output captured before the stop.
 
 ### Snapshots
 

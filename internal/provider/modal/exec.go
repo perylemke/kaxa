@@ -26,7 +26,7 @@ const sttyWrapper = `stty rows "$1" cols "$2" 2>/dev/null; shift 2; exec "$@"`
 //
 // A sandbox created with --sync runs the command as the modal user in
 // /home/modal/workspace; any other sandbox runs it as root in the image's
-// default directory.
+// default directory. opts.Dir, when set, replaces that directory.
 //
 // With TTY, Modal merges stderr into stdout, and the terminal size is applied once
 // at start: the Modal SDK has no way to resize a running terminal, so opts.Resize
@@ -38,6 +38,9 @@ func (p *Provider) Exec(ctx context.Context, id sandbox.ID, opts sandbox.ExecOpt
 	}
 	if len(opts.Command) == 0 {
 		return errors.New("modal exec: empty command")
+	}
+	if _, err := sandbox.ResolveExecDir(opts.Dir, ""); err != nil {
+		return err
 	}
 	c, secrets, err := p.clientAndSecrets()
 	if err != nil {
@@ -51,11 +54,16 @@ func (p *Provider) Exec(ctx context.Context, id sandbox.ID, opts sandbox.ExecOpt
 	if rec.ExitCode != nil {
 		return userErr(ErrNotFound, name, secrets...)
 	}
+	fallback := ""
 	if isSynced(rec) {
 		opts.Command = asModal(nil, opts.Command)
-		return p.run(ctx, id, workspaceDir, opts)
+		fallback = workspaceDir
 	}
-	return p.run(ctx, id, "", opts)
+	dir, err := sandbox.ResolveExecDir(opts.Dir, fallback)
+	if err != nil {
+		return err
+	}
+	return p.run(ctx, id, dir, opts)
 }
 
 // run starts opts.Command in dir and waits for it. The caller has checked the

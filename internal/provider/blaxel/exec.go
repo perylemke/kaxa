@@ -17,9 +17,12 @@ import (
 //
 // With TTY, Exec attaches to the terminal Blaxel starts and ignores Command.
 // A sandbox created with sync starts in /root/workspace; any other starts in
-// /root. The toolchain PATH is set for a command. An archived sandbox is left
-// archived.
+// /root. opts.Dir, when set, replaces that directory. The toolchain PATH is
+// set for a command. An archived sandbox is left archived.
 func (p *Provider) Exec(ctx context.Context, id sandbox.ID, opts sandbox.ExecOptions) error {
+	if _, err := sandbox.ResolveExecDir(opts.Dir, ""); err != nil {
+		return err
+	}
 	if opts.TTY {
 		return p.console(ctx, id, opts)
 	}
@@ -40,12 +43,17 @@ func (p *Provider) Exec(ctx context.Context, id sandbox.ID, opts sandbox.ExecOpt
 	if err != nil {
 		return err
 	}
+	fallback := blaxelHome
+	if p.synced(rec) {
+		fallback = workspaceDir
+	}
+	dir, err := sandbox.ResolveExecDir(opts.Dir, fallback)
+	if err != nil {
+		return err
+	}
 	spec := runSpec{
 		argv: opts.Command, stdin: pipedInput(opts.Stdin), stdout: opts.Stdout, stderr: opts.Stderr,
-		env: blaxelLayout.Env(), dir: blaxelHome,
-	}
-	if p.synced(rec) {
-		spec.dir = workspaceDir
+		env: blaxelLayout.Env(), dir: dir,
 	}
 	code, err := rt.Run(ctx, rec.Name, spec)
 	if err != nil {
@@ -68,9 +76,13 @@ func (p *Provider) console(ctx context.Context, id sandbox.ID, opts sandbox.Exec
 	if err != nil {
 		return err
 	}
-	dir := blaxelHome
+	fallback := blaxelHome
 	if p.synced(rec) {
-		dir = workspaceDir
+		fallback = workspaceDir
+	}
+	dir, err := sandbox.ResolveExecDir(opts.Dir, fallback)
+	if err != nil {
+		return err
 	}
 	err = rt.Terminal(ctx, rec.Name, termSpec{
 		dir: dir, stdin: opts.Stdin, stdout: opts.Stdout, stderr: opts.Stderr,
