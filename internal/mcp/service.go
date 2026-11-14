@@ -160,6 +160,7 @@ func (s *service) create(ctx context.Context, in createIn) (createOut, error) {
 		EnvKeys: sandboxEnvKeys(req.Env),
 	}
 	detail, err := p.Inspect(ctx, res.ID)
+	out.PreviewToken = takePreviewToken(p, res.ID)
 	if err != nil {
 		s.log.Warn("inspect after create failed", "sandbox", res.ID, "error", err)
 		return out, nil
@@ -177,7 +178,7 @@ func (s *service) createRequest(name string, in createIn) (lifecycle.Request, er
 	}
 	req := lifecycle.Request{
 		Name: name, Running: in.Running, Sync: in.Sync, Public: in.Public, Template: in.Template, NoInstall: in.NoInstall,
-		CPU: in.CPU, MemoryMiB: in.MemoryMiB, NetworkBlockAll: in.NetworkBlockAll,
+		CPU: in.CPU, MemoryMiB: in.MemoryMiB, DiskPercent: in.DiskPercent, NetworkBlockAll: in.NetworkBlockAll,
 	}
 	env, err := s.resolveSandboxEnv(in)
 	if err != nil {
@@ -482,6 +483,16 @@ func (s *service) destroy(ctx context.Context, in nameIn) (actionOut, error) {
 	return s.act(ctx, in, "destroyed", sandbox.Provider.Destroy)
 }
 
+func (s *service) unarchive(ctx context.Context, in nameIn) (actionOut, error) {
+	return s.act(ctx, in, "unarchived", func(p sandbox.Provider, ctx context.Context, id sandbox.ID) error {
+		u, ok := p.(sandbox.Unarchiver)
+		if !ok {
+			return lifecycle.Unsupported(p, sandbox.FeatureUnarchive)
+		}
+		return u.Unarchive(ctx, id)
+	})
+}
+
 func (s *service) restart(ctx context.Context, in nameIn) (actionOut, error) {
 	return s.act(ctx, in, "restarted", func(p sandbox.Provider, ctx context.Context, id sandbox.ID) error {
 		r, ok := p.(sandbox.Restarter)
@@ -545,6 +556,7 @@ func (s *service) publishAPI(ctx context.Context, in publishIn) (actionOut, erro
 	if err != nil {
 		return actionOut{}, err
 	}
+	ctx = sandbox.WithAPIPublic(ctx, in.Public)
 	err = s.progress(ctx, "publishing api…", func(ctx context.Context) error {
 		return publisher.PublishAPI(ctx, id, workDir, port, in.APICmd, env)
 	})
@@ -553,12 +565,21 @@ func (s *service) publishAPI(ctx context.Context, in publishIn) (actionOut, erro
 	}
 	out := actionOut{ID: string(id), Provider: p.Name(), Status: "published"}
 	detail, err := p.Inspect(ctx, id)
+	out.PreviewToken = takePreviewToken(p, id)
 	if err != nil {
 		s.log.Warn("inspect after publish failed", "sandbox", id, "error", err)
 		return out, nil
 	}
 	out.URL, out.Auth = detail.URL, detail.Auth
 	return out, nil
+}
+
+func takePreviewToken(p sandbox.Provider, id sandbox.ID) string {
+	cred, ok := p.(sandbox.PreviewCredential)
+	if !ok {
+		return ""
+	}
+	return cred.TakePreviewToken(id)
 }
 
 func publishDir(p sandbox.Provider, dir string) (string, error) {

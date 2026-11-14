@@ -32,7 +32,11 @@ func TestProviderIdentityAndCapabilities(t *testing.T) {
 		t.Fatal("configured provider is unavailable")
 	}
 	caps := sandbox.CapabilitiesOf(p)
-	want := sandbox.Capabilities{Sync: true, Setup: true, API: true, Layout: true, Template: true, Memory: true}
+	want := sandbox.Capabilities{
+		Sync: true, Setup: true, API: true, Layout: true, Template: true, Memory: true,
+		Snapshot: true, SnapshotRestore: string(sandbox.RestoreInPlace),
+		DiskPercent: true, Unarchive: true, PublicPreview: true,
+	}
 	if caps != want {
 		t.Fatalf("capabilities = %+v, want %+v", caps, want)
 	}
@@ -252,7 +256,7 @@ func TestInspectReportsPublishedAPIURL(t *testing.T) {
 	if err != nil || d.URL != "" {
 		t.Fatalf("URL before publish = %+v, %v", d, err)
 	}
-	if _, err := api.CreatePreview(t.Context(), apiName, 8000); err != nil {
+	if _, _, err := api.CreatePreview(t.Context(), apiName, 8000, true); err != nil {
 		t.Fatal(err)
 	}
 	d, err = p.Inspect(t.Context(), apiName)

@@ -82,8 +82,11 @@ func TestBlaxelCreateAPIThroughLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("inspect: %v", err)
 	}
-	if detail.URL == "" || detail.Auth != sandbox.URLAuthPublic {
-		t.Fatalf("detail = %+v, want a public url", detail)
+	if detail.URL == "" || detail.Auth != "" {
+		t.Fatalf("detail = %+v, want a private preview url", detail)
+	}
+	if p.TakePreviewToken(res.ID) != "preview-token" {
+		t.Fatal("private preview did not return a token")
 	}
 }
 
@@ -95,7 +98,7 @@ func TestBlaxelRejectsUnsupportedFeaturesThroughLifecycle(t *testing.T) {
 		want string
 	}{
 		{name: "running", req: lifecycle.Request{Name: boxName, Running: true}, want: "running is not available for blaxel"},
-		{name: "public url", req: lifecycle.Request{Name: boxName, Public: true}, want: "public urls is not available for blaxel"},
+		{name: "disk percent", req: lifecycle.Request{Name: boxName, DiskPercent: 5}, want: "invalid disk percent"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

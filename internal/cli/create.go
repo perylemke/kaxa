@@ -26,6 +26,7 @@ func newCreateCmd(reg *registry.Registry) *cobra.Command {
 	var template string
 	var cpu float64
 	var memoryMiB int
+	var diskPercent int
 	var networkBlockAll bool
 	var envFlag string
 	var envFile string
@@ -41,9 +42,10 @@ func newCreateCmd(reg *registry.Registry) *cobra.Command {
 --api publishes one HTTP service on that URL after the copy. It requires --api-cmd and works with Sprites, E2B, Docker, Daytona, and Blaxel. With --sync, the repository must be an HTTP API; a CLI project is rejected before the sandbox is created. The process must listen on 0.0.0.0 and on --api-port (8000 unless you change it). Together with --running, port 8080 stays with tmux and the URL forwards to the API. A failed publish deletes the sandbox. Create waits until the service is running. If it fails or does not become running within 90s, the sandbox is deleted.
 --env sets variables on the sandbox itself, as comma-separated KEY=VALUE entries. A value cannot contain a comma, and a bare KEY is rejected. --env-file reads a dotenv file; blank lines and # comments are ignored, export KEY=VALUE is accepted, and one layer of quotes is removed. There is no interpolation. The same key uses the --env value. These variables are not --api-env: exec and console see them, and with --api the service sees them too, with --api-env winning on the same key.
 --api-env sets a variable for that service: KEY=VALUE, or KEY to copy the value from your shell so a secret stays out of the command line. Repeat it for more variables. Values cannot contain commas. HOME, USER, PATH, and KAXA_ names are reserved.
---public makes the Sprites URL reachable without an account. A failed auth change leaves the sandbox in place.
+--public makes the Sprites URL reachable without an account, and makes a Blaxel preview public. Without it, a Blaxel preview is private and its token is printed once. A failed Sprites auth change leaves the sandbox in place.
 --template starts a sandbox from a template. On E2B it is a template you built with the E2B CLI or SDK, for example one with more memory, and it must have the same user and home as the base template (user, /home/user); without it, kaxa uses KAXA_E2B_TEMPLATE, then base. On Docker it is an image reference that Docker can pull, and it must have the same user and home as the Docker agent images (agent, /home/agent); without it, kaxa uses KAXA_DOCKER_TEMPLATE, then the image of the shell agent. On Daytona it is an image (or snapshot name) that Daytona can start, and it must have the same user and home as the Daytona default image (daytona, /home/daytona); without it, kaxa uses KAXA_DAYTONA_TEMPLATE, then the Daytona default. On Blaxel it is an image reference that must keep the same user and home as blaxel/base-image:latest (root, /root); without it, kaxa uses KAXA_BLAXEL_TEMPLATE, then blaxel/base-image:latest.
 --cpu and --memory request compute for the sandbox (empty means the provider default). Modal accepts fractional CPU and memory in MiB; Docker accepts both with integer CPU only; Blaxel accepts memory only. Other providers reject these flags.
+--disk-percent sets how much of a Blaxel sandbox's memory the filesystem may use, from 10 to 95. Empty uses KAXA_BLAXEL_DISK_PERCENT, then 50. Other providers reject it.
 Without a name, a wizard asks for the provider and name, then only the options that provider supports, then sync and API details when those are enabled. In a terminal it uses the alternate screen so the form does not mix with your scrollback; only the result is printed when it finishes.`,
 		Example: `  kaxa create --sync my-sprite
   kaxa create --sync --dir ~/projects/api-python my-sprite
@@ -70,6 +72,7 @@ Without a name, a wizard asks for the provider and name, then only the options t
 				Template:        template,
 				CPU:             cpu,
 				MemoryMiB:       memoryMiB,
+				DiskPercent:     diskPercent,
 				NetworkBlockAll: networkBlockAll,
 				Env:             envFlag,
 				EnvFile:         envFile,
@@ -85,13 +88,14 @@ Without a name, a wizard asks for the provider and name, then only the options t
 	cmd.Flags().IntVar(&apiPort, "api-port", defaultAPIPort, "port for --api; the process must listen on 0.0.0.0 (8080 is reserved with --running)")
 	cmd.Flags().StringArrayVar(&apiEnv, "api-env", nil, "environment variable for the --api service: KEY=VALUE, or KEY to copy it from this shell; repeat for more (no commas in values)")
 	cmd.Flags().StringVar(&template, "template", "", "template to start the sandbox from (E2B, Docker, Daytona, and Blaxel; default: KAXA_E2B_TEMPLATE, KAXA_DOCKER_TEMPLATE, KAXA_DAYTONA_TEMPLATE, or KAXA_BLAXEL_TEMPLATE, then the base image)")
-	cmd.Flags().BoolVar(&publicURL, "public", false, "make the Sprites URL reachable without authentication")
+	cmd.Flags().BoolVar(&publicURL, "public", false, "make the Sprites URL reachable without authentication, or make a Blaxel preview public")
 	cmd.Flags().Float64Var(&cpu, "cpu", 0, "CPU cores for the sandbox (Modal and Docker; fractional on Modal; omit for the provider default)")
 	cmd.Flags().IntVar(&memoryMiB, "memory", 0, "memory for the sandbox in MiB (Modal, Docker, Blaxel; omit for the provider default)")
+	cmd.Flags().IntVar(&diskPercent, "disk-percent", 0, "share of Blaxel memory for the filesystem, from 10 to 95 (omit for KAXA_BLAXEL_DISK_PERCENT or 50)")
 	cmd.Flags().BoolVar(&networkBlockAll, "block-all-network-access", false, "block all outbound network access from the sandbox (Daytona)")
 	cmd.Flags().StringVar(&envFlag, "env", "", "comma-separated KEY=VALUE variables for the sandbox (a value cannot contain a comma)")
 	cmd.Flags().StringVar(&envFile, "env-file", "", "dotenv file of sandbox variables; --env wins on the same key")
-	markProviderFlags(cmd, "running", "api", "api-cmd", "api-port", "api-env", "template", "public", "cpu", "memory", "block-all-network-access")
+	markProviderFlags(cmd, "running", "api", "api-cmd", "api-port", "api-env", "template", "public", "cpu", "memory", "disk-percent", "block-all-network-access")
 	return cmd
 }
 
@@ -124,7 +128,7 @@ func namedCreateRequest(name string, flags createFlags, portSet bool) (createReq
 	}
 	req := createRequest{
 		Name: name, Running: flags.Running, Sync: flags.Sync, Template: flags.Template, NoInstall: flags.NoInstall,
-		CPU: flags.CPU, MemoryMiB: flags.MemoryMiB, NetworkBlockAll: flags.NetworkBlockAll, Env: env,
+		CPU: flags.CPU, MemoryMiB: flags.MemoryMiB, DiskPercent: flags.DiskPercent, NetworkBlockAll: flags.NetworkBlockAll, Env: env,
 	}
 	if err := applyAPIFlags(&req, flags, portSet); err != nil {
 		return createRequest{}, err
@@ -185,6 +189,7 @@ func resolveCreateRequest(cmd *cobra.Command, reg *registry.Registry, args []str
 		NoInstall:       form.NoInstall,
 		CPU:             form.CPU,
 		MemoryMiB:       form.MemoryMiB,
+		DiskPercent:     form.DiskPercent,
 		NetworkBlockAll: form.NetworkBlockAll,
 	}
 	cfg.Provider = form.Provider
@@ -198,12 +203,16 @@ func resolveCreateRequest(cmd *cobra.Command, reg *registry.Registry, args []str
 func writeCreated(cmd *cobra.Command, p sandbox.Provider, id sandbox.ID, req createRequest) error {
 	ref := sandboxLabel(p.Name(), id)
 	msg := fmt.Sprintf("sandbox %s is ready", ref)
-	if req.Running || req.API || req.Public {
+	token := ""
+	if cred, ok := p.(sandbox.PreviewCredential); ok {
+		token = cred.TakePreviewToken(id)
+	}
+	if req.Running || req.API || req.Public || token != "" {
 		detail, err := p.Inspect(cmd.Context(), id)
 		if err != nil {
 			return err
 		}
-		msg = createdMessage(ref, p.Name(), detail, req)
+		msg = createdMessage(ref, p.Name(), detail, req, token)
 		if req.Running && !req.API {
 			_ = openBrowserFn(detail.URL)
 		}

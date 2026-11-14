@@ -2,8 +2,8 @@
 //
 // It uses the official Blaxel Go SDK (github.com/blaxel-ai/sdk-go) behind the
 // apiClient and runtime interfaces, so tests run on fakes. Sandboxes scale to
-// zero when idle and resume with their files and processes. kaxa does not
-// restart, snapshot, or open a terminal: the process API has no PTY.
+// zero when idle and resume with their files and processes. Snapshots restore
+// the same sandbox. Restart and upgrade are not available.
 package blaxel
 
 import (
@@ -38,9 +38,10 @@ const (
 
 // Provider implements sandbox.Provider for Blaxel sandboxes.
 //
-// Blaxel has no in-place restart, no snapshot in this version, and no terminal
-// on the sandbox URL, so Provider does not implement sandbox.Restarter,
-// sandbox.Upgrader, sandbox.PublicURL, sandbox.RunningSupport, or sandbox.Snapshotter.
+// Blaxel has no in-place restart and no Sprites-style URL auth, so Provider
+// does not implement sandbox.Restarter, sandbox.Upgrader, sandbox.PublicURL,
+// or sandbox.RunningSupport. Snapshots restore in place. A standby sandbox
+// resumes on the next call; that is not a restart.
 type Provider struct {
 	mu        sync.Mutex
 	apiKey    string
@@ -51,9 +52,14 @@ type Provider struct {
 	// can miss one whose labels are not visible yet.
 	recent sync.Map
 
-	template string
-	region   string
-	memory   int
+	template    string
+	region      string
+	memory      int
+	diskPercent int
+	// snapshotIndex is the comment file. Empty uses the user config directory.
+	snapshotIndex string
+	// previewTokens holds a private preview token until TakePreviewToken reads it.
+	previewTokens sync.Map
 	// startTimeout and pollInterval bound the waits for a sandbox.
 	startTimeout, pollInterval time.Duration
 	// goneLimit bounds the wait after a delete. Zero means goneTimeout.
@@ -96,6 +102,12 @@ func (*Provider) SupportsTemplate() {}
 // SupportsMemory marks Blaxel as honoring sandbox memory (MiB) when non-zero.
 func (*Provider) SupportsMemory() {}
 
+// SupportsDiskPercent marks Blaxel as honoring the filesystem share of memory.
+func (*Provider) SupportsDiskPercent() {}
+
+// SupportsPublicPreview marks Blaxel as able to open a public API preview.
+func (*Provider) SupportsPublicPreview() {}
+
 // SetDefaultTemplate sets the image used when a create names none. An empty
 // name restores blaxel/base-image:latest.
 func (p *Provider) SetDefaultTemplate(name string) error {
@@ -127,6 +139,18 @@ func (p *Provider) SetMemory(mb int) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.memory = mb
+	return nil
+}
+
+// SetDiskPercent sets the filesystem share of memory for a new sandbox, from
+// 10 to 95. Zero omits the field and Blaxel uses 50.
+func (p *Provider) SetDiskPercent(percent int) error {
+	if err := validateDiskPercent(percent); err != nil {
+		return err
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.diskPercent = percent
 	return nil
 }
 
@@ -209,8 +233,13 @@ func (p *Provider) createParams(spec sandbox.Spec) (CreateParams, error) {
 	if err != nil {
 		return CreateParams{}, err
 	}
+	disk, err := p.diskFor(spec)
+	if err != nil {
+		return CreateParams{}, err
+	}
 	params := CreateParams{
-		Name: spec.Name, Image: image, Region: p.regionFor(), Memory: p.memoryFor(spec), Labels: spec.Labels,
+		Name: spec.Name, Image: image, Region: p.regionFor(), Memory: p.memoryFor(spec),
+		DiskPercent: disk, Labels: spec.Labels,
 	}
 	if !spec.ExposeAPI {
 		return params, nil
@@ -256,6 +285,19 @@ func (p *Provider) memoryFor(spec sandbox.Spec) int {
 		return p.memory
 	}
 	return defaultMemory
+}
+
+func (p *Provider) diskFor(spec sandbox.Spec) (int, error) {
+	percent := spec.DiskPercent
+	if percent == 0 {
+		p.mu.Lock()
+		percent = p.diskPercent
+		p.mu.Unlock()
+	}
+	if err := validateDiskPercent(percent); err != nil {
+		return 0, err
+	}
+	return percent, nil
 }
 
 func removeBest(ctx context.Context, c apiClient, name string) error {
@@ -304,10 +346,13 @@ func (p *Provider) Inspect(ctx context.Context, id sandbox.ID) (sandbox.Detail, 
 	}
 	var url, auth string
 	if rec.APIPort != 0 {
-		u, err := c.PreviewURL(ctx, rec.Name)
+		u, public, err := c.PreviewURL(ctx, rec.Name)
 		switch {
 		case err == nil:
-			url, auth = u, sandbox.URLAuthPublic
+			url = u
+			if public {
+				auth = sandbox.URLAuthPublic
+			}
 		case !errors.Is(err, ErrNotFound):
 			return sandbox.Detail{}, userErr(err, string(id), secrets...)
 		}
@@ -459,7 +504,7 @@ func usable(rec Record) error {
 	case statusArchived:
 		return usererr.New(
 			fmt.Sprintf("sandbox %q is archived", rec.Name),
-			"unarchive it in the Blaxel console, or create a new sandbox",
+			"run kaxa unarchive "+rec.Name+" --provider blaxel",
 		)
 	default:
 		return usererr.New(

@@ -84,7 +84,7 @@ func TestRootHelpListsEveryCommandInOneList(t *testing.T) {
 
 	want := []string{
 		"completion", testCmdConsole, testCmdCreate, testCmdDestroy, testCmdExec, testCmdList, "mcp",
-		testCmdRestart, cmdSnapshot, "sync", testCmdUpgrade, testCmdURL, cmdVersion,
+		testCmdRestart, cmdSnapshot, "sync", "unarchive", testCmdUpgrade, testCmdURL, cmdVersion,
 	}
 	if got := sections[sectionCommands]; !slices.Equal(got, want) {
 		t.Errorf("Commands = %v, want %v\n%s", got, want, help)

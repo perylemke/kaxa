@@ -57,6 +57,10 @@ type Spec struct {
 	// MemoryMiB is memory for the sandbox in MiB. Zero means the provider default.
 	// Only providers that implement MemorySupport read it.
 	MemoryMiB int
+	// DiskPercent is the share of sandbox memory the filesystem may use, from
+	// 10 to 95. Zero means the provider default. Only a provider that implements
+	// DiskPercentSupport reads it.
+	DiskPercent int
 	// NetworkBlockAll blocks every outbound connection from the sandbox.
 	// Only a provider that implements NetworkBlockSupport accepts it.
 	NetworkBlockAll bool
@@ -236,6 +240,42 @@ type CPUSupport interface {
 // MemorySupport marks a provider that honors Spec.MemoryMiB when non-zero.
 type MemorySupport interface {
 	SupportsMemory()
+}
+
+// DiskPercentSupport marks a provider that honors Spec.DiskPercent when non-zero.
+type DiskPercentSupport interface {
+	SupportsDiskPercent()
+}
+
+// Unarchiver brings an archived sandbox back. It does not restart a running one.
+type Unarchiver interface {
+	Unarchive(ctx context.Context, id ID) error
+}
+
+// PublicPreview marks an API publisher whose preview can be public.
+// It is not URL auth: kaxa url stays on PublicURL.
+type PublicPreview interface {
+	SupportsPublicPreview()
+}
+
+// PreviewCredential returns a one-time secret for a private API preview.
+// TakePreviewToken forgets the token after the first read.
+type PreviewCredential interface {
+	TakePreviewToken(id ID) string
+}
+
+type apiPublicKey struct{}
+
+// WithAPIPublic records whether the API preview of this create should be public.
+// A provider that implements PublicPreview reads it inside PublishAPI.
+func WithAPIPublic(ctx context.Context, public bool) context.Context {
+	return context.WithValue(ctx, apiPublicKey{}, public)
+}
+
+// APIPublicFrom reports the value stored by WithAPIPublic. The default is private.
+func APIPublicFrom(ctx context.Context) bool {
+	public, _ := ctx.Value(apiPublicKey{}).(bool)
+	return public
 }
 
 // NetworkBlockSupport marks a provider that can block all outbound network

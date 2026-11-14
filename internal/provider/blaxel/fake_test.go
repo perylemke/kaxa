@@ -2,6 +2,7 @@ package blaxel
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"slices"
 	"strings"
@@ -25,10 +26,14 @@ type fakeResult struct {
 }
 
 type fakeAPI struct {
-	mu           sync.Mutex
-	sandboxes    map[string]*Record
-	lastCreate   CreateParams
-	previews     map[string]string
+	mu         sync.Mutex
+	sandboxes  map[string]*Record
+	lastCreate CreateParams
+	previews   map[string]previewState
+	snaps      []snapshotRow
+	// snapPending is how many reads leave the newest snapshot pending.
+	snapPending  int
+	snapFail     bool
 	createStatus string
 	createErr    error
 	commands     [][]string
@@ -60,7 +65,7 @@ type termCall struct {
 
 func newFakeAPI() *fakeAPI {
 	return &fakeAPI{
-		sandboxes: map[string]*Record{}, previews: map[string]string{},
+		sandboxes: map[string]*Record{}, previews: map[string]previewState{},
 		uploads: map[string]string{}, createStatus: statusRunning,
 	}
 }
@@ -70,7 +75,13 @@ func newTestProvider(t *testing.T, api *fakeAPI) *Provider {
 	p := NewWithClients(api, api, "test-key", "kaxa")
 	p.SetPolling(time.Second, time.Millisecond)
 	p.SetReadiness(time.Second, time.Millisecond)
+	p.SetSnapshotIndexPath(t.TempDir() + "/snapshots.json")
 	return p
+}
+
+type previewState struct {
+	url    string
+	public bool
 }
 
 func (f *fakeAPI) ListHub(context.Context) ([]hubTemplate, error) {
@@ -162,30 +173,131 @@ func (f *fakeAPI) Delete(_ context.Context, name string) error {
 	return nil
 }
 
-func (f *fakeAPI) PreviewURL(_ context.Context, name string) (string, error) {
+func (f *fakeAPI) PreviewURL(_ context.Context, name string) (string, bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if _, ok := f.sandboxes[name]; !ok {
-		return "", ErrNotFound
+		return "", false, ErrNotFound
 	}
-	url, ok := f.previews[name]
+	preview, ok := f.previews[name]
 	if !ok {
-		return "", ErrNotFound
+		return "", false, ErrNotFound
 	}
-	return url, nil
+	return preview.url, preview.public, nil
 }
 
-func (f *fakeAPI) CreatePreview(_ context.Context, name string, port int) (string, error) {
+func (f *fakeAPI) CreatePreview(_ context.Context, name string, port int, public bool) (string, string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	rec, ok := f.sandboxes[name]
 	if !ok {
-		return "", ErrNotFound
+		return "", "", ErrNotFound
 	}
-	url := "https://" + name + ".preview.example"
-	f.previews[name] = url
+	previewURL := "https://" + name + ".preview.example"
+	f.previews[name] = previewState{url: previewURL, public: public}
 	rec.APIPort = port
-	return url, nil
+	if public {
+		return previewURL, "", nil
+	}
+	return previewURL, "preview-token", nil
+}
+
+func (f *fakeAPI) CreateSnapshot(_ context.Context, sandboxName string) (snapshotRow, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.sandboxes[sandboxName]; !ok {
+		return snapshotRow{}, ErrNotFound
+	}
+	status := snapReady
+	if f.snapFail {
+		status = snapFailed
+	} else if f.snapPending > 0 {
+		status = "pending"
+	}
+	id := fmt.Sprintf("snap-%s-%d", sandboxName, len(f.snaps)+1)
+	row := snapshotRow{
+		ID: id, Name: id, Sandbox: sandboxName,
+		Status: status, CreatedAt: time.Unix(1_700_000_100, 0).UTC(),
+	}
+	f.snaps = append(f.snaps, row)
+	return row, nil
+}
+
+func (f *fakeAPI) GetSnapshot(_ context.Context, id string) (snapshotRow, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for i := range f.snaps {
+		if f.snaps[i].ID != id {
+			continue
+		}
+		if f.snaps[i].Status == "pending" && f.snapPending > 0 {
+			f.snapPending--
+			if f.snapPending == 0 {
+				f.snaps[i].Status = snapReady
+			}
+		}
+		return f.snaps[i], nil
+	}
+	return snapshotRow{}, ErrNotFound
+}
+
+func (f *fakeAPI) ListSandboxSnapshots(_ context.Context, sandboxName string) ([]snapshotRow, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.snapshotsOf(sandboxName), nil
+}
+
+func (f *fakeAPI) ListWorkspaceSnapshots(context.Context) ([]snapshotRow, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.snaps), nil
+}
+
+func (f *fakeAPI) snapshotsOf(sandboxName string) []snapshotRow {
+	var out []snapshotRow
+	for _, row := range f.snaps {
+		if row.Sandbox == sandboxName {
+			out = append(out, row)
+		}
+	}
+	return out
+}
+
+func (f *fakeAPI) DeleteSnapshot(_ context.Context, id string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	next := slices.DeleteFunc(f.snaps, func(row snapshotRow) bool { return row.ID == id })
+	if len(next) == len(f.snaps) {
+		return ErrNotFound
+	}
+	f.snaps = next
+	return nil
+}
+
+func (f *fakeAPI) RestoreSnapshot(_ context.Context, sandboxName, id string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.sandboxes[sandboxName]; !ok {
+		return ErrNotFound
+	}
+	for _, row := range f.snaps {
+		if row.ID == id {
+			f.sandboxes[sandboxName].Status = statusRunning
+			return nil
+		}
+	}
+	return ErrNotFound
+}
+
+func (f *fakeAPI) Unarchive(_ context.Context, name string) (Record, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	rec, ok := f.sandboxes[name]
+	if !ok {
+		return Record{}, ErrNotFound
+	}
+	rec.Status = statusStarting
+	return *rec, nil
 }
 
 func (f *fakeAPI) Run(_ context.Context, name string, spec runSpec) (int, error) {

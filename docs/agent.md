@@ -71,14 +71,14 @@ After the server is connected, ask the agent to call `list_providers`. Sprites, 
 | E2B | create (with `sync` and `api`), list, inspect, exec, restart, destroy | `sync`, `setup`, `api`, `workspace_layout`, `restart` |
 | Docker | create (with `sync`, `template`, and `api`), list, inspect, exec, restart, snapshots, destroy | `sync`, `setup`, `api`, `workspace_layout`, `restart`, `template`, `snapshot` |
 | Daytona | create (with `sync`, `template`, `api`, and `block_all_network_access`), list, inspect, exec, restart, snapshots, destroy | `sync`, `setup`, `api`, `workspace_layout`, `restart`, `template`, `network_block`, `snapshot` |
-| Blaxel | create (with `sync`, `template`, and `api`), list, inspect, exec, console, sync, destroy | `sync`, `setup`, `api`, `workspace_layout`, `template` |
+| Blaxel | create (with `sync`, `template`, `api`, and `disk_percent`), list, inspect, exec, console, sync, snapshots, unarchive, destroy | `sync`, `setup`, `api`, `workspace_layout`, `template`, `memory`, `snapshot`, `disk_percent`, `unarchive`, `public_preview` |
 
 What to expect from `exec` and the other tools on each provider:
 
 - **Modal:** commands start in the image root. A sandbox created with `sync` runs them as the `modal` user in `/home/modal/workspace`.
 - **E2B:** commands run as `user`, starting in `/home/user`, or in `/home/user/workspace` when the sandbox was created with `sync`. The toolchain `PATH` is set either way, and every sandbox has a workspace, so `sync_repository` works without `sync` at create time.
 - **Daytona:** it works through the Daytona API. Set `KAXA_DAYTONA_API_KEY` in the environment of `kaxa mcp`, and `KAXA_DAYTONA_TEMPLATE` for a default template. Commands run as `daytona`, starting where the image starts, or in `/home/daytona/workspace` when the sandbox was created with `sync`. The toolchain `PATH` is set either way, and every sandbox has a workspace. `api` makes one port public on a preview URL, and anyone with the URL can call it. `block_all_network_access` blocks every outbound connection; toolchain downloads then fail, while a public preview URL still accepts inbound calls. A Daytona sandbox is billed to your Daytona account while it runs.
-- **Blaxel:** it works through the Blaxel API. Set `KAXA_BLAXEL_API_KEY` and `KAXA_BLAXEL_WORKSPACE` in the environment of `kaxa mcp`. `KAXA_BLAXEL_TEMPLATE`, `KAXA_BLAXEL_REGION`, and `KAXA_BLAXEL_MEMORY` are optional. Commands run as `root`, starting in `/root`, or in `/root/workspace` when the sandbox was created with `sync`. The toolchain `PATH` is set either way, and every sandbox has a workspace. `console` attaches to the terminal the sandbox starts, in that same directory. `api` opens a public preview named `kaxa-api`, and anyone with the URL can call it. A Blaxel sandbox is billed to your workspace while it runs.
+- **Blaxel:** it works through the Blaxel API. Set `KAXA_BLAXEL_API_KEY` and `KAXA_BLAXEL_WORKSPACE` in the environment of `kaxa mcp`. `KAXA_BLAXEL_TEMPLATE`, `KAXA_BLAXEL_REGION`, `KAXA_BLAXEL_MEMORY`, and `KAXA_BLAXEL_DISK_PERCENT` are optional. Commands run as `root`, starting in `/root`, or in `/root/workspace` when the sandbox was created with `sync`. The toolchain `PATH` is set either way, and every sandbox has a workspace. `console` attaches to the terminal the sandbox starts, in that same directory. `api` opens a private preview named `kaxa-api`. The result includes `preview_token` once; without it the URL does not open. Do not write the token into a file, a label, or a later message. `public: true` makes that preview public and omits the token. `snapshot_restore` is `in_place`. An archived sandbox needs `unarchive` before `exec`. Standby is already running and resumes on the next call. There is no `restart`. A Blaxel sandbox is billed to your workspace while it runs.
 - **Docker:** it works through the Docker Sandboxes API. Set `KAXA_DOCKER_ID` and `KAXA_DOCKER_PAT` in the environment of `kaxa mcp`, and `KAXA_DOCKER_TEMPLATE` for a default template. Commands run as `agent`, starting where the image starts, or in `/home/agent/workspace` when the sandbox was created with `sync`. The toolchain `PATH` is set either way, and every sandbox has a workspace. `api` publishes one HTTP service on a URL that Docker chooses, and anyone with the URL can call it. A Docker sandbox is billed to your Docker subscription while it runs.
 
 ### Cursor
@@ -204,6 +204,7 @@ Every tool that works on a sandbox takes an optional `provider`. Without it, the
 | `list_sandboxes` | Sandboxes of every configured provider, or of one with `provider` |
 | `inspect` | Status, labels, URL, URL auth, and, when the provider has a workspace layout, `home_dir` and `workspace_dir` |
 | `restart`, `upgrade` | Same as [restart](restart.md) and [upgrade](upgrade.md) |
+| `unarchive` | Bring an archived Blaxel sandbox back. Same as [unarchive](unarchive.md). `exec` does not do this |
 | `destroy` | Delete a sandbox. The name is required |
 | `create_snapshot`, `list_snapshots`, `restore_snapshot`, `delete_snapshot` | Save, list, restore, and delete sandbox snapshots. See [snapshot](snapshot.md) and [Snapshots](#snapshots) |
 | `publish_api` | Start one HTTP service in an existing sandbox. The result includes `url` and `auth` when the provider reports them |
@@ -237,8 +238,11 @@ Call this first. A provider is `available: false` when it cannot serve requests 
 | `sync` | `create_sandbox` with `sync`, and `sync_repository` |
 | `setup` | Dependency install after a sync |
 | `api` | `create_sandbox` with `api`, and `publish_api` |
-| `public_url` | `create_sandbox` with `public`, and `set_url_auth` |
+| `public_url` | `create_sandbox` with `public` on Sprites, and `set_url_auth` |
+| `public_preview` | `create_sandbox` with `public` on Blaxel. The preview is private when `public` is omitted |
 | `restart` | `restart` |
+| `unarchive` | `unarchive` |
+| `disk_percent` | `create_sandbox` with `disk_percent` (Blaxel) |
 | `upgrade` | `upgrade` |
 | `running` | `create_sandbox` with `running` |
 | `template` | `create_sandbox` with `template` (E2B) |
@@ -264,7 +268,8 @@ A request that needs a missing capability fails before anything is created, with
 | `api_env` | Service environment as a list. Each item is `KEY=VALUE`, or `KEY` to copy the value from the server environment, but only for names the user listed in `KAXA_MCP_API_ENV`. No commas in values. `HOME`, `USER`, `PATH`, and names that start with `KAXA_`, `MODAL_TOKEN_`, `FLY_`, or `SPRITES_` are reserved. Requires `api` |
 | `env` | Names of server environment variables to copy into the sandbox. Each item is a name, never `KEY=VALUE`. The name must be listed in `KAXA_MCP_ENV`. These names replace the same key from `env_file` |
 | `env_file` | Path of a dotenv file inside the server root. A relative path is inside that root. Pass the path; do not open the file or paste its contents |
-| `public` | Make the URL reachable without a provider account. Refused with `running` unless `api` is set, because the tmux terminal has no login |
+| `public` | On Sprites, make the URL reachable without a provider account. On Blaxel, make the preview public. Refused with `running` unless `api` is set, because the tmux terminal has no login |
+| `disk_percent` | Share of Blaxel memory for the filesystem, from 10 to 95. Omit for `KAXA_BLAXEL_DISK_PERCENT` or the API default of 50 |
 | `block_all_network_access` | Block all outbound network access. Daytona only. Toolchain downloads fail while it is on |
 
 The result has `id`, `provider`, `work_dir`, `url`, `auth`, and `env_keys` when the sandbox has environment variables. `env_keys` is names only. `work_dir` is where the repository lives inside the sandbox and is set only with `sync`. Use it instead of assuming a path.
@@ -309,10 +314,10 @@ Each of `stdout` and `stderr` keeps the last 256 KiB. When more was produced, th
 
 | `snapshot_restore` | Provider | `target` | Effect |
 | --- | --- | --- | --- |
-| `in_place` | Sprites | Rejected | Overwrites the sandbox and discards what changed after the snapshot |
+| `in_place` | Sprites, Blaxel | Rejected | Overwrites the sandbox and discards what changed after the snapshot |
 | `new_sandbox` | Modal, Docker, Daytona | Required, and different from `name` | Creates `target` from the snapshot and keeps the source |
 
-The result has `sandbox` (the one that holds the restored state), `snapshot`, `provider`, and `status`. `restore_snapshot` and `delete_snapshot` are marked destructive so a client can ask first; call them only when the user asks. A snapshot holds everything in the sandbox, including secrets written there. Modal snapshots are kept for 30 days and are listed only on the machine that took them. Docker snapshots are kept until deleted and are listed from any machine. See [snapshot](snapshot.md).
+The result has `sandbox` (the one that holds the restored state), `snapshot`, `provider`, and `status`. `restore_snapshot` and `delete_snapshot` are marked destructive so a client can ask first; call them only when the user asks. A snapshot holds everything in the sandbox, including secrets written there. Modal snapshots are kept for 30 days and are listed only on the machine that took them. Docker snapshots are kept until deleted and are listed from any machine. Blaxel comments are stored on this machine, and a list without a name shows only those snapshots. Standby on Blaxel is not a snapshot restore. See [snapshot](snapshot.md).
 
 ## Limits
 
@@ -320,7 +325,8 @@ The result has `sandbox` (the one that holds the restored state), `snapshot`, `p
 - `sync_repository` adds a repository but never refreshes one. To send new local changes, create a new sandbox or move the code with `git` inside `exec`.
 - `sync` and `sync_repository` copy only a repository that contains `KAXA_MCP_ROOT` or sits below it. When the variable is empty, the server working directory is that bound. This keeps a prompt from sending an unrelated repository to a remote provider. Pass a `dir` inside the bound. A symlink that leaves it is rejected. The server refuses the filesystem root and your home directory, because that would allow every repository under them. `kaxa mcp init --root` writes the variable; a set `KAXA_MCP_ROOT` that is your home directory or `/` stops the server before it listens.
 - Network policy and connectors are not exposed. Use the provider's own tools for them. Memory snapshots are not supported.
-- `destroy` is permanent, and its tool is marked destructive so a client can ask first. On Modal, Docker, and Daytona it does not delete snapshots, which outlive the sandbox; on Sprites the checkpoints are destroyed with the sprite.
+- `destroy` is permanent, and its tool is marked destructive so a client can ask first. On Modal, Docker, Daytona, and Blaxel it does not delete snapshots, which outlive the sandbox; on Sprites the checkpoints are destroyed with the sprite.
+- A private Blaxel preview token is returned once in `preview_token`. It is not in `inspect` or `list_sandboxes`. Do not store it.
 
 ## Errors
 

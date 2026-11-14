@@ -85,6 +85,7 @@ func TestLoadBlaxelFromEnv(t *testing.T) {
 	t.Setenv("KAXA_BLAXEL_TEMPLATE", "blaxel/py-app:latest")
 	t.Setenv("KAXA_BLAXEL_REGION", "eu-lon-1")
 	t.Setenv("KAXA_BLAXEL_MEMORY", "8192")
+	t.Setenv("KAXA_BLAXEL_DISK_PERCENT", "70")
 
 	cfg, err := config.Load(config.LoadOptions{}, reg)
 	if err != nil {
@@ -93,8 +94,18 @@ func TestLoadBlaxelFromEnv(t *testing.T) {
 	if cfg.Blaxel.APIKey != "bl-key" || cfg.Blaxel.Workspace != "kaxa" || cfg.Blaxel.Template != "blaxel/py-app:latest" {
 		t.Fatalf("blaxel config = %+v", cfg.Blaxel)
 	}
-	if cfg.Blaxel.Region != "eu-lon-1" || cfg.Blaxel.MemoryMB != 8192 {
+	if cfg.Blaxel.Region != "eu-lon-1" || cfg.Blaxel.MemoryMB != 8192 || cfg.Blaxel.DiskPercent != 70 {
 		t.Fatalf("blaxel placement = %+v", cfg.Blaxel)
+	}
+}
+
+func TestLoadRejectsBadBlaxelDiskPercent(t *testing.T) {
+	reg := testRegistry(t)
+	t.Setenv("KAXA_BLAXEL_DISK_PERCENT", "5")
+
+	_, err := config.Load(config.LoadOptions{}, reg)
+	if err == nil {
+		t.Fatal("expected invalid disk percent error")
 	}
 }
 

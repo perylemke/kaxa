@@ -117,7 +117,7 @@ func serverRoot() (string, error) {
 
 func (s *service) register(srv *sdk.Server) {
 	addTool(s, srv, "list_providers", "List providers",
-		"List the registered sandbox providers, whether each is available, and which optional features it supports (sync, setup, api, public_url, workspace_layout, cpu, memory, snapshot). A provider with snapshot also reports snapshot_restore: in_place or new_sandbox.",
+		"List the registered sandbox providers, whether each is available, and which optional features it supports (sync, setup, api, public_url, public_preview, workspace_layout, cpu, memory, disk_percent, snapshot, unarchive). A provider with snapshot also reports snapshot_restore: in_place or new_sandbox.",
 		readOnly, s.listProviders)
 	addTool(s, srv, "create_sandbox", "Create a sandbox",
 		"Create a sandbox. With sync it copies a local Git repository into the sandbox and installs its dependencies; a failed copy, install or API publish deletes the sandbox. Can take minutes. env is a list of names copied from the server only when each name is in KAXA_MCP_ENV; never pass KEY=VALUE. env_file is a dotenv path inside the server root; pass the path, do not open the file or paste secrets. The response lists env_keys and never the values.",
@@ -134,6 +134,9 @@ func (s *service) register(srv *sdk.Server) {
 	addTool(s, srv, "inspect", "Inspect a sandbox",
 		"Show status, labels, URL and URL auth of a sandbox. When the provider has a workspace layout, the result includes home_dir, and workspace_dir when the sandbox was created with sync.",
 		readOnly, s.inspect)
+	addTool(s, srv, "unarchive", "Unarchive a sandbox",
+		"Bring an archived sandbox back from its stored filesystem. Processes start again with new ids. Only providers that list unarchive in their capabilities support it. A standby sandbox resumes on the next call and does not need this.",
+		idempotent, s.unarchive)
 	addTool(s, srv, "restart", "Restart a sandbox",
 		"Restart a sandbox.",
 		idempotent, s.restart)

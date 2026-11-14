@@ -32,6 +32,7 @@ type blaxelAccount interface {
 	Configure(apiKey, workspace string) error
 	SetRegion(region string) error
 	SetMemory(mb int) error
+	SetDiskPercent(percent int) error
 }
 
 type credentialsConfigurer interface {
@@ -131,6 +132,9 @@ func configureBlaxel(p sandbox.Provider, cfg config.BlaxelConfig) error {
 		return err
 	}
 	if err := c.SetMemory(cfg.MemoryMB); err != nil {
+		return err
+	}
+	if err := c.SetDiskPercent(cfg.DiskPercent); err != nil {
 		return err
 	}
 	if d, ok := p.(templateDefaulter); ok {

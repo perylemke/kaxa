@@ -29,6 +29,7 @@ Every command except `version` and `--help` loads configuration before it runs.
 | `KAXA_BLAXEL_TEMPLATE` | Blaxel image for new sandboxes. Optional; default `blaxel/base-image:latest` |
 | `KAXA_BLAXEL_REGION` | Blaxel region. Optional; default `us-pdx-1` |
 | `KAXA_BLAXEL_MEMORY` | Blaxel memory in megabytes. Optional; default `4096` |
+| `KAXA_BLAXEL_DISK_PERCENT` | Share of Blaxel memory for the filesystem, from 10 to 95. Optional; empty uses 50. `create --disk-percent` overrides it |
 
 `--provider` wins over `KAXA_DEFAULT_PROVIDER`. Tokens are never read from a flag, from the Sprites CLI config file, from `~/.modal.toml`, from `E2B_API_KEY`, or from `BL_API_KEY`, `BL_WORKSPACE`, and `~/.blaxel`.
 
@@ -44,6 +45,7 @@ Every command except `version` and `--help` loads configuration before it runs.
 | `kaxa sync` | [sync](sync.md) |
 | `kaxa destroy` (`rm`) | [destroy](destroy.md) |
 | `kaxa restart` | [restart](restart.md) |
+| `kaxa unarchive` | [unarchive](unarchive.md) |
 | `kaxa upgrade` | [upgrade](upgrade.md) |
 | `kaxa snapshot` | [snapshot](snapshot.md) |
 | `kaxa url` | [url](url.md) |

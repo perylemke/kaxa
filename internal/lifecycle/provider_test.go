@@ -263,6 +263,7 @@ type blaxelProvider struct {
 	basicProvider
 	apiKey, workspace, template, region string
 	memory                              int
+	disk                                int
 	configErr, regionErr, memoryErr     error
 	templateErr                         error
 }
@@ -289,18 +290,23 @@ func (b *blaxelProvider) SetMemory(mb int) error {
 	return b.memoryErr
 }
 
+func (b *blaxelProvider) SetDiskPercent(percent int) error {
+	b.disk = percent
+	return nil
+}
+
 func TestResolveProviderConfiguresBlaxel(t *testing.T) {
 	t.Parallel()
 
 	p := &blaxelProvider{}
 	cfg := config.Config{Blaxel: config.BlaxelConfig{
-		APIKey: keyFixture, Workspace: labelKaxa, Template: "blaxel/py-app:latest", Region: "eu-lon-1", MemoryMB: 8192,
+		APIKey: keyFixture, Workspace: labelKaxa, Template: "blaxel/py-app:latest", Region: "eu-lon-1", MemoryMB: 8192, DiskPercent: 70,
 	}}
 
 	if _, err := lifecycle.ResolveProvider(registryWith(t, p), cfg, "blaxel"); err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
-	if p.apiKey != keyFixture || p.workspace != labelKaxa || p.template != "blaxel/py-app:latest" || p.region != "eu-lon-1" || p.memory != 8192 {
+	if p.apiKey != keyFixture || p.workspace != labelKaxa || p.template != "blaxel/py-app:latest" || p.region != "eu-lon-1" || p.memory != 8192 || p.disk != 70 {
 		t.Fatalf("blaxel = %+v", p)
 	}
 }

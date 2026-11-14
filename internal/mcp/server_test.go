@@ -66,7 +66,7 @@ func TestServerListsEveryTool(t *testing.T) {
 	want := []string{
 		"create_sandbox", "create_snapshot", "delete_snapshot", "destroy", "exec", "inspect", "list_providers",
 		"list_sandboxes", "list_snapshots", "publish_api", "restart", "restore_snapshot", "set_url_auth",
-		"sync_repository", "upgrade",
+		"sync_repository", "unarchive", "upgrade",
 	}
 	if !slices.Equal(names, want) {
 		t.Fatalf("tools = %v, want %v", names, want)

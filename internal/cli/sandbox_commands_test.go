@@ -31,6 +31,7 @@ type fakeProvider struct {
 	inspectErr     error
 	restarted      sandbox.ID
 	restartErr     error
+	unarchived     sandbox.ID
 	upgraded       sandbox.ID
 	upgradeErr     error
 	lastExec       sandbox.ExecOptions
@@ -77,6 +78,11 @@ func (f *fakeProvider) Inspect(_ context.Context, id sandbox.ID) (sandbox.Detail
 func (f *fakeProvider) Restart(_ context.Context, id sandbox.ID) error {
 	f.restarted = id
 	return f.restartErr
+}
+
+func (f *fakeProvider) Unarchive(_ context.Context, id sandbox.ID) error {
+	f.unarchived = id
+	return nil
 }
 
 func (f *fakeProvider) Upgrade(_ context.Context, id sandbox.ID) error {
@@ -584,6 +590,12 @@ func TestRestartCancelledWithoutConfirm(t *testing.T) {
 	if !strings.Contains(out.String(), "cancelled") {
 		t.Fatalf("output = %q", out.String())
 	}
+}
+
+func TestUnarchiveWithConfirm(t *testing.T) {
+	testNamedActionConfirm(t, "unarchive", "unarchived", func(fp *fakeProvider) sandbox.ID {
+		return fp.unarchived
+	})
 }
 
 func TestRestartWithConfirm(t *testing.T) {

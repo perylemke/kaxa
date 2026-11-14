@@ -51,6 +51,19 @@ func validateRegion(region string) error {
 	)
 }
 
+func validateDiskPercent(percent int) error {
+	if percent == 0 {
+		return nil
+	}
+	if percent < 10 || percent > 95 {
+		return usererr.New(
+			fmt.Sprintf("invalid Blaxel disk percent %d", percent),
+			"use a whole number from 10 to 95, or omit it to keep 50",
+		)
+	}
+	return nil
+}
+
 func validateMemory(mb int) error {
 	if mb < 0 {
 		return usererr.New(

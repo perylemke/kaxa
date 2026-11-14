@@ -43,9 +43,10 @@ func (p *Provider) readiness() (timeout, interval time.Duration) {
 	return timeout, interval
 }
 
-// PublishAPI starts an HTTP service in workDir and exposes port on a public
-// preview named kaxa-api. The sandbox must have been created with that port.
-// Anyone with the preview URL can call the service.
+// PublishAPI starts an HTTP service in workDir and exposes port on a preview
+// named kaxa-api. The sandbox must have been created with that port. The preview
+// is private unless the context was marked public. A private preview's token is
+// kept until TakePreviewToken reads it once.
 func (p *Provider) PublishAPI(ctx context.Context, id sandbox.ID, workDir string, port int, argv, env []string) error {
 	if err := validateName(string(id)); err != nil {
 		return err
@@ -76,10 +77,32 @@ func (p *Provider) PublishAPI(ctx context.Context, id sandbox.ID, workDir string
 	if err != nil {
 		return err
 	}
-	if _, err := c.CreatePreview(ctx, rec.Name, port); err != nil {
-		return userErr(err, rec.Name, secrets...)
+	public := sandbox.APIPublicFrom(ctx)
+	_, token, err := c.CreatePreview(ctx, rec.Name, port, public)
+	if err != nil {
+		return userErr(err, rec.Name, append(secrets, token)...)
 	}
+	p.rememberPreviewToken(id, token)
 	return nil
+}
+
+// TakePreviewToken returns the private preview token of id and forgets it.
+// A public preview, or a second read, returns an empty string.
+func (p *Provider) TakePreviewToken(id sandbox.ID) string {
+	v, ok := p.previewTokens.LoadAndDelete(string(id))
+	if !ok {
+		return ""
+	}
+	token, _ := v.(string)
+	return token
+}
+
+func (p *Provider) rememberPreviewToken(id sandbox.ID, token string) {
+	if token == "" {
+		p.previewTokens.Delete(string(id))
+		return
+	}
+	p.previewTokens.Store(string(id), token)
 }
 
 func (p *Provider) startService(ctx context.Context, name, workDir string, port int, argv, env, secrets []string) error {

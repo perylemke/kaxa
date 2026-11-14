@@ -71,6 +71,53 @@ func TestCapabilitiesOfFullProvider(t *testing.T) {
 	}
 }
 
+type blaxelCapsProvider struct{ fullProvider }
+
+func (blaxelCapsProvider) SupportsDiskPercent()                        {}
+func (blaxelCapsProvider) SupportsPublicPreview()                      {}
+func (blaxelCapsProvider) Unarchive(context.Context, sandbox.ID) error { return nil }
+func (blaxelCapsProvider) RestoreMode() sandbox.RestoreMode {
+	return sandbox.RestoreInPlace
+}
+
+func (blaxelCapsProvider) Snapshot(context.Context, sandbox.ID, string) (sandbox.Snapshot, error) {
+	return sandbox.Snapshot{}, nil
+}
+
+func (blaxelCapsProvider) ListSnapshots(context.Context, sandbox.ID) ([]sandbox.Snapshot, error) {
+	return nil, nil
+}
+
+func (blaxelCapsProvider) Restore(context.Context, sandbox.RestoreRequest) (sandbox.ID, error) {
+	return "", nil
+}
+
+func (blaxelCapsProvider) DeleteSnapshot(context.Context, sandbox.ID, sandbox.SnapshotID) error {
+	return nil
+}
+
+func TestCapabilitiesOfBlaxelFeatures(t *testing.T) {
+	t.Parallel()
+	got := sandbox.CapabilitiesOf(blaxelCapsProvider{})
+	if !got.DiskPercent || !got.Unarchive || !got.PublicPreview || !got.Snapshot || got.SnapshotRestore != string(sandbox.RestoreInPlace) {
+		t.Fatalf("capabilities = %+v", got)
+	}
+	if !got.Has(sandbox.FeatureDiskPercent) || !got.Has(sandbox.FeatureUnarchive) {
+		t.Fatal("Has missed disk percent or unarchive")
+	}
+}
+
+func TestAPIPublicFromDefaultsToPrivate(t *testing.T) {
+	t.Parallel()
+	if sandbox.APIPublicFrom(context.Background()) {
+		t.Fatal("default is public")
+	}
+	ctx := sandbox.WithAPIPublic(context.Background(), true)
+	if !sandbox.APIPublicFrom(ctx) {
+		t.Fatal("public flag was lost")
+	}
+}
+
 func TestIsAvailable(t *testing.T) {
 	t.Parallel()
 
@@ -108,6 +155,8 @@ func TestCapabilitiesHas(t *testing.T) {
 		{sandbox.FeatureCPU, true},
 		{sandbox.FeatureMemory, true},
 		{sandbox.FeatureNetworkBlock, false},
+		{sandbox.FeatureDiskPercent, false},
+		{sandbox.FeatureUnarchive, false},
 		{sandbox.FeatureUpgrade, false},
 		{sandbox.FeatureRunning, false},
 		{sandbox.FeatureSync, false},

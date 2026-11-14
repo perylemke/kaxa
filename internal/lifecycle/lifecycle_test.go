@@ -362,6 +362,7 @@ func TestCheckRejectsMissingCapabilities(t *testing.T) {
 		{name: "cpu", req: lifecycle.Request{Name: boxName, CPU: 1}, want: "cpu"},
 		{name: "memory", req: lifecycle.Request{Name: boxName, MemoryMiB: 1024}, want: "memory"},
 		{name: "network block", req: lifecycle.Request{Name: boxName, NetworkBlockAll: true}, want: "network block"},
+		{name: "disk percent", req: lifecycle.Request{Name: boxName, DiskPercent: 50}, want: "disk percent"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -376,6 +377,27 @@ func TestCheckRejectsMissingCapabilities(t *testing.T) {
 				t.Fatalf("created %q before rejecting", rec.created.Name)
 			}
 		})
+	}
+}
+
+type diskPreviewProvider struct{ basicProvider }
+
+func (diskPreviewProvider) SupportsDiskPercent()   {}
+func (diskPreviewProvider) SupportsPublicPreview() {}
+
+func TestDiskPercentAndPublicPreview(t *testing.T) {
+	t.Parallel()
+	rec := &recorder{}
+	p := diskPreviewProvider{basicProvider{rec: rec}}
+	_, err := lifecycle.Create(context.Background(), p, lifecycle.Request{Name: boxName, Public: true, DiskPercent: 40}, nil)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if rec.created.DiskPercent != 40 {
+		t.Fatalf("disk = %d", rec.created.DiskPercent)
+	}
+	if err := lifecycle.Check(p, lifecycle.Request{Name: boxName, DiskPercent: 9}); err == nil {
+		t.Fatal("disk percent 9 accepted")
 	}
 }
 

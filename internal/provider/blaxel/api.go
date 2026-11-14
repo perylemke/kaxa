@@ -33,12 +33,22 @@ const (
 
 // CreateParams describes the sandbox to create.
 type CreateParams struct {
-	Name    string
-	Image   string
-	Region  string
-	Memory  int
-	Labels  []string
-	APIPort int
+	Name        string
+	Image       string
+	Region      string
+	Memory      int
+	DiskPercent int
+	Labels      []string
+	APIPort     int
+}
+
+// snapshotRow is one Blaxel snapshot as kaxa sees it.
+type snapshotRow struct {
+	ID        string
+	Name      string
+	Sandbox   string
+	Status    string
+	CreatedAt time.Time
 }
 
 // Record is one Blaxel sandbox as kaxa sees it. The kaxa name is the Blaxel name.
@@ -75,9 +85,17 @@ type apiClient interface {
 	// Sandbox returns the sandbox document for inspect detail fields.
 	Sandbox(ctx context.Context, name string) (*sdk.Sandbox, error)
 	Delete(ctx context.Context, name string) error
-	// PreviewURL returns the public preview URL, or ErrNotFound when none exists.
-	PreviewURL(ctx context.Context, name string) (string, error)
-	CreatePreview(ctx context.Context, name string, port int) (string, error)
+	// PreviewURL returns the preview URL and whether it is public, or ErrNotFound when none exists.
+	PreviewURL(ctx context.Context, name string) (string, bool, error)
+	// CreatePreview opens the kaxa-api preview. A private preview also returns a token.
+	CreatePreview(ctx context.Context, name string, port int, public bool) (string, string, error)
+	CreateSnapshot(ctx context.Context, sandboxName string) (snapshotRow, error)
+	GetSnapshot(ctx context.Context, id string) (snapshotRow, error)
+	ListSandboxSnapshots(ctx context.Context, sandboxName string) ([]snapshotRow, error)
+	ListWorkspaceSnapshots(ctx context.Context) ([]snapshotRow, error)
+	DeleteSnapshot(ctx context.Context, id string) error
+	RestoreSnapshot(ctx context.Context, sandboxName, id string) error
+	Unarchive(ctx context.Context, name string) (Record, error)
 	// ListHub returns the pre-built sandbox templates from the Blaxel Hub.
 	ListHub(ctx context.Context) ([]hubTemplate, error)
 }

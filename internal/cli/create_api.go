@@ -34,6 +34,8 @@ type createFlags struct {
 	CPU float64
 	// MemoryMiB is memory in MiB. Zero means the provider default.
 	MemoryMiB int
+	// DiskPercent is the filesystem share of memory, from 10 to 95. Zero means the provider default.
+	DiskPercent int
 	// NetworkBlockAll blocks every outbound connection from the sandbox.
 	NetworkBlockAll bool
 	// Env is the raw --env value. EnvFile is the --env-file path.
@@ -96,7 +98,7 @@ func parseAPICommand(raw string) ([]string, error) {
 	return argv, nil
 }
 
-func createdMessage(ref, provider string, detail sandbox.Detail, req createRequest) string {
+func createdMessage(ref, provider string, detail sandbox.Detail, req createRequest, token string) string {
 	url := detail.URL
 	if !req.API && !req.Public {
 		return fmt.Sprintf("sandbox %s is ready and will stay running for 1 hour\n%s", ref, url)
@@ -110,9 +112,12 @@ func createdMessage(ref, provider string, detail sandbox.Detail, req createReque
 	if req.API {
 		fmt.Fprintf(&b, " forwards to port %d", req.APIPort)
 	}
-	if access := urlAccess(provider, detail.Auth, req.Public); access != "" {
+	if access := urlAccess(provider, detail.Auth, req.Public, req.API); access != "" {
 		b.WriteString("\n")
 		b.WriteString(access)
+	}
+	if token != "" {
+		fmt.Fprintf(&b, "\npreview token: %s", token)
 	}
 	return b.String()
 }
@@ -120,12 +125,14 @@ func createdMessage(ref, provider string, detail sandbox.Detail, req createReque
 // urlAccess says who can open the URL, or nothing when the provider does not
 // report it. Only a Sprites URL asks for a Sprites account by default; Docker
 // chooses its own URLs and kaxa cannot tell who may open them.
-func urlAccess(provider, auth string, madePublic bool) string {
+func urlAccess(provider, auth string, madePublic, api bool) string {
 	switch {
 	case madePublic || auth == sandbox.URLAuthPublic:
 		return "access is public"
 	case provider == spritesProviderName:
 		return "requires a Sprites account"
+	case provider == formProviderBlaxel && api:
+		return "access is private"
 	}
 	return ""
 }

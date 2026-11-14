@@ -8,6 +8,8 @@ import (
 	"time"
 
 	sdk "github.com/blaxel-ai/sdk-go"
+
+	"github.com/perylemke/kaxa/internal/usererr"
 )
 
 func TestRecordFromKeepsOnlyManaged(t *testing.T) {
@@ -96,6 +98,29 @@ func TestConvertErr(t *testing.T) {
 	}
 	if convertErr(nil) != nil {
 		t.Fatal("nil error changed")
+	}
+}
+
+func TestSnapshotFeatureDisabledIsNotAnAPIKeyError(t *testing.T) {
+	t.Parallel()
+	body := []byte(`{"code":403,"error":"Sandbox snapshot/fork feature is not enabled for this workspace"}`)
+	apiErr := &sdk.Error{StatusCode: http.StatusForbidden}
+	if err := apiErr.UnmarshalJSON(body); err != nil {
+		t.Fatal(err)
+	}
+	err := userErr(convertErr(apiErr), boxName)
+	ue, ok := usererr.As(err)
+	if !ok || ue.Message != "Blaxel has not enabled snapshots for this workspace" {
+		t.Fatalf("err = %#v", err)
+	}
+	if strings.Contains(ue.Message, "API key") || strings.Contains(ue.Hint, "API key") {
+		t.Fatalf("message still blames the key: %+v", ue)
+	}
+
+	other := userErr(&APIError{Status: http.StatusForbidden, Message: "nope"}, boxName)
+	ue, ok = usererr.As(other)
+	if !ok || ue.Message != "Blaxel rejected the API key" {
+		t.Fatalf("other 403 = %#v", other)
 	}
 }
 
