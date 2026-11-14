@@ -10,6 +10,8 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 
 ### Changed
 
+- A Blaxel preview from `--api` or `publish_api` is private by default. The URL still appears, and the preview token is printed once on create and in the MCP result. It is not stored in labels, logs, errors, `inspect`, or `list`. `--public` keeps the preview public and prints no token. `kaxa url` stays Sprites-only.
+- An archived Blaxel sandbox tells you to run `kaxa unarchive`. Standby is still a running sandbox: files and processes come back on the next call, and there is no `restart`.
 - MCP `exec` accepts `cwd`, an absolute directory inside the sandbox. Omit it and the command still starts in the provider workspace or home. A timeout returns `timed_out` with the output captured so far. Each stream keeps the last 256 KiB.
 - MCP `inspect` includes `home_dir`, and `workspace_dir` when the sandbox was created with sync and the provider reports a workspace layout.
 - MCP `publish_api` includes `url` and `auth` when the provider reports them. A failed inspect after a successful publish keeps the published service and omits the URL.
@@ -29,6 +31,8 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 
 ### Fixed
 
+- Builds require Go 1.27.4, which fixes GO-2026-6859 in `net/http`.
+- A Blaxel snapshot call that the workspace is not allowed to make says Blaxel has not enabled snapshots for this workspace. It no longer says the API key was rejected.
 - Sprites applies `kaxa create --env` and `--env-file` on `exec`, `console`, and the `--api` service. Create finishes when the sprite is already running.
 - `kaxa create` wizard no longer inserts large blank gaps between visible fields when other provider-specific fields are hidden.
 - `kaxa list` on Docker accepts `memoryMib` in list responses as a number or a string, so listing no longer fails when the API returns quoted values.
@@ -38,11 +42,14 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 
 ### Added
 
+- Blaxel snapshots restore the same sandbox in place. `kaxa snapshot create|list|restore|delete` uses the workspace snapshot API. `--comment` is stored on this machine in `blaxel-snapshots.json`. `snapshot list` without a name shows only snapshots kaxa recorded. Restore asks `[y/N]` and rejects `--to`.
+- `kaxa unarchive` and the MCP tool `unarchive` bring an archived Blaxel sandbox back. `exec`, `console`, and `sync` do not unarchive on their own. `list_providers` reports `unarchive`.
+- `KAXA_BLAXEL_DISK_PERCENT`, `kaxa create --disk-percent`, the create wizard, and MCP `create_sandbox` `disk_percent` set the share of Blaxel memory used by the filesystem (10–95). An empty value leaves the API default of 50. The flag for that create wins over the environment variable.
 - `kaxa create --env` and `--env-file`, the create wizard's Environment and Env file fields, and MCP `create_sandbox` fields `env` and `env_file` set variables for the life of the sandbox. `exec` and `console` see them, and with `--api` the service sees them too, with `--api-env` winning on the same key. `env` is a list of names copied from the server only when each name is in `KAXA_MCP_ENV`. `env_file` must stay inside the MCP root. The response lists `env_keys` and never the values.
 - `kaxa create --cpu` and `--memory` (MiB), optional fields in the create wizard, and MCP `create_sandbox` fields `cpu` and `memory_mib` request compute for Modal (fractional CPU), Docker (integer CPU; rejected pairs surface as provider errors), and memory for Blaxel (overrides `KAXA_BLAXEL_MEMORY` for that create). `list_providers` capabilities include `cpu` and `memory` when supported.
 - `kaxa list` detail view: press `c` to open the same interactive shell as `kaxa console` for that row; when the shell closes, list returns to the table on that sandbox.
 - `KAXA_MCP_ROOT` bounds which repositories `kaxa mcp` may copy. `kaxa mcp init --root` and `kaxa mcp config --root` write it into the client entry for every agent. Without `--root`, the command uses its current directory and refuses your home directory and `/`.
-- Blaxel sandboxes as the `blaxel` provider, through the official Blaxel Go SDK, with `KAXA_BLAXEL_API_KEY` and `KAXA_BLAXEL_WORKSPACE`. It supports create (with `--sync`, `--template`, and `--api`), list, exec, console, sync, and destroy. The default image is `blaxel/base-image:latest` (user `root`, workspace `/root/workspace/<repo>`), the default region is `us-pdx-1`, and the default memory is 4096 MB. `create --api` starts an HTTP service and publishes a public preview named `kaxa-api`. `console` attaches to the terminal the sandbox starts, follows window resizing, and ends after 15 minutes without input. Restart, upgrade, snapshots, and `--running` are not available.
+- Blaxel sandboxes as the `blaxel` provider, through the official Blaxel Go SDK, with `KAXA_BLAXEL_API_KEY` and `KAXA_BLAXEL_WORKSPACE`. It supports create (with `--sync`, `--template`, `--api`, and `--disk-percent`), list, exec, console, sync, snapshot, unarchive, and destroy. The default image is `blaxel/base-image:latest` (user `root`, workspace `/root/workspace/<repo>`), the default region is `us-pdx-1`, and the default memory is 4096 MB. `create --api` starts an HTTP service and publishes a private preview named `kaxa-api` unless `--public` is set. `console` attaches to the terminal the sandbox starts, follows window resizing, and ends after 15 minutes without input. Restart, upgrade, and `--running` are not available. Standby is a running sandbox, not a restart.
 - The manuals are published at [kaxa.io](https://kaxa.io).
 - `kaxa mcp start` serves the MCP server, `kaxa mcp init` writes it into claude, cursor, gemini, or windsurf, and `kaxa mcp config` prints that client entry. `kaxa mcp` still serves the server.
 

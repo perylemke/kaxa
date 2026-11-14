@@ -140,6 +140,9 @@ func applyDockerFlagsToComputePresets(flags createFlags, r *createFormResult) {
 }
 
 func applyBlaxelFlagsToComputePresets(flags createFlags, r *createFormResult) {
+	if flags.DiskPercent != 0 {
+		r.diskInput = strconv.Itoa(flags.DiskPercent)
+	}
 	if flags.MemoryMiB == 0 {
 		return
 	}
@@ -319,6 +322,9 @@ func modalMemoryFromPreset(preset, rawInput string) (int, error) {
 }
 
 func resolveBlaxelWizardCompute(r *createFormResult) error {
+	if err := resolveBlaxelDisk(r); err != nil {
+		return err
+	}
 	if r.memoryPreset == "" || r.memoryPreset == formPresetDefault {
 		r.MemoryMiB = 0
 		return nil
@@ -331,6 +337,23 @@ func resolveBlaxelWizardCompute(r *createFormResult) error {
 		)
 	}
 	r.MemoryMiB = n
+	return nil
+}
+
+func resolveBlaxelDisk(r *createFormResult) error {
+	raw := strings.TrimSpace(r.diskInput)
+	if raw == "" {
+		r.DiskPercent = 0
+		return nil
+	}
+	if err := validateDiskPercentInput(raw); err != nil {
+		return usererr.New(err.Error(), "use a whole number from 10 to 95, or leave it empty")
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil {
+		return err
+	}
+	r.DiskPercent = n
 	return nil
 }
 

@@ -48,6 +48,9 @@ type Request struct {
 	CPU float64
 	// MemoryMiB is memory for the sandbox in MiB. Zero means the provider default.
 	MemoryMiB int
+	// DiskPercent is the share of memory the filesystem may use, from 10 to 95.
+	// Zero means the provider default.
+	DiskPercent int
 	// NetworkBlockAll blocks every outbound connection from the sandbox.
 	NetworkBlockAll bool
 	// Env is resolved KEY=VALUE entries for the sandbox itself. See ResolveSandboxEnv
@@ -108,6 +111,9 @@ func Check(p sandbox.Provider, req Request) error {
 	if err := checkPublicRequest(p, req); err != nil {
 		return err
 	}
+	if err := checkDiskPercent(p, req); err != nil {
+		return err
+	}
 	if err := checkNetworkBlockRequest(p, req); err != nil {
 		return err
 	}
@@ -128,11 +134,29 @@ func checkPublicRequest(p sandbox.Provider, req Request) error {
 	if !req.Public {
 		return nil
 	}
-	if _, ok := p.(sandbox.PublicURL); !ok {
+	_, urlAuth := p.(sandbox.PublicURL)
+	_, preview := p.(sandbox.PublicPreview)
+	if !urlAuth && !preview {
 		return Unsupported(p, sandbox.FeaturePublicURLs)
 	}
-	if req.Running && !req.API {
+	if req.Running && !req.API && urlAuth {
 		return sandbox.PublicTerminalError()
+	}
+	return nil
+}
+
+func checkDiskPercent(p sandbox.Provider, req Request) error {
+	if req.DiskPercent == 0 {
+		return nil
+	}
+	if _, ok := p.(sandbox.DiskPercentSupport); !ok {
+		return Unsupported(p, sandbox.FeatureDiskPercent)
+	}
+	if req.DiskPercent < 10 || req.DiskPercent > 95 {
+		return usererr.New(
+			fmt.Sprintf("invalid disk percent %d", req.DiskPercent),
+			"use a whole number from 10 to 95, or omit it to keep the provider default",
+		)
 	}
 	return nil
 }
@@ -224,6 +248,7 @@ func createSandbox(ctx context.Context, p sandbox.Provider, req Request, run Run
 			Template:        req.Template,
 			CPU:             req.CPU,
 			MemoryMiB:       req.MemoryMiB,
+			DiskPercent:     req.DiskPercent,
 			NetworkBlockAll: req.NetworkBlockAll,
 			Env:             req.Env,
 		})
@@ -376,6 +401,7 @@ func publishAPI(ctx context.Context, p sandbox.Provider, id sandbox.ID, req Requ
 	if err != nil {
 		return destroyAfterFailure(ctx, p, id, err, "publish api")
 	}
+	ctx = sandbox.WithAPIPublic(ctx, req.Public)
 	err = run(ctx, "publishing api…", func(ctx context.Context) error {
 		return publisher.PublishAPI(ctx, id, workDir, req.APIPort, req.APICmd, req.APIEnv)
 	})
@@ -391,6 +417,9 @@ func makePublic(ctx context.Context, p sandbox.Provider, id sandbox.ID, req Requ
 	}
 	setter, ok := p.(sandbox.PublicURL)
 	if !ok {
+		if _, preview := p.(sandbox.PublicPreview); preview {
+			return nil
+		}
 		return Unsupported(p, sandbox.FeaturePublicURLs)
 	}
 	if err := setter.SetURLAuth(ctx, id, sandbox.URLAuthPublic); err != nil {

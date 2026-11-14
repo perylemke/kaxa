@@ -35,6 +35,7 @@ func TestRestartAndUpgradeRejectedWithoutCapability(t *testing.T) {
 	}{
 		{"restart", testCmdRestart, sandbox.FeatureRestart},
 		{"upgrade", testCmdUpgrade, sandbox.FeatureUpgrade},
+		{"unarchive", "unarchive", sandbox.FeatureUnarchive},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

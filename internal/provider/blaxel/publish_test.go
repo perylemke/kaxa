@@ -28,8 +28,28 @@ func TestPublishAPIStartsServiceAndPreview(t *testing.T) {
 		t.Fatalf("env = %v", api.envs[0])
 	}
 	d, err := p.Inspect(t.Context(), apiName)
-	if err != nil || d.URL == "" || d.Auth != sandbox.URLAuthPublic {
+	if err != nil || d.URL == "" || d.Auth != "" {
 		t.Fatalf("Inspect = %+v, %v", d, err)
+	}
+	if p.TakePreviewToken(apiName) != "preview-token" || p.TakePreviewToken(apiName) != "" {
+		t.Fatal("preview token was not returned once")
+	}
+}
+
+func TestPublishAPIPublicPreviewHasNoToken(t *testing.T) {
+	t.Parallel()
+	api := newFakeAPI()
+	p := newTestProvider(t, api)
+	if _, err := p.Create(t.Context(), sandbox.Spec{Name: apiName, ExposeAPI: true, APIPort: 8000}); err != nil {
+		t.Fatal(err)
+	}
+	ctx := sandbox.WithAPIPublic(t.Context(), true)
+	if err := p.PublishAPI(ctx, apiName, blaxelHome, 8000, serviceArgv, nil); err != nil {
+		t.Fatalf("PublishAPI: %v", err)
+	}
+	d, err := p.Inspect(t.Context(), apiName)
+	if err != nil || d.Auth != sandbox.URLAuthPublic || p.TakePreviewToken(apiName) != "" {
+		t.Fatalf("Inspect = %+v token %q err %v", d, p.TakePreviewToken(apiName), err)
 	}
 }
 

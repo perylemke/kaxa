@@ -30,6 +30,7 @@ type createIn struct {
 	Template        string   `json:"template,omitempty" jsonschema:"Template to start the sandbox from. Only for providers whose capabilities report template (E2B, docker, daytona). Defaults to KAXA_E2B_TEMPLATE, KAXA_DOCKER_TEMPLATE or KAXA_DAYTONA_TEMPLATE, then base. A custom template must have the same user and home as base (E2B: user, /home/user; docker: agent, /home/agent; daytona: daytona, /home/daytona)."`
 	CPU             float64  `json:"cpu,omitempty" jsonschema:"CPU cores for the sandbox (Modal and Docker; fractional on Modal). Omit for the provider default. Requires capabilities.cpu."`
 	MemoryMiB       int      `json:"memory_mib,omitempty" jsonschema:"Memory in MiB (Modal, Docker, Blaxel). Omit for the provider default. Requires capabilities.memory."`
+	DiskPercent     int      `json:"disk_percent,omitempty" jsonschema:"Share of Blaxel memory for the filesystem, from 10 to 95. Omit for KAXA_BLAXEL_DISK_PERCENT or 50. Requires capabilities.disk_percent."`
 	NetworkBlockAll bool     `json:"block_all_network_access,omitempty" jsonschema:"Block all outbound network access from the sandbox. Daytona only. Requires capabilities.network_block. Toolchain downloads fail while it is on."`
 	Env             []string `json:"env,omitempty" jsonschema:"Names of server environment variables to copy into the sandbox for exec, console and the HTTP service. Each item is a name, never KEY=VALUE. The name must be listed in KAXA_MCP_ENV. These names replace the same key from env_file. Values are not returned."`
 	EnvFile         string   `json:"env_file,omitempty" jsonschema:"Path of a dotenv file inside the server root (KAXA_MCP_ROOT or the working directory). A relative path is inside that root. Pass the path; do not open the file or paste its contents."`
@@ -43,6 +44,7 @@ type createOut struct {
 	URL             string     `json:"url,omitempty"`
 	Auth            string     `json:"auth,omitempty"`
 	EnvKeys         []string   `json:"env_keys,omitempty"`
+	PreviewToken    string     `json:"preview_token,omitempty" jsonschema:"One-time token for a private Blaxel preview. It is not shown again."`
 }
 
 type syncIn struct {
@@ -111,11 +113,12 @@ type inspectOut struct {
 }
 
 type actionOut struct {
-	ID       string `json:"id"`
-	Provider string `json:"provider"`
-	Status   string `json:"status"`
-	URL      string `json:"url,omitempty"`
-	Auth     string `json:"auth,omitempty"`
+	ID           string `json:"id"`
+	Provider     string `json:"provider"`
+	Status       string `json:"status"`
+	URL          string `json:"url,omitempty"`
+	Auth         string `json:"auth,omitempty"`
+	PreviewToken string `json:"preview_token,omitempty" jsonschema:"One-time token for a private Blaxel preview. It is not shown again."`
 }
 
 type publishIn struct {
@@ -125,6 +128,7 @@ type publishIn struct {
 	APIPort  int      `json:"api_port,omitempty" jsonschema:"Port the HTTP service listens on. Defaults to 8000."`
 	APIEnv   []string `json:"api_env,omitempty" jsonschema:"Environment of the HTTP service. Each item is KEY=VALUE, or KEY to copy the value from the server environment so secrets stay out of the conversation. Values cannot contain commas. HOME, USER, PATH and KAXA_ names are reserved."`
 	WorkDir  string   `json:"work_dir,omitempty" jsonschema:"Absolute directory inside the sandbox to run the service from. Defaults to the sandbox home directory."`
+	Public   bool     `json:"public,omitempty" jsonschema:"On Blaxel, make the preview public. Omit it and the preview is private; the response then includes preview_token once."`
 }
 
 type urlAuthIn struct {

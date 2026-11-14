@@ -41,7 +41,9 @@ type createFormResult struct {
 	EnvText     string
 	EnvFile     string
 	Env         []string
+	DiskPercent int
 	cpuInput    string
+	diskInput   string
 	memoryInput string
 	// Wizard-only presets (flags stay numeric). Modal: cpu_preset / memory_preset.
 	// Docker: docker_size. Blaxel: memory_preset only.
@@ -236,7 +238,7 @@ func createOptionsGroup(
 		conditionalField(capsOf, sandbox.FeatureAPIPublish,
 			huh.NewConfirm().Title("API").Affirmative("Yes").Negative("No").Value(&result.API).
 				Validate(func(v bool) error { return validateCreateAPIAnswer(v, apiRaw) })),
-		conditionalField(capsOf, sandbox.FeaturePublicURLs,
+		presetConditionalField(result, publicChoiceVisible(capsOf),
 			huh.NewConfirm().Title("Public").Affirmative("Yes").Negative("No").Value(&result.Public).
 				Validate(func(v bool) error { return validateCreatePublic(v, result) })),
 		presetConditionalField(result, dockerComputeVisible(capsOf),
@@ -271,6 +273,11 @@ func createOptionsGroup(
 				Description("Provider default uses KAXA_BLAXEL_MEMORY or 4096.").
 				Options(blaxelMemorySelectOptions(result)...).
 				Value(&result.memoryPreset)),
+		presetConditionalField(result, blaxelDiskVisible(capsOf),
+			huh.NewInput().Title("Disk percent").
+				Description("Share of memory for the filesystem, 10-95. Empty uses KAXA_BLAXEL_DISK_PERCENT or 50.").
+				Value(&result.diskInput).
+				Validate(validateDiskPercentInput)),
 		presetConditionalField(result, genericCPUVisible(capsOf),
 			huh.NewInput().Title("CPU (cores)").Description("Empty means the provider default.").Value(&result.cpuInput).
 				Validate(validateCreateCPUInput)),
@@ -578,8 +585,8 @@ func checkCreateFormFeatureFlags(p sandbox.Provider, caps sandbox.Capabilities, 
 	if flags.API && !caps.Has(sandbox.FeatureAPIPublish) {
 		return lifecycle.Unsupported(p, sandbox.FeatureAPIPublish)
 	}
-	if flags.Public && !caps.Has(sandbox.FeaturePublicURLs) {
-		return lifecycle.Unsupported(p, sandbox.FeaturePublicURLs)
+	if err := checkCreateFormPreviewFlags(p, caps, flags); err != nil {
+		return err
 	}
 	if flags.CPU != 0 && !caps.Has(sandbox.FeatureCPU) {
 		return lifecycle.Unsupported(p, sandbox.FeatureCPU)
@@ -588,6 +595,16 @@ func checkCreateFormFeatureFlags(p sandbox.Provider, caps sandbox.Capabilities, 
 		return lifecycle.Unsupported(p, sandbox.FeatureMemory)
 	}
 	return checkCreateFormNetworkBlockFlag(p, caps, flags)
+}
+
+func checkCreateFormPreviewFlags(p sandbox.Provider, caps sandbox.Capabilities, flags createFlags) error {
+	if flags.Public && !caps.Has(sandbox.FeaturePublicURLs) && !caps.PublicPreview {
+		return lifecycle.Unsupported(p, sandbox.FeaturePublicURLs)
+	}
+	if flags.DiskPercent != 0 && !caps.Has(sandbox.FeatureDiskPercent) {
+		return lifecycle.Unsupported(p, sandbox.FeatureDiskPercent)
+	}
+	return nil
 }
 
 func checkCreateFormNetworkBlockFlag(p sandbox.Provider, caps sandbox.Capabilities, flags createFlags) error {
@@ -641,8 +658,12 @@ func applyCreateFormBooleanCaps(result *createFormResult, caps sandbox.Capabilit
 	if !caps.Has(sandbox.FeatureAPIPublish) {
 		result.API = false
 	}
-	if !caps.Has(sandbox.FeaturePublicURLs) {
+	if !caps.PublicURL && !caps.PublicPreview {
 		result.Public = false
+	}
+	if !caps.Has(sandbox.FeatureDiskPercent) {
+		result.diskInput = ""
+		result.DiskPercent = 0
 	}
 	if !caps.Has(sandbox.FeatureNetworkBlock) {
 		result.NetworkBlockAll = false
@@ -1147,6 +1168,31 @@ func modalMemOtherVisible(capsOf func() sandbox.Capabilities) func(*createFormRe
 		}
 		return capsOf().Has(sandbox.FeatureMemory) && r.memoryPreset == formPresetMemOther
 	}
+}
+
+func publicChoiceVisible(capsOf func() sandbox.Capabilities) func(*createFormResult) bool {
+	return func(*createFormResult) bool {
+		c := capsOf()
+		return c.PublicURL || c.PublicPreview
+	}
+}
+
+func blaxelDiskVisible(capsOf func() sandbox.Capabilities) func(*createFormResult) bool {
+	return func(r *createFormResult) bool {
+		return r.Provider == formProviderBlaxel && capsOf().Has(sandbox.FeatureDiskPercent)
+	}
+}
+
+func validateDiskPercentInput(raw string) error {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 10 || n > 95 {
+		return errors.New("disk percent must be a whole number from 10 to 95")
+	}
+	return nil
 }
 
 func blaxelMemPresetVisible(capsOf func() sandbox.Capabilities) func(*createFormResult) bool {

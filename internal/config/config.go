@@ -28,6 +28,7 @@ const (
 	envBlaxelTemplate   = "KAXA_BLAXEL_TEMPLATE"
 	envBlaxelRegion     = "KAXA_BLAXEL_REGION"
 	envBlaxelMemory     = "KAXA_BLAXEL_MEMORY"
+	envBlaxelDisk       = "KAXA_BLAXEL_DISK_PERCENT"
 )
 
 // Config holds resolved CLI settings (secrets are never logged via String).
@@ -54,6 +55,9 @@ type BlaxelConfig struct {
 	Region string
 	// MemoryMB is the memory of a new sandbox, in megabytes. Zero means 4096.
 	MemoryMB int
+	// DiskPercent is the share of that memory the filesystem may use, from 10 to 95.
+	// Zero omits the field and Blaxel uses 50.
+	DiskPercent int
 }
 
 // DaytonaConfig holds the Daytona API key and the image new daytona sandboxes
@@ -122,6 +126,11 @@ func Load(opts LoadOptions, reg *registry.Registry) (Config, error) {
 		return Config{}, err
 	}
 	cfg.Blaxel.MemoryMB = memory
+	disk, err := blaxelDiskPercent(os.Getenv(envBlaxelDisk))
+	if err != nil {
+		return Config{}, err
+	}
+	cfg.Blaxel.DiskPercent = disk
 
 	if opts.Provider != "" {
 		cfg.Provider = opts.Provider
@@ -144,6 +153,21 @@ func blaxelMemory(raw string) (int, error) {
 		return 0, usererr.New(
 			fmt.Sprintf("invalid Blaxel memory %q", raw),
 			"set KAXA_BLAXEL_MEMORY to a whole number of megabytes, such as 4096",
+		)
+	}
+	return n, nil
+}
+
+// blaxelDiskPercent parses KAXA_BLAXEL_DISK_PERCENT. An empty value omits the field.
+func blaxelDiskPercent(raw string) (int, error) {
+	if raw == "" {
+		return 0, nil
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 10 || n > 95 {
+		return 0, usererr.New(
+			fmt.Sprintf("invalid Blaxel disk percent %q", raw),
+			"set KAXA_BLAXEL_DISK_PERCENT to a whole number from 10 to 95, or leave it unset",
 		)
 	}
 	return n, nil

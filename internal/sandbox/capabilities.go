@@ -26,6 +26,8 @@ const (
 	FeatureCPU               Feature = "cpu"
 	FeatureMemory            Feature = "memory"
 	FeatureNetworkBlock      Feature = "network block"
+	FeatureDiskPercent       Feature = "disk percent"
+	FeatureUnarchive         Feature = "unarchive"
 )
 
 // UnsupportedError reports that a provider does not offer a feature.
@@ -89,38 +91,31 @@ type Capabilities struct {
 	Snapshot     bool `json:"snapshot"`
 	// SnapshotRestore is the RestoreMode of a provider that has Snapshot.
 	SnapshotRestore string `json:"snapshot_restore,omitempty"`
+	DiskPercent     bool   `json:"disk_percent"`
+	Unarchive       bool   `json:"unarchive"`
+	PublicPreview   bool   `json:"public_preview"`
 }
 
 // Has reports whether the capabilities cover feature.
 func (c Capabilities) Has(feature Feature) bool {
-	switch feature {
-	case FeatureRestart:
-		return c.Restart
-	case FeatureUpgrade:
-		return c.Upgrade
-	case FeatureRunning:
-		return c.Running
-	case FeatureTemplate:
-		return c.Template
-	case FeatureSnapshot:
-		return c.Snapshot
-	case FeatureCPU:
-		return c.CPU
-	case FeatureMemory:
-		return c.Memory
-	case FeatureNetworkBlock:
-		return c.NetworkBlock
-	case FeatureSync:
-		return c.Sync
-	case FeatureDependencyInstall:
-		return c.Setup
-	case FeatureAPIPublish:
-		return c.API
-	case FeaturePublicURLs, FeatureURLAuth:
-		return c.PublicURL
-	default:
-		return false
+	known := map[Feature]bool{
+		FeatureRestart:           c.Restart,
+		FeatureUpgrade:           c.Upgrade,
+		FeatureRunning:           c.Running,
+		FeatureTemplate:          c.Template,
+		FeatureSnapshot:          c.Snapshot,
+		FeatureCPU:               c.CPU,
+		FeatureMemory:            c.Memory,
+		FeatureNetworkBlock:      c.NetworkBlock,
+		FeatureSync:              c.Sync,
+		FeatureDependencyInstall: c.Setup,
+		FeatureAPIPublish:        c.API,
+		FeaturePublicURLs:        c.PublicURL,
+		FeatureURLAuth:           c.PublicURL,
+		FeatureDiskPercent:       c.DiskPercent,
+		FeatureUnarchive:         c.Unarchive,
 	}
+	return known[feature]
 }
 
 // CapabilitiesOf inspects which optional interfaces p implements.
@@ -137,10 +132,14 @@ func CapabilitiesOf(p Provider) Capabilities {
 	_, cpu := p.(CPUSupport)
 	_, memory := p.(MemorySupport)
 	_, networkBlock := p.(NetworkBlockSupport)
+	_, disk := p.(DiskPercentSupport)
+	_, unarchive := p.(Unarchiver)
+	_, preview := p.(PublicPreview)
 	caps := Capabilities{
 		Sync: sync, Setup: setup, API: api, PublicURL: public, Layout: layout,
 		Restart: restart, Upgrade: upgrade, Running: running, Template: template,
 		CPU: cpu, Memory: memory, NetworkBlock: networkBlock,
+		DiskPercent: disk, Unarchive: unarchive, PublicPreview: preview,
 	}
 	if s, ok := p.(Snapshotter); ok {
 		caps.Snapshot = true

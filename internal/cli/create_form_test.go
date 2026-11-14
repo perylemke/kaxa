@@ -73,6 +73,8 @@ func (formDockerFake) PublishAPI(context.Context, sandbox.ID, string, int, []str
 type formBlaxelFake struct{ formBareProvider }
 
 func (formBlaxelFake) SupportsMemory()                                    {}
+func (formBlaxelFake) SupportsDiskPercent()                               {}
+func (formBlaxelFake) SupportsPublicPreview()                             {}
 func (formBlaxelFake) SupportsTemplate()                                  {}
 func (formBlaxelFake) PrepareWorkspace(context.Context, sandbox.ID) error { return nil }
 func (formBlaxelFake) SyncWorkspace(context.Context, sandbox.ID, io.Reader) error {
@@ -647,9 +649,9 @@ func TestCreateFormDockerAccessibleSizeMedium(t *testing.T) {
 }
 
 func TestCreateFormBlaxelAccessibleMemoryPreset(t *testing.T) {
-	// blaxel=5, name, sync=n, template="", api=n, memory 4096 MiB (option 4)
+	// blaxel=5, name, sync=n, template="", api=n, public=n, memory 4096 MiB (option 4), disk empty
 	in := strings.NewReader(strings.Join([]string{
-		"5", fixtureDemo, "n", "", "n", "4",
+		"5", fixtureDemo, "n", "", "n", "n", "4", "",
 	}, "\n"))
 	out := new(bytes.Buffer)
 	got, err := collectCreateForm(context.Background(), in, out, formProviders(), spritesProviderName, formWizardLookup, createFlags{}, false)

@@ -60,6 +60,12 @@ func userErr(err error, name string, secrets ...string) error {
 }
 
 func apiUserErr(api *APIError, secrets []string) error {
+	if api.Status == http.StatusForbidden && snapshotsNotEnabled(api.Message) {
+		return usererr.Wrap(redact(api, secrets...),
+			"Blaxel has not enabled snapshots for this workspace",
+			"ask Blaxel to enable sandbox snapshots for the workspace in KAXA_BLAXEL_WORKSPACE",
+		)
+	}
 	switch api.Status {
 	case http.StatusUnauthorized, http.StatusForbidden:
 		return usererr.Wrap(redact(api, secrets...), "Blaxel rejected the API key", "check KAXA_BLAXEL_API_KEY and KAXA_BLAXEL_WORKSPACE")
@@ -67,6 +73,10 @@ func apiUserErr(api *APIError, secrets []string) error {
 		return usererr.Wrap(redact(api, secrets...), "Blaxel rate limit reached", "wait a moment and try again")
 	}
 	return nil
+}
+
+func snapshotsNotEnabled(message string) bool {
+	return strings.Contains(strings.ToLower(message), "snapshot/fork feature is not enabled")
 }
 
 func redact(err error, secrets ...string) error {

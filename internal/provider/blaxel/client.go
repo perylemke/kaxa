@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -27,8 +28,12 @@ var identPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$`)
 type sdkClient struct {
 	apiKey    string
 	workspace string
+	opts      []option.RequestOption
 	sandboxes *sdk.SandboxService
-	http      *http.Client
+	snapshots *sdk.SnapshotService
+	// sandboxSnapshots restores a snapshot onto the sandbox it came from.
+	sandboxSnapshots *sdk.SandboxSnapshotService
+	http             *http.Client
 	// termDial replaces the terminal WebSocket dial in tests.
 	termDial wsDialFunc
 }
@@ -40,8 +45,11 @@ func newSDKClient(apiKey, workspace string) *sdkClient {
 		option.WithWorkspace(workspace),
 	}
 	svc := sdk.NewSandboxService(opts...)
+	snaps := sdk.NewSnapshotService(opts...)
+	sandboxSnaps := sdk.NewSandboxSnapshotService(opts...)
 	return &sdkClient{
-		apiKey: apiKey, workspace: workspace, sandboxes: &svc,
+		apiKey: apiKey, workspace: workspace, opts: opts, sandboxes: &svc,
+		snapshots: &snaps, sandboxSnapshots: &sandboxSnaps,
 		http: &http.Client{CheckRedirect: refuseRedirect},
 	}
 }
@@ -69,14 +77,15 @@ func (s *sdkClient) ListHub(ctx context.Context) ([]hubTemplate, error) {
 }
 
 func (s *sdkClient) Create(ctx context.Context, p CreateParams) (Record, error) {
+	runtime := sdk.SandboxRuntimeParam{
+		Image: sdk.String(p.Image), Memory: sdk.Int(int64(p.Memory)), Ports: portParams(p.APIPort),
+	}
+	if p.DiskPercent > 0 {
+		runtime.DiskPercent = sdk.Int(int64(p.DiskPercent))
+	}
 	body := sdk.SandboxNewParams{Sandbox: sdk.SandboxParam{
 		Metadata: sdk.MetadataParam{Name: p.Name, Labels: kaxaLabels(p)},
-		Spec: sdk.SandboxSpecParam{
-			Region: sdk.String(p.Region),
-			Runtime: sdk.SandboxRuntimeParam{
-				Image: sdk.String(p.Image), Memory: sdk.Int(int64(p.Memory)), Ports: portParams(p.APIPort),
-			},
-		},
+		Spec:     sdk.SandboxSpecParam{Region: sdk.String(p.Region), Runtime: runtime},
 	}}
 	inst, err := s.sandboxes.NewInstance(ctx, body)
 	if err != nil {
@@ -136,33 +145,53 @@ func (s *sdkClient) Delete(ctx context.Context, name string) error {
 	return convertErr(err)
 }
 
-func (s *sdkClient) PreviewURL(ctx context.Context, name string) (string, error) {
+func (s *sdkClient) PreviewURL(ctx context.Context, name string) (string, bool, error) {
 	inst, err := s.get(ctx, name)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	preview, err := inst.Previews.Get(ctx, previewName)
 	if err != nil {
-		return "", convertErr(err)
+		return "", false, convertErr(err)
 	}
-	return previewURL(preview)
+	u, err := previewURL(preview)
+	if err != nil {
+		return "", false, err
+	}
+	return u, preview.Spec.Public, nil
 }
 
-func (s *sdkClient) CreatePreview(ctx context.Context, name string, port int) (string, error) {
+func (s *sdkClient) CreatePreview(ctx context.Context, name string, port int, public bool) (string, string, error) {
 	inst, err := s.get(ctx, name)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	preview, err := inst.Previews.NewIfNotExists(ctx, sdk.SandboxPreviewNewParams{
 		Preview: sdk.PreviewParam{
 			Metadata: sdk.PreviewMetadataParam{Name: previewName},
-			Spec:     sdk.PreviewSpecParam{Port: sdk.Int(int64(port)), Public: sdk.Bool(true)},
+			Spec:     sdk.PreviewSpecParam{Port: sdk.Int(int64(port)), Public: sdk.Bool(public)},
 		},
 	})
 	if err != nil {
-		return "", convertErr(err)
+		return "", "", convertErr(err)
 	}
-	return previewURL(preview)
+	u, err := previewURL(preview)
+	if err != nil {
+		return "", "", err
+	}
+	if public {
+		return u, "", nil
+	}
+	token, err := preview.Tokens.New(ctx, sdk.PreviewTokenParam{
+		Metadata: sdk.PreviewTokenMetadataParam{Name: previewName},
+	})
+	if err != nil {
+		return "", "", convertErr(err)
+	}
+	if token == nil || token.Spec.Token == "" {
+		return "", "", errors.New("blaxel: preview token is empty")
+	}
+	return u, token.Spec.Token, nil
 }
 
 func (s *sdkClient) Run(ctx context.Context, name string, spec runSpec) (int, error) {
@@ -601,6 +630,23 @@ func convertErr(err error) error {
 	case http.StatusConflict:
 		return ErrAlreadyExists
 	default:
-		return &APIError{Status: api.StatusCode, Message: api.Message}
+		return &APIError{Status: api.StatusCode, Message: apiDetail(api)}
 	}
+}
+
+func apiDetail(api *sdk.Error) string {
+	if api.Message != "" {
+		return api.Message
+	}
+	raw := api.RawJSON()
+	if raw == "" {
+		return ""
+	}
+	var body struct {
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal([]byte(raw), &body); err != nil {
+		return ""
+	}
+	return body.Error
 }

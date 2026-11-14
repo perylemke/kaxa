@@ -60,10 +60,10 @@ Empty `--all` prints `no sandboxes to destroy`.
 
 ## Snapshots
 
-`destroy` does not delete snapshots. A Modal, Docker, or Daytona snapshot outlives its sandbox, so you can restore it into a new sandbox after the source is gone; it stays until you run `kaxa snapshot delete`, or on Modal until Modal expires it after 30 days. A sprite takes its persisted state with it. An E2B sandbox is killed, and its paused disk goes with it. See [snapshot](snapshot.md).
+`destroy` does not delete snapshots. A Modal, Docker, or Daytona snapshot outlives its sandbox, so you can restore it into a new sandbox after the source is gone; it stays until you run `kaxa snapshot delete`, or on Modal until Modal expires it after 30 days. kaxa does not delete a Blaxel snapshot when it destroys the sandbox. Restore is in place and needs that sandbox. Delete a snapshot you no longer want with `kaxa snapshot delete`. A sprite takes its persisted state with it. An E2B sandbox is killed, and its paused disk goes with it. See [snapshot](snapshot.md).
 
 On Daytona, destroy deletes the sandbox through the API and everything in it; images from `snapshot` stay until you delete them. kaxa only destroys sandboxes it created.
 
-On Blaxel, destroy deletes the sandbox through the API and everything in it. kaxa only destroys sandboxes it created. Blaxel has no snapshots in kaxa.
+On Blaxel, destroy deletes the sandbox through the API and everything in it. kaxa only destroys sandboxes it created. kaxa does not delete snapshots during destroy. Restore is in place, so it needs the sandbox.
 
 On Docker, destroy deletes the sandbox through the API and waits until Docker no longer lists it, which frees its place in the quota. kaxa only destroys sandboxes it created.

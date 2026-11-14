@@ -979,6 +979,46 @@ func TestPublishAPIAndURLAuthNeedCapabilities(t *testing.T) {
 	wantErr(t, err, "url auth is not available for plain")
 }
 
+type unarchiveProvider struct{ *fakeProvider }
+
+func (unarchiveProvider) Unarchive(context.Context, sandbox.ID) error { return nil }
+
+type tokenProvider struct {
+	fakeProvider
+	token string
+}
+
+func (p *tokenProvider) TakePreviewToken(sandbox.ID) string {
+	token := p.token
+	p.token = ""
+	return token
+}
+
+func TestUnarchiveNeedsCapability(t *testing.T) {
+	t.Parallel()
+	svc := newTestService(t, t.TempDir(), testPlain, plainProvider{name: testPlain}, unarchiveProvider{&fakeProvider{name: testSprites}})
+	ctx := context.Background()
+	_, err := svc.unarchive(ctx, nameIn{Name: testBox})
+	wantErr(t, err, "unarchive is not available for plain")
+	out, err := svc.unarchive(ctx, nameIn{Name: testBox, Provider: testSprites})
+	if err != nil || out.Status != "unarchived" {
+		t.Fatalf("out=%+v err=%v", out, err)
+	}
+}
+
+func TestCreateReturnsPreviewToken(t *testing.T) {
+	t.Parallel()
+	p := &tokenProvider{fakeProvider{name: testSprites}, "sekret"}
+	svc := newTestService(t, t.TempDir(), testSprites, p)
+	out, err := svc.create(context.Background(), createIn{Name: testBox, API: true, APICmd: []string{"serve"}})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if out.PreviewToken != "sekret" {
+		t.Fatalf("token = %q", out.PreviewToken)
+	}
+}
+
 func TestRestartAndUpgradeNeedCapabilities(t *testing.T) {
 	t.Parallel()
 

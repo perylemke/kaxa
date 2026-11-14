@@ -37,6 +37,7 @@ A snapshot ID is one segment of letters, digits, dots, underscores, and hyphens.
 | Provider | Restore | `--to` | Snapshot is |
 | --- | --- | --- | --- |
 | Sprites | In place: the same sandbox returns to the snapshot state and what changed after it is lost | Rejected | A checkpoint, such as `v7` |
+| Blaxel | In place: the same sandbox and the same URLs return to the snapshot state and what changed after it is lost | Rejected | A workspace snapshot, such as `snap-my-box-1` |
 | Modal | New sandbox: kaxa creates the sandbox named by `--to` and keeps the source | Required | A filesystem image, such as `im-...` |
 | Docker | New sandbox: kaxa creates the sandbox named by `--to` and keeps the source | Required | A disk snapshot, such as `0abc...` |
 | Daytona | New sandbox: kaxa creates the sandbox named by `--to` and keeps the source | Required | A disk image, such as `kaxa-my-box-20261101T183005Z` |
@@ -54,9 +55,26 @@ kaxa snapshot restore my-sprite v7 --provider sprites
 kaxa snapshot delete my-sprite v7 --provider sprites
 ```
 
-A Sprites checkpoint does not include `/tmp`, which is in memory. Keep what you want to save under `/home/sprite`, `/opt`, or `/var`. Modal, Docker, and Daytona snapshots hold the whole filesystem. E2B and Blaxel have no snapshots in kaxa yet: `snapshot` prints that they are not available and names the providers that have them.
+A Sprites checkpoint does not include `/tmp`, which is in memory. Keep what you want to save under `/home/sprite`, `/opt`, or `/var`. Modal, Docker, Daytona, and Blaxel snapshots hold the filesystem of the sandbox. E2B has no snapshots in kaxa yet: `snapshot` prints that they are not available and names the providers that have them.
+
+Standby on Blaxel is not a snapshot. A deployed sandbox resumes on the next call with its files and processes. A snapshot restore discards what changed after the snapshot. Archive is a third state: use [unarchive](unarchive.md), not `snapshot restore`.
 
 Deleting a checkpoint uses `DELETE /v1/sprites/{name}/checkpoints/{id}`. That route is not in the public Sprites API reference, so a failure names the status code. `create` finds the new checkpoint by listing before and after, because the create stream does not return its ID.
+
+### Blaxel
+
+A restore overwrites the sandbox and keeps its name and URLs, so it asks `[y/N]` first; `--force` skips the question. Answering no prints `cancelled` and changes nothing. `--to` is rejected.
+
+```bash
+kaxa snapshot create my-box --comment "before the migration" --provider blaxel
+kaxa snapshot list my-box --provider blaxel
+kaxa snapshot restore my-box snap-my-box-1 --provider blaxel
+kaxa snapshot delete my-box snap-my-box-1 --provider blaxel
+```
+
+The Blaxel API has no comment field. kaxa stores `--comment` in `blaxel-snapshots.json` under your user config directory (`~/Library/Application Support/kaxa` on macOS, `$XDG_CONFIG_HOME/kaxa` or `~/.config/kaxa` on Linux, `%AppData%\kaxa` on Windows). The directory is mode `0700` and the file `0600`. `list` with a sandbox name shows every snapshot of that sandbox and adds the comment when this machine recorded it. `list` without a name shows only snapshots recorded in that file. The index is per machine, and two kaxa processes writing at the same moment can lose an entry because the file is not locked.
+
+`create` waits until the snapshot is ready. `restore` waits until the sandbox is deployed again. Forking a snapshot into a new sandbox is not supported.
 
 ### Modal
 

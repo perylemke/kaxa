@@ -74,6 +74,7 @@ Configure the credentials of each provider via KAXA_* environment variables (see
 	root.AddCommand(newSyncCmd(reg))
 	root.AddCommand(newDestroyCmd(reg))
 	root.AddCommand(newRestartCmd(reg))
+	root.AddCommand(newUnarchiveCmd(reg))
 	root.AddCommand(newUpgradeCmd(reg))
 	root.AddCommand(newSnapshotCmd(reg))
 	root.AddCommand(newURLCmd(reg))
