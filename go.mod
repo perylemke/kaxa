@@ -1,6 +1,6 @@
 module github.com/perylemke/kaxa
 
-go 1.27
+go 1.27.4
 
 require (
 	charm.land/bubbles/v2 v2.2.1

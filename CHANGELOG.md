@@ -31,6 +31,7 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 
 ### Fixed
 
+- Builds require Go 1.27.4, which fixes GO-2026-6859 in `net/http`.
 - A Blaxel snapshot call that the workspace is not allowed to make says Blaxel has not enabled snapshots for this workspace. It no longer says the API key was rejected.
 - Sprites applies `kaxa create --env` and `--env-file` on `exec`, `console`, and the `--api` service. Create finishes when the sprite is already running.
 - `kaxa create` wizard no longer inserts large blank gaps between visible fields when other provider-specific fields are hidden.
