@@ -8,6 +8,8 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-14
+
 ### Changed
 
 - A Blaxel preview from `--api` or `publish_api` is private by default. The URL still appears, and the preview token is printed once on create and in the MCP result. It is not stored in labels, logs, errors, `inspect`, or `list`. `--public` keeps the preview public and prints no token. `kaxa url` stays Sprites-only.
@@ -109,5 +111,6 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 - Names and URLs from the provider are stripped of control characters before they are printed, and only `http(s)` URLs are opened in the browser.
 - An API command that starts with an option instead of a binary is rejected.
 
-[Unreleased]: https://github.com/perylemke/kaxa/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/perylemke/kaxa/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/perylemke/kaxa/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/perylemke/kaxa/releases/tag/v0.1.0
