@@ -8,6 +8,10 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 
 ## [Unreleased]
 
+### Fixed
+
+- Windows release builds compile. An env file is still opened without following a symlink; Windows has no `O_NOFOLLOW`.
+
 ## [0.2.0] - 2026-11-14
 
 ### Changed

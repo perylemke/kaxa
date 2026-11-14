@@ -7,7 +7,6 @@ import (
 	"os"
 	"slices"
 	"strings"
-	"syscall"
 
 	"github.com/perylemke/kaxa/internal/usererr"
 )
@@ -130,7 +129,7 @@ func ReadEnvFile(path string) ([]string, error) {
 	if !info.Mode().IsRegular() {
 		return nil, usererr.New(fmt.Sprintf("env file %s is not a regular file", path), "pass a path to a file")
 	}
-	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW, 0) //gosec:disable G304 -- the caller names the file; a symlink was already rejected
+	f, err := openEnvFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("env file: %w", err)
 	}
