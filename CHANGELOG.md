@@ -8,6 +8,8 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-14
+
 ### Fixed
 
 - Windows release builds compile. An env file is still opened without following a symlink; Windows has no `O_NOFOLLOW`.
@@ -115,6 +117,7 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 - Names and URLs from the provider are stripped of control characters before they are printed, and only `http(s)` URLs are opened in the browser.
 - An API command that starts with an option instead of a binary is rejected.
 
-[Unreleased]: https://github.com/perylemke/kaxa/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/perylemke/kaxa/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/perylemke/kaxa/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/perylemke/kaxa/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/perylemke/kaxa/releases/tag/v0.1.0
