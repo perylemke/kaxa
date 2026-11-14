@@ -48,6 +48,11 @@ func (p *Provider) PublishAPI(ctx context.Context, id sandbox.ID, workDir string
 	if err != nil {
 		return err
 	}
+	user, err := readSpriteEnv(ctx, c, string(id), token)
+	if err != nil {
+		return err
+	}
+	env = sandbox.MergeEnv(sandbox.EnvFromMap(sandbox.EnvMap(user)), env)
 	if _, err := runRemote(ctx, c, string(id), token, apiServiceArgv(workDir, port, argv, env)); err != nil {
 		return fmt.Errorf("start api service: %w", err)
 	}
@@ -111,7 +116,7 @@ func apiServiceArgv(workDir string, port int, argv, env []string) []string {
 	return append(cmd,
 		"--dir", workDir,
 		"--http-port", strconv.Itoa(port),
-		"--env", strings.Join(append(spriteLayout.Env(), env...), ","),
+		"--env", strings.Join(sandbox.MergeEnv(spriteLayout.Env(), env), ","),
 		"--no-stream",
 	)
 }
@@ -222,9 +227,13 @@ func validateAPIEnv(env []string) error {
 	return nil
 }
 
-func putSpriteJSON(ctx context.Context, baseURL, token, path string, body []byte) (err error) {
+func putSpriteJSON(ctx context.Context, baseURL, token, path string, body []byte) error {
+	return spriteJSON(ctx, http.MethodPut, baseURL, token, path, body)
+}
+
+func spriteJSON(ctx context.Context, method, baseURL, token, path string, body []byte) (err error) {
 	endpoint := strings.TrimRight(baseURL, "/") + path
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, endpoint, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, method, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}

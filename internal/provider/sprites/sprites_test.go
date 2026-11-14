@@ -16,6 +16,7 @@ import (
 
 type fakeSDKClient struct {
 	create  func(ctx context.Context, name string, labels []string) (*spritesdk.Sprite, error)
+	envFile string
 	get     func(ctx context.Context, name string) (*spritesdk.Sprite, error)
 	list    func(ctx context.Context, prefix string) ([]sprites.SpriteListEntry, error)
 	upgrade func(ctx context.Context, name string) error
@@ -65,10 +66,52 @@ func (f *fakeSDKClient) Run(ctx context.Context, name string, argv []string, std
 }
 
 func (f *fakeSDKClient) RunIn(ctx context.Context, name, _ string, _, argv []string, stdin io.Reader, stdout, stderr io.Writer) error {
+	if handled, err := f.answerEnv(argv, stdin, stdout); handled {
+		return err
+	}
 	if f.run != nil {
 		return f.run(ctx, name, argv, stdin, stdout, stderr)
 	}
 	return nil
+}
+
+// answerEnv handles sandbox.env commands so user-command stubs never see them.
+// cat of a missing file exits 1, which readers treat as an empty environment.
+func (f *fakeSDKClient) answerEnv(argv []string, stdin io.Reader, stdout io.Writer) (bool, error) {
+	kind, ok := sandboxEnvKind(argv)
+	if !ok {
+		return false, nil
+	}
+	switch kind {
+	case "tee":
+		body, err := io.ReadAll(stdin)
+		if err != nil {
+			return true, err
+		}
+		f.envFile = string(body)
+	case "cat":
+		if f.envFile == "" {
+			return true, &spritesdk.ExitError{Code: 1}
+		}
+		_, err := io.WriteString(stdout, f.envFile)
+		return true, err
+	}
+	return true, nil
+}
+
+func sandboxEnvKind(argv []string) (string, bool) {
+	path := sandbox.EnvFilePath("/home/sprite")
+	dir := sandbox.EnvDirPath("/home/sprite")
+	if len(argv) == 3 && argv[0] == "mkdir" && argv[1] == "-p" && argv[2] == dir {
+		return "mkdir", true
+	}
+	if len(argv) == 3 && argv[0] == "chmod" && argv[2] == path {
+		return "chmod", true
+	}
+	if len(argv) == 2 && argv[1] == path && (argv[0] == "tee" || argv[0] == "cat") {
+		return argv[0], true
+	}
+	return "", false
 }
 
 func (f *fakeSDKClient) DestroySprite(ctx context.Context, name string) error {
@@ -253,6 +296,35 @@ func TestCreateWithoutRunningSkipsHold(t *testing.T) {
 	}
 	if runCalls != 0 {
 		t.Fatalf("runCalls = %d", runCalls)
+	}
+}
+
+func TestCreateWritesSandboxEnv(t *testing.T) {
+	t.Parallel()
+
+	var userCmds [][]string
+	client := &fakeSDKClient{
+		create: func(_ context.Context, name string, _ []string) (*spritesdk.Sprite, error) {
+			return spritesdk.New("token").Sprite(name), nil
+		},
+		run: func(_ context.Context, _ string, argv []string, _ io.Reader, _, _ io.Writer) error {
+			userCmds = append(userCmds, append([]string(nil), argv...))
+			return nil
+		},
+	}
+	p := sprites.NewWithClient(client, "token")
+	id, err := p.Create(context.Background(), sandbox.Spec{Name: spriteName, Env: []string{"MODE=sandbox"}})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if id != spriteName {
+		t.Fatalf("id = %q", id)
+	}
+	if client.envFile != "MODE=sandbox\n" {
+		t.Fatalf("env file = %q", client.envFile)
+	}
+	if len(userCmds) != 0 {
+		t.Fatalf("env commands recorded as user commands: %v", userCmds)
 	}
 }
 

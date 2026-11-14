@@ -96,6 +96,31 @@ func TestPublishAPIAppendsServiceEnv(t *testing.T) {
 	}
 }
 
+func TestPublishAPIEnvOverridesSpriteEnvironment(t *testing.T) {
+	t.Parallel()
+
+	var got []string
+	client := &fakeSDKClient{
+		envFile: "MODE=sandbox\nOTHER=keep\n",
+		run: func(_ context.Context, _ string, argv []string, _ io.Reader, stdout, _ io.Writer) error {
+			if len(argv) >= 3 && argv[2] == "get" {
+				_, _ = io.WriteString(stdout, `{"state":{"status":"running"}}`)
+				return nil
+			}
+			got = append([]string(nil), argv...)
+			return nil
+		},
+	}
+	p := sprites.NewWithClient(client, "token")
+	if err := p.PublishAPI(context.Background(), "box", "/home/sprite", 8000, []string{"app"}, []string{"MODE=api"}); err != nil {
+		t.Fatalf("PublishAPI: %v", err)
+	}
+	env := strings.Split(got[slices.Index(got, "--env")+1], ",")
+	if !slices.Contains(env, "MODE=api") || slices.Contains(env, "MODE=sandbox") || !slices.Contains(env, "OTHER=keep") {
+		t.Fatalf("env = %#v", env)
+	}
+}
+
 func TestPublishAPIRejectsBadEnv(t *testing.T) {
 	t.Parallel()
 

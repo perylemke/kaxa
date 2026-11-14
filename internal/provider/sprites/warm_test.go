@@ -83,3 +83,47 @@ func TestWaitForWarmTimeout(t *testing.T) {
 		t.Fatalf("err = %v, want ErrWarmTimeout", err)
 	}
 }
+
+func TestWaitForWarmAcceptsRunning(t *testing.T) {
+	t.Parallel()
+
+	client := &warmStubClient{statuses: []string{"running"}}
+	if err := waitForWarm(context.Background(), client, "demo", "tok"); err != nil {
+		t.Fatalf("waitForWarm: %v", err)
+	}
+	if client.getCalls != 1 {
+		t.Fatalf("getCalls = %d, want 1", client.getCalls)
+	}
+}
+
+// deadlineStub fails the first poll with the short deadline, then reports warm.
+type deadlineStub struct {
+	warmStubClient
+	firstRemaining time.Duration
+}
+
+func (s *deadlineStub) GetSprite(ctx context.Context, _ string) (*spritesdk.Sprite, error) {
+	s.getCalls++
+	if s.getCalls == 1 {
+		if deadline, ok := ctx.Deadline(); ok {
+			s.firstRemaining = time.Until(deadline)
+		}
+		return nil, context.DeadlineExceeded
+	}
+	return &spritesdk.Sprite{Status: "warm"}, nil
+}
+
+func TestWaitForWarmRetriesTimedOutPoll(t *testing.T) {
+	t.Parallel()
+
+	client := &deadlineStub{}
+	if err := waitForWarm(context.Background(), client, "demo", "tok"); err != nil {
+		t.Fatalf("waitForWarm: %v", err)
+	}
+	if client.getCalls < 2 {
+		t.Fatalf("getCalls = %d, want at least 2", client.getCalls)
+	}
+	if client.firstRemaining == 0 || client.firstRemaining > 15*time.Second {
+		t.Fatalf("poll deadline = %s, want a short timeout", client.firstRemaining)
+	}
+}

@@ -29,6 +29,7 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 
 ### Fixed
 
+- Sprites applies `kaxa create --env` and `--env-file` on `exec`, `console`, and the `--api` service. Create finishes when the sprite is already running.
 - `kaxa create` wizard no longer inserts large blank gaps between visible fields when other provider-specific fields are hidden.
 - `kaxa list` on Docker accepts `memoryMib` in list responses as a number or a string, so listing no longer fails when the API returns quoted values.
 - Toolchain downloads install `curl` when the sandbox image does not have it, using `apt-get` or `apk`. An image that already has `curl` skips that step.
