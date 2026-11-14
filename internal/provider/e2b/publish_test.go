@@ -67,7 +67,7 @@ func TestPublishAPIStartsServiceAndWaits(t *testing.T) {
 		t.Fatalf("probes = %d, want 3", probes)
 	}
 	svc := envd.starts[0]
-	if svc.Cmd != "env" || svc.Cwd != apiDir || svc.User != testUser || svc.Stdin {
+	if svc.Cmd != envCommand || svc.Cwd != apiDir || svc.User != testUser || svc.Stdin {
 		t.Fatalf("service request = %+v", svc)
 	}
 	if !slices.Contains(svc.Args, "MODE=prod") || !slices.Contains(svc.Args, "HOME=/home/user") {
@@ -82,6 +82,22 @@ func TestPublishAPIStartsServiceAndWaits(t *testing.T) {
 	}
 	if !service.closed {
 		t.Fatal("the stream to the service was left open")
+	}
+}
+
+func TestPublishAPIEnvOverridesSandboxEnv(t *testing.T) {
+	t.Parallel()
+
+	p, _, envd := apiProvider(t)
+	envd.envFile = "MODE=sandbox\nOTHER=keep\n"
+	var probes int
+	envd.script = serviceScript(&probes, 0, &fakeProc{block: make(chan struct{})})
+	if err := p.PublishAPI(context.Background(), testBox, apiDir, 8000, apiArgv, []string{"MODE=api"}); err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+	svc := envd.starts[0]
+	if !slices.Contains(svc.Args, "MODE=api") || slices.Contains(svc.Args, "MODE=sandbox") || !slices.Contains(svc.Args, "OTHER=keep") {
+		t.Fatalf("service args = %v", svc.Args)
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -20,6 +21,58 @@ const (
 	testAPIEnvFlag = "--api-env"
 	testUvicorn    = "uvicorn"
 )
+
+func TestCreateEnvReachesSpec(t *testing.T) {
+	dir := t.TempDir()
+	path := dir + "/app.env"
+	if err := os.WriteFile(path, []byte("FROM_FILE=1\nSHARED=file\n"), 0o600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	fp := &fakeProvider{name: testSpritesName, createID: testBoxName}
+	cmd := newCreateCmd(t, fp)
+	out := new(bytes.Buffer)
+	cmd.SetOut(out)
+	cmd.SetArgs([]string{
+		testProviderFlag, testSpritesName, testCmdCreate, testBoxName,
+		"--env", "SHARED=flag,LOG_LEVEL=info", "--env-file", path,
+	})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	want := []string{"FROM_FILE=1", "SHARED=flag", "LOG_LEVEL=info"}
+	if !slices.Equal(fp.lastCreate.Env, want) {
+		t.Fatalf("env = %v, want %v", fp.lastCreate.Env, want)
+	}
+	if strings.Contains(out.String(), "SHARED") || strings.Contains(out.String(), "flag") {
+		t.Fatal("stdout leaked an env value")
+	}
+}
+
+func TestCreateEnvRejectsBeforeCreate(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "bare key", args: []string{"--env", "DATABASE_URL"}, want: "needs a value"},
+		{name: "reserved", args: []string{"--env", "PATH=/bin"}, want: "reserved"},
+		{name: "missing file", args: []string{"--env-file", "missing.env"}, want: "not found"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fp := &fakeProvider{name: testSpritesName, createID: testBoxName}
+			cmd := newCreateCmd(t, fp)
+			cmd.SetArgs(append([]string{testProviderFlag, testSpritesName, testCmdCreate, testBoxName}, tt.args...))
+			err := cmd.Execute()
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("err = %v, want %q", err, tt.want)
+			}
+			if fp.lastCreate.Name != "" {
+				t.Fatal("sandbox was created")
+			}
+		})
+	}
+}
 
 func TestCreateAPIFlagValidation(t *testing.T) {
 	tests := []struct {

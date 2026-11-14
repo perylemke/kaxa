@@ -52,7 +52,7 @@ func TestCreateWizardListsOnlyConfiguredProviders(t *testing.T) {
 	// One configured provider: confirm sprites, then the name, then sprites options.
 	cmd.SetIn(strings.NewReader(strings.Join([]string{
 		"1", testBoxName,
-		"n", "n", "", "n", "n",
+		"n", "", "",
 	}, "\n")))
 
 	if err := cmd.Execute(); err != nil {
@@ -81,7 +81,7 @@ func TestCreateWizardWithProviderFlagListsOnlyThatProvider(t *testing.T) {
 	// --provider modal: only modal is listed; confirm it, then the name, then modal options.
 	cmd.SetIn(strings.NewReader(strings.Join([]string{
 		"1", testBoxName,
-		"n", "1", "1",
+		"n", "", "",
 	}, "\n")))
 
 	if err := cmd.Execute(); err != nil {
@@ -113,7 +113,7 @@ func TestCreateWizardListsAllConfiguredProvidersWhenNoProviderFlag(t *testing.T)
 	// Registry sorts names: modal=1, sprites=2; pick modal, name, then modal options.
 	cmd.SetIn(strings.NewReader(strings.Join([]string{
 		"1", testBoxName,
-		"n", "1", "1",
+		"n", "", "",
 	}, "\n")))
 
 	if err := cmd.Execute(); err != nil {

@@ -60,6 +60,9 @@ type Spec struct {
 	// NetworkBlockAll blocks every outbound connection from the sandbox.
 	// Only a provider that implements NetworkBlockSupport accepts it.
 	NetworkBlockAll bool
+	// Env is resolved KEY=VALUE entries for the sandbox. Providers persist them
+	// and apply them on later commands. Empty means none.
+	Env []string
 }
 
 // Info summarizes an existing sandbox.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -47,6 +48,8 @@ type fakeAPI struct {
 	termOut              string
 	termErr              error
 	hub                  []hubTemplate
+	// envFile is what cat of the sandbox env file returns.
+	envFile string
 }
 
 type termCall struct {
@@ -191,14 +194,17 @@ func (f *fakeAPI) Run(_ context.Context, name string, spec runSpec) (int, error)
 	if _, ok := f.sandboxes[name]; !ok {
 		return 0, ErrNotFound
 	}
-	f.commands = append(f.commands, slices.Clone(spec.argv))
-	f.dirs = append(f.dirs, spec.dir)
-	f.envs = append(f.envs, slices.Clone(spec.env))
 	var stdin string
 	if spec.stdin != nil {
 		b, _ := io.ReadAll(spec.stdin)
 		stdin = string(b)
 	}
+	if sandboxEnvArgv(spec.argv) {
+		return f.answerEnv(spec, stdin)
+	}
+	f.commands = append(f.commands, slices.Clone(spec.argv))
+	f.dirs = append(f.dirs, spec.dir)
+	f.envs = append(f.envs, slices.Clone(spec.env))
 	f.stdins = append(f.stdins, stdin)
 	res := fakeResult{}
 	if f.handler != nil {
@@ -211,6 +217,40 @@ func (f *fakeAPI) Run(_ context.Context, name string, spec runSpec) (int, error)
 		_, _ = io.WriteString(spec.stderr, res.stderr)
 	}
 	return res.code, res.err
+}
+
+func sandboxEnvArgv(argv []string) bool {
+	cmd := argv
+	for len(cmd) > 0 && (cmd[0] == "env" || strings.Contains(cmd[0], "=")) {
+		cmd = cmd[1:]
+	}
+	if len(cmd) == 3 && cmd[0] == "mkdir" && cmd[1] == "-p" && strings.HasSuffix(cmd[2], "/.config/kaxa") {
+		return true
+	}
+	for _, arg := range cmd {
+		if strings.HasSuffix(arg, "/sandbox.env") {
+			return true
+		}
+	}
+	return false
+}
+
+func (f *fakeAPI) answerEnv(spec runSpec, stdin string) (int, error) {
+	line := strings.Join(spec.argv, " ")
+	if strings.Contains(line, " tee ") || strings.HasPrefix(line, "tee ") {
+		f.envFile = stdin
+		return 0, nil
+	}
+	if strings.Contains(line, "cat") && strings.Contains(line, "sandbox.env") {
+		if f.envFile == "" {
+			return 1, nil
+		}
+		if spec.stdout != nil {
+			_, _ = io.WriteString(spec.stdout, f.envFile)
+		}
+		return 0, nil
+	}
+	return 0, nil
 }
 
 func (f *fakeAPI) Start(ctx context.Context, name string, spec runSpec) error {

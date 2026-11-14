@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -230,6 +231,8 @@ type fakeStarter struct {
 	// immediate reports the processes that run their script at once, instead
 	// of waiting for the end of their input like a command does.
 	immediate func(ProcessSpec) bool
+	// envFile is what cat of the sandbox env file returns.
+	envFile string
 }
 
 func (f *fakeStarter) Start(_ context.Context, ep Endpoint, cred Credential, spec ProcessSpec) (Process, error) {
@@ -238,6 +241,9 @@ func (f *fakeStarter) Start(_ context.Context, ep Endpoint, cred Credential, spe
 	if f.err != nil {
 		return nil, f.err
 	}
+	if sandboxEnvArgv(spec.Argv) {
+		return f.envProcess(spec), nil
+	}
 	f.specs = append(f.specs, spec)
 	f.tokens = append(f.tokens, cred.Token)
 	f.eps = append(f.eps, ep)
@@ -245,6 +251,44 @@ func (f *fakeStarter) Start(_ context.Context, ep Endpoint, cred Credential, spe
 	p.immediate = f.immediate != nil && f.immediate(spec)
 	f.stdins = append(f.stdins, &p.stdin)
 	return p, nil
+}
+
+func sandboxEnvArgv(argv []string) bool {
+	cmd := argv
+	for len(cmd) > 0 && (cmd[0] == "env" || strings.Contains(cmd[0], "=")) {
+		cmd = cmd[1:]
+	}
+	if len(cmd) == 3 && cmd[0] == "mkdir" && cmd[1] == "-p" && strings.HasSuffix(cmd[2], "/.config/kaxa") {
+		return true
+	}
+	for _, arg := range cmd {
+		if strings.HasSuffix(arg, "/sandbox.env") {
+			return true
+		}
+	}
+	return false
+}
+
+func (f *fakeStarter) envProcess(spec ProcessSpec) *fakeProcess {
+	line := strings.Join(spec.Argv, " ")
+	tee := strings.Contains(line, " tee ") || strings.HasPrefix(line, "tee ")
+	p := &fakeProcess{
+		spec: spec, closed: make(chan struct{}), eof: make(chan struct{}), immediate: !tee,
+	}
+	p.script = func(_ ProcessSpec, stdin string) []Event {
+		if strings.Contains(line, " cat ") || strings.HasPrefix(line, "cat ") {
+			if f.envFile == "" {
+				p.exitCode = 1
+				return nil
+			}
+			return []Event{{Data: []byte(f.envFile)}}
+		}
+		if tee {
+			f.envFile = stdin
+		}
+		return nil
+	}
+	return p
 }
 
 func (f *fakeStarter) lastSpec(t *testing.T) ProcessSpec {
@@ -281,6 +325,7 @@ type fakeProcess struct {
 	resizes [][2]uint16
 	// immediate skips the wait for the end of the input.
 	immediate bool
+	exitCode  int
 }
 
 func (p *fakeProcess) Next() (Event, error) {
@@ -298,7 +343,7 @@ func (p *fakeProcess) Next() (Event, error) {
 		if p.script != nil {
 			p.queue = p.script(p.spec, p.stdin.String())
 		}
-		p.queue = append(p.queue, Event{Exited: true})
+		p.queue = append(p.queue, Event{Exited: true, ExitCode: p.exitCode})
 	}
 	ev := p.queue[0]
 	p.queue = p.queue[1:]

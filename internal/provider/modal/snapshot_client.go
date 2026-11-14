@@ -31,7 +31,7 @@ func (r *realSDKClient) CreateFromImage(ctx context.Context, name string, labels
 	if err != nil {
 		return Record{}, imageNotFound(err)
 	}
-	return r.create(ctx, name, labels, img, 0, 0)
+	return r.create(ctx, name, labels, img, 0, 0, nil)
 }
 
 func (r *realSDKClient) DeleteImage(ctx context.Context, imageID string) error {

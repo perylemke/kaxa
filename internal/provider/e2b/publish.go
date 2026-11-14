@@ -92,7 +92,11 @@ func (p *Provider) startService(ctx context.Context, s *session, workDir string,
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	cmd, args := commandOf(argv, append(e2bLayout.Env(), env...))
+	user, err := s.readEnv(ctx)
+	if err != nil {
+		return err
+	}
+	cmd, args := commandOf(argv, sandbox.MergeEnv(e2bLayout.Env(), user, env))
 	proc, err := s.envd.Start(ctx, s.conn, StartRequest{Cmd: cmd, Args: args, Cwd: workDir, User: e2bUser})
 	if err != nil {
 		return fmt.Errorf("start api service: %w", s.err(err))

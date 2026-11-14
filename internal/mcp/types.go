@@ -31,6 +31,8 @@ type createIn struct {
 	CPU             float64  `json:"cpu,omitempty" jsonschema:"CPU cores for the sandbox (Modal and Docker; fractional on Modal). Omit for the provider default. Requires capabilities.cpu."`
 	MemoryMiB       int      `json:"memory_mib,omitempty" jsonschema:"Memory in MiB (Modal, Docker, Blaxel). Omit for the provider default. Requires capabilities.memory."`
 	NetworkBlockAll bool     `json:"block_all_network_access,omitempty" jsonschema:"Block all outbound network access from the sandbox. Daytona only. Requires capabilities.network_block. Toolchain downloads fail while it is on."`
+	Env             []string `json:"env,omitempty" jsonschema:"Names of server environment variables to copy into the sandbox for exec, console and the HTTP service. Each item is a name, never KEY=VALUE. The name must be listed in KAXA_MCP_ENV. These names replace the same key from env_file. Values are not returned."`
+	EnvFile         string   `json:"env_file,omitempty" jsonschema:"Path of a dotenv file inside the server root (KAXA_MCP_ROOT or the working directory). A relative path is inside that root. Pass the path; do not open the file or paste its contents."`
 }
 
 type createOut struct {
@@ -40,6 +42,7 @@ type createOut struct {
 	SkippedCommands [][]string `json:"skipped_commands,omitempty"`
 	URL             string     `json:"url,omitempty"`
 	Auth            string     `json:"auth,omitempty"`
+	EnvKeys         []string   `json:"env_keys,omitempty"`
 }
 
 type syncIn struct {

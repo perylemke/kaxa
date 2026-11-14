@@ -61,7 +61,7 @@ type Process interface {
 type sdkClient interface {
 	// Create starts a sandbox. withTools picks the image with a build toolchain and
 	// the modal user, used by --sync; Modal builds it once and caches it.
-	Create(ctx context.Context, name string, labels []string, withTools bool, cpu float64, memoryMiB int) (Record, error)
+	Create(ctx context.Context, name string, labels []string, withTools bool, cpu float64, memoryMiB int, env map[string]string) (Record, error)
 	List(ctx context.Context) ([]Record, error)
 	Get(ctx context.Context, name string) (Record, error)
 	Terminate(ctx context.Context, name string) error
@@ -102,11 +102,11 @@ func newSDKClient(tokenID, tokenSecret string) (*realSDKClient, error) {
 
 func (r *realSDKClient) Close() { r.c.Close() }
 
-func (r *realSDKClient) Create(ctx context.Context, name string, labels []string, withTools bool, cpu float64, memoryMiB int) (Record, error) {
-	return r.create(ctx, name, labels, r.image(withTools), cpu, memoryMiB)
+func (r *realSDKClient) Create(ctx context.Context, name string, labels []string, withTools bool, cpu float64, memoryMiB int, env map[string]string) (Record, error) {
+	return r.create(ctx, name, labels, r.image(withTools), cpu, memoryMiB, env)
 }
 
-func (r *realSDKClient) create(ctx context.Context, name string, labels []string, image *sdk.Image, cpu float64, memoryMiB int) (Record, error) {
+func (r *realSDKClient) create(ctx context.Context, name string, labels []string, image *sdk.Image, cpu float64, memoryMiB int, env map[string]string) (Record, error) {
 	app, err := r.c.Apps.FromName(ctx, appName, &sdk.AppFromNameParams{CreateIfMissing: true})
 	if err != nil {
 		return Record{}, err
@@ -117,6 +117,7 @@ func (r *realSDKClient) create(ctx context.Context, name string, labels []string
 		Command:     []string{"sleep", "infinity"},
 		Timeout:     sandboxTimeout,
 		IdleTimeout: idleTimeout,
+		Env:         env,
 	}
 	if cpu != 0 {
 		params.CPU = cpu

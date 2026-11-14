@@ -220,6 +220,35 @@ func TestExecStopsWhenContextIsCancelled(t *testing.T) {
 	}
 }
 
+func TestExecAppliesSandboxEnvFile(t *testing.T) {
+	t.Parallel()
+
+	f := runningFake(t)
+	f.envFile = "MODE=sandbox\nSHARED=file\n"
+	err := newProvider(t, f).Exec(context.Background(), testName, sandbox.ExecOptions{Command: []string{"id"}})
+	if err != nil {
+		t.Fatalf("exec: %v", err)
+	}
+	if !slices.Contains(f.execArgv, "MODE=sandbox") || !slices.Contains(f.execArgv, "SHARED=file") || f.execArgv[len(f.execArgv)-1] != "id" {
+		t.Fatalf("argv = %#v", f.execArgv)
+	}
+}
+
+func TestExecSyncedEnvFollowsRunuser(t *testing.T) {
+	t.Parallel()
+
+	f := runningFake(t)
+	f.boxes[testName].Labels = []string{sandbox.SyncLabel}
+	f.envFile = "MODE=sandbox\n"
+	err := newProvider(t, f).Exec(context.Background(), testName, sandbox.ExecOptions{Command: []string{"id"}})
+	if err != nil {
+		t.Fatalf("exec: %v", err)
+	}
+	if slices.Index(f.execArgv, "MODE=sandbox") < slices.Index(f.execArgv, "USER=modal") {
+		t.Fatalf("argv = %#v", f.execArgv)
+	}
+}
+
 type blockingReader struct{}
 
 func (blockingReader) Read([]byte) (int, error) { select {} }

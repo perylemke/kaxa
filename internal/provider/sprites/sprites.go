@@ -70,6 +70,9 @@ func (p *Provider) Create(ctx context.Context, spec sandbox.Spec) (sandbox.ID, e
 	if err := waitForWarm(ctx, c, name, token); err != nil {
 		return "", err
 	}
+	if err := writeSpriteEnv(ctx, c, name, token, spec.Env); err != nil {
+		return "", err
+	}
 	if spec.Running {
 		if err := configureRunning(ctx, c, name, token, spec.ExposeAPI); err != nil {
 			return "", redactErr(err, token)
@@ -131,8 +134,12 @@ func (p *Provider) Exec(ctx context.Context, id sandbox.ID, opts sandbox.ExecOpt
 	if err != nil {
 		return redactErr(err, token)
 	}
+	entries, err := readSpriteEnv(ctx, c, string(id), token)
+	if err != nil {
+		return err
+	}
 
-	cmd, err := prepareExecCmd(ctx, c.Sprite(string(id)), opts, spriteLabels(sp))
+	cmd, err := prepareExecCmd(ctx, c.Sprite(string(id)), opts, spriteLabels(sp), entries)
 	if err != nil {
 		return redactErr(err, token)
 	}
@@ -161,15 +168,17 @@ func (p *Provider) Destroy(ctx context.Context, id sandbox.ID) error {
 	return nil
 }
 
-func prepareExecCmd(ctx context.Context, sprite *spritesdk.Sprite, opts sandbox.ExecOptions, labels []string) (*spritesdk.Cmd, error) {
+func prepareExecCmd(ctx context.Context, sprite *spritesdk.Sprite, opts sandbox.ExecOptions, labels, env []string) (*spritesdk.Cmd, error) {
 	dir, err := sandbox.ResolveExecDir(opts.Dir, workspaceExecDir(labels))
 	if err != nil {
 		return nil, err
 	}
 	cmd := sprite.CommandContext(ctx, opts.Command[0], opts.Command[1:]...)
 	cmd.Dir = dir
-	// The toolchains are on PATH in every sandbox.
-	cmd.Env = spriteLayout.Env()
+	// The toolchains are on PATH in every sandbox. The sandbox environment
+	// follows them, so a later exec still sees the variables from create.
+	// Reserved names are left out so PATH stays the toolchain value.
+	cmd.Env = sandbox.MergeEnv(spriteLayout.Env(), sandbox.EnvFromMap(sandbox.EnvMap(env)))
 	if opts.TTY {
 		cmd.SetTTY(true)
 		if opts.Size.Rows > 0 && opts.Size.Cols > 0 {

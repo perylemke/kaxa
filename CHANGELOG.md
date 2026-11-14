@@ -29,6 +29,7 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 
 ### Fixed
 
+- Sprites applies `kaxa create --env` and `--env-file` on `exec`, `console`, and the `--api` service. Create finishes when the sprite is already running.
 - `kaxa create` wizard no longer inserts large blank gaps between visible fields when other provider-specific fields are hidden.
 - `kaxa list` on Docker accepts `memoryMib` in list responses as a number or a string, so listing no longer fails when the API returns quoted values.
 - Toolchain downloads install `curl` when the sandbox image does not have it, using `apt-get` or `apk`. An image that already has `curl` skips that step.
@@ -37,6 +38,7 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 
 ### Added
 
+- `kaxa create --env` and `--env-file`, the create wizard's Environment and Env file fields, and MCP `create_sandbox` fields `env` and `env_file` set variables for the life of the sandbox. `exec` and `console` see them, and with `--api` the service sees them too, with `--api-env` winning on the same key. `env` is a list of names copied from the server only when each name is in `KAXA_MCP_ENV`. `env_file` must stay inside the MCP root. The response lists `env_keys` and never the values.
 - `kaxa create --cpu` and `--memory` (MiB), optional fields in the create wizard, and MCP `create_sandbox` fields `cpu` and `memory_mib` request compute for Modal (fractional CPU), Docker (integer CPU; rejected pairs surface as provider errors), and memory for Blaxel (overrides `KAXA_BLAXEL_MEMORY` for that create). `list_providers` capabilities include `cpu` and `memory` when supported.
 - `kaxa list` detail view: press `c` to open the same interactive shell as `kaxa console` for that row; when the shell closes, list returns to the table on that sandbox.
 - `KAXA_MCP_ROOT` bounds which repositories `kaxa mcp` may copy. `kaxa mcp init --root` and `kaxa mcp config --root` write it into the client entry for every agent. Without `--root`, the command uses its current directory and refuses your home directory and `/`.

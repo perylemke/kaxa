@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"os"
@@ -58,6 +59,7 @@ const (
 	modeProd       = "MODE=prod"
 	envDatabaseURL = "DATABASE_URL"
 	envHostVar     = "GITHUB_TOKEN"
+	envShared      = "SHARED"
 )
 
 func (f *fakeProvider) Name() string           { return f.name }
@@ -1120,6 +1122,87 @@ func TestCreateAPIEnvHonorsAllowlist(t *testing.T) {
 	if len(fp.created) != 0 {
 		t.Fatalf("created %v", fp.created)
 	}
+}
+
+func TestCreateSandboxEnvRejectsValuesAllowlistAndPaths(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	outside := t.TempDir()
+	secret := "super-secret-value"
+	if err := os.WriteFile(filepath.Join(outside, "secret.env"), []byte("TOKEN=nope\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(outside, "secret.env"), filepath.Join(root, "link.env")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(root, "dir.env"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	fp := &fakeProvider{name: testSprites}
+	svc := newSandboxEnvService(t, root, nil, nil, fp)
+
+	_, err := svc.create(context.Background(), createIn{Name: testBox, Env: []string{"TOKEN=" + secret}})
+	if err == nil || !strings.Contains(err.Error(), "TOKEN") || strings.Contains(err.Error(), secret) {
+		t.Fatalf("err = %v", err)
+	}
+	_, err = svc.create(context.Background(), createIn{Name: testBox, Env: []string{"MODE"}})
+	wantErr(t, err, EnvSandboxAllow)
+	_, err = svc.create(context.Background(), createIn{Name: testBox, EnvFile: filepath.Join(outside, "secret.env")})
+	wantErr(t, err, "outside")
+	_, err = svc.create(context.Background(), createIn{Name: testBox, EnvFile: "link.env"})
+	wantErr(t, err, "outside")
+	_, err = svc.create(context.Background(), createIn{Name: testBox, EnvFile: "missing.env"})
+	wantErr(t, err, "not found")
+	_, err = svc.create(context.Background(), createIn{Name: testBox, EnvFile: "dir.env"})
+	wantErr(t, err, "directory")
+	if len(fp.created) != 0 {
+		t.Fatalf("created %v", fp.created)
+	}
+}
+
+func TestCreateSandboxEnvFileAndAllowlist(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, ".env"), []byte("SHARED=from-file\nOTHER=keep\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	fp := &fakeProvider{name: testSprites}
+	svc := newSandboxEnvService(t, root, []string{envShared}, map[string]string{envShared: "from-env"}, fp)
+	out, err := svc.create(context.Background(), createIn{Name: testBox, Env: []string{envShared}, EnvFile: ".env"})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if len(fp.created) != 1 || !slices.Equal(fp.created[0].Env, []string{"SHARED=from-env", "OTHER=keep"}) {
+		t.Fatalf("env = %#v", fp.created[0].Env)
+	}
+	if !slices.Equal(out.EnvKeys, []string{envShared, "OTHER"}) {
+		t.Fatalf("keys = %#v", out.EnvKeys)
+	}
+	raw, err := json.Marshal(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "from-env") || strings.Contains(string(raw), "from-file") || strings.Contains(string(raw), "keep") {
+		t.Fatalf("response contains a value: %s", raw)
+	}
+}
+
+func newSandboxEnvService(t *testing.T, root string, allow []string, host map[string]string, fp *fakeProvider) *service {
+	t.Helper()
+	reg := registry.New()
+	if err := reg.Register(fp); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	svc, err := newService(reg, config.Config{Provider: testSprites}, Options{
+		Root: root, Stderr: io.Discard, EnvAllow: allow,
+		LookupEnv: func(k string) (string, bool) { v, ok := host[k]; return v, ok },
+	})
+	if err != nil {
+		t.Fatalf("service: %v", err)
+	}
+	return svc
 }
 
 func TestParseAPIEnvAllow(t *testing.T) {

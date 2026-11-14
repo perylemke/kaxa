@@ -90,9 +90,13 @@ func (p *Provider) startService(ctx context.Context, name, workDir string, port 
 	timeout, _ := p.readiness()
 	readyCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	user, err := p.readEnv(ctx, name)
+	if err != nil {
+		return userErr(err, name, secrets...)
+	}
 	spec := runSpec{
 		argv: argv, dir: workDir, port: port,
-		env: append(blaxelLayout.Env(), env...),
+		env: sandbox.MergeEnv(blaxelLayout.Env(), user, env),
 	}
 	if err := rt.Start(readyCtx, name, spec); err != nil {
 		return userErr(err, name, secrets...)

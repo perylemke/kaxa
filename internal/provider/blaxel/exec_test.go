@@ -49,6 +49,30 @@ func TestExecSplitsStdoutAndStderr(t *testing.T) {
 	}
 }
 
+func TestExecAppliesSandboxEnv(t *testing.T) {
+	t.Parallel()
+	api := newFakeAPI()
+	api.envFile = "MODE=sandbox\n"
+	p := newTestProvider(t, api)
+	api.add(boxName, statusRunning)
+	var stdout bytes.Buffer
+	if err := p.Exec(t.Context(), boxName, sandbox.ExecOptions{Command: []string{"id"}, Stdout: &stdout}); err != nil {
+		t.Fatalf("Exec: %v", err)
+	}
+	if strings.Contains(stdout.String(), "sandbox") {
+		t.Fatalf("stdout = %q", stdout.String())
+	}
+	if !commandIs(api.argvs()[0], "id") {
+		t.Fatalf("argv = %v", api.argvs())
+	}
+	if !slices.Contains(api.envs[0], "MODE=sandbox") || !slices.Contains(api.envs[0], "HOME="+blaxelHome) {
+		t.Fatalf("env = %v", api.envs[0])
+	}
+	if slices.Index(api.envs[0], "MODE=sandbox") < slices.Index(api.envs[0], "HOME="+blaxelHome) {
+		t.Fatalf("toolchain env must stay first: %v", api.envs[0])
+	}
+}
+
 func TestExecReturnsExitError(t *testing.T) {
 	t.Parallel()
 	api := newFakeAPI()

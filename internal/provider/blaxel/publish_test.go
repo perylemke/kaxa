@@ -33,6 +33,22 @@ func TestPublishAPIStartsServiceAndPreview(t *testing.T) {
 	}
 }
 
+func TestPublishAPIEnvOverridesSandboxEnv(t *testing.T) {
+	t.Parallel()
+	api := newFakeAPI()
+	p := newTestProvider(t, api)
+	if _, err := p.Create(t.Context(), sandbox.Spec{Name: apiName, ExposeAPI: true, APIPort: 8000}); err != nil {
+		t.Fatal(err)
+	}
+	api.envFile = "MODE=sandbox\nOTHER=keep\n"
+	if err := p.PublishAPI(t.Context(), apiName, blaxelHome, 8000, serviceArgv, []string{"MODE=api"}); err != nil {
+		t.Fatalf("PublishAPI: %v", err)
+	}
+	if !slices.Contains(api.envs[0], "MODE=api") || slices.Contains(api.envs[0], "MODE=sandbox") || !slices.Contains(api.envs[0], "OTHER=keep") {
+		t.Fatalf("env = %v", api.envs[0])
+	}
+}
+
 func TestPublishAPIServiceExitsEarly(t *testing.T) {
 	t.Parallel()
 	api := newFakeAPI()

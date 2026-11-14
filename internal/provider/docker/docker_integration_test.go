@@ -323,7 +323,14 @@ func TestCreateWithAPIPublishesThePort(t *testing.T) {
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if len(f.cmds) < 3 || !slices.Contains(f.cmds[0], "mkdir") || !slices.Contains(f.cmds[1], "uvicorn") || f.cmds[2][0] != "bash" {
+	var cmds [][]string
+	for _, cmd := range f.cmds {
+		if slices.Contains(cmd, sandbox.EnvFilePath(agentHome)) {
+			continue
+		}
+		cmds = append(cmds, cmd)
+	}
+	if len(cmds) < 3 || !slices.Contains(cmds[0], "mkdir") || !slices.Contains(cmds[1], "uvicorn") || cmds[2][0] != "bash" {
 		t.Fatalf("commands = %v, want the service and then the probe", f.cmds)
 	}
 }

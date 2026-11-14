@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -153,7 +154,7 @@ func TestCreateFormSpritesAccessibleDefaults(t *testing.T) {
 func TestCreateFormE2BAccessible(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://example")
 	in := strings.NewReader(strings.Join([]string{
-		"3", fixturePery, "y", "", "my-template", "y", "n",
+		"3", fixturePery, "y", "", "my-template", "y", "", "", "n",
 		".venv/bin/uvicorn,app.main:app", "9000", "DATABASE_URL",
 	}, "\n"))
 	out := new(bytes.Buffer)
@@ -190,7 +191,7 @@ func assertFormPrompts(t *testing.T, view string, want, omit []string) {
 
 func TestCreateFormSpritesSyncPage(t *testing.T) {
 	in := strings.NewReader(strings.Join([]string{
-		"2", fixturePery, "n", "y", "", "n", "n", "y",
+		"2", fixturePery, "n", "y", "", "n", "n", "", "", "y",
 	}, "\n"))
 	out := new(bytes.Buffer)
 
@@ -203,6 +204,36 @@ func TestCreateFormSpritesSyncPage(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "Directories") || !strings.Contains(out.String(), "Skip install") {
 		t.Fatalf("prompts = %q", out.String())
+	}
+}
+
+func TestCreateFormEnvironmentReachesResult(t *testing.T) {
+	in := strings.NewReader(strings.Join([]string{
+		"2", fixturePery, "n", "n", "n", "n", "LOG_LEVEL=info", "",
+	}, "\n"))
+	out := new(bytes.Buffer)
+
+	got, err := collectCreateForm(context.Background(), in, out, formProviders(), spritesProviderName, formWizardLookup, createFlags{}, false)
+	if err != nil {
+		t.Fatalf("form: %v", err)
+	}
+	if !slices.Equal(got.Env, []string{"LOG_LEVEL=info"}) {
+		t.Fatalf("env = %v", got.Env)
+	}
+}
+
+func TestCreateFormEnvironmentRejectsReserved(t *testing.T) {
+	in := strings.NewReader(strings.Join([]string{
+		"2", fixturePery, "n", "n", "n", "n", "PATH=/bin",
+	}, "\n"))
+	out := new(bytes.Buffer)
+
+	_, err := collectCreateForm(context.Background(), in, out, formProviders(), spritesProviderName, formWizardLookup, createFlags{}, false)
+	if err == nil || !strings.Contains(err.Error(), "reserved") {
+		t.Fatalf("err = %v", err)
+	}
+	if strings.Contains(err.Error(), "/bin") {
+		t.Fatalf("error leaks a value: %v", err)
 	}
 }
 

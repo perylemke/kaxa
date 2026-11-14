@@ -51,9 +51,13 @@ func (p *Provider) Exec(ctx context.Context, id sandbox.ID, opts sandbox.ExecOpt
 	if err != nil {
 		return err
 	}
+	user, err := p.readEnv(ctx, rec.Name)
+	if err != nil {
+		return userErr(err, rec.Name, secrets...)
+	}
 	spec := runSpec{
 		argv: opts.Command, stdin: pipedInput(opts.Stdin), stdout: opts.Stdout, stderr: opts.Stderr,
-		env: blaxelLayout.Env(), dir: dir,
+		env: sandbox.MergeEnv(blaxelLayout.Env(), user), dir: dir,
 	}
 	code, err := rt.Run(ctx, rec.Name, spec)
 	if err != nil {

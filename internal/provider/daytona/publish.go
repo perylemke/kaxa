@@ -100,8 +100,12 @@ func apiPortMismatch(created, want int) error {
 }
 
 func (p *Provider) startService(ctx context.Context, s *session, workDir string, port int, argv, env []string) error {
+	user, err := s.readEnv(ctx)
+	if err != nil {
+		return err
+	}
 	proc, err := s.tb.Spawn(ctx, s.rec.ID, runSpec{
-		argv: argv, dir: workDir, env: append(daytonaLayout.Env(), env...),
+		argv: argv, dir: workDir, env: sandbox.MergeEnv(daytonaLayout.Env(), user, env),
 	})
 	if err != nil {
 		return fmt.Errorf("start api service: %w", s.err(err))

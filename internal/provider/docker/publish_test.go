@@ -98,6 +98,20 @@ func checkServiceSpec(t *testing.T, proc *fakeStarter) {
 	}
 }
 
+func TestPublishAPIEnvOverridesSandboxEnv(t *testing.T) {
+	t.Parallel()
+	p, api, proc := publishProvider(t)
+	proc.envFile = "MODE=sandbox\nOTHER=keep\n"
+	probeAnswers(api, proc, 0)
+	if err := p.PublishAPI(context.Background(), testSandbox, apiDir, 8000, apiArgv, []string{"MODE=api"}); err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+	svc := proc.specs[0]
+	if !slices.Contains(svc.Argv, "MODE=api") || slices.Contains(svc.Argv, "MODE=sandbox") || !slices.Contains(svc.Argv, "OTHER=keep") {
+		t.Fatalf("service argv = %v", svc.Argv)
+	}
+}
+
 func TestPublishAPIServiceExits(t *testing.T) {
 	t.Parallel()
 	p, api, proc := publishProvider(t)

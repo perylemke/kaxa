@@ -19,7 +19,10 @@ type fakeClient struct {
 	withTools     bool
 	lastCPU       float64
 	lastMemoryMiB int
+	lastEnv       map[string]string
 	failWith      error
+	// envFile is the contents cat returns for the sandbox env file.
+	envFile string
 
 	// Snapshot bookkeeping.
 	nextImage     int
@@ -49,10 +52,11 @@ func newFakeClient() *fakeClient {
 	return &fakeClient{boxes: map[string]*modal.Record{}}
 }
 
-func (f *fakeClient) Create(_ context.Context, name string, labels []string, withTools bool, cpu float64, memoryMiB int) (modal.Record, error) {
+func (f *fakeClient) Create(_ context.Context, name string, labels []string, withTools bool, cpu float64, memoryMiB int, env map[string]string) (modal.Record, error) {
 	f.creates++
 	f.withTools = withTools
 	f.lastCPU, f.lastMemoryMiB = cpu, memoryMiB
+	f.lastEnv = env
 	if f.failWith != nil {
 		return modal.Record{}, f.failWith
 	}
@@ -141,6 +145,18 @@ func (f *fakeClient) DeleteImage(_ context.Context, imageID string) error {
 	return nil
 }
 
+func sandboxEnvCommand(argv []string) bool {
+	if len(argv) == 3 && argv[0] == "mkdir" && argv[1] == "-p" && strings.HasSuffix(argv[2], "/.config/kaxa") {
+		return true
+	}
+	for _, arg := range argv {
+		if strings.HasSuffix(arg, "/sandbox.env") {
+			return true
+		}
+	}
+	return false
+}
+
 type imageCall struct {
 	name   string
 	labels []string
@@ -148,6 +164,16 @@ type imageCall struct {
 }
 
 func (f *fakeClient) Exec(_ context.Context, name string, argv []string, params modal.ExecParams) (modal.Process, error) {
+	if sandboxEnvCommand(argv) {
+		if len(argv) > 0 && argv[0] == "cat" {
+			code := 1
+			if f.envFile != "" {
+				code = 0
+			}
+			return newFakeProcess(f.envFile, "", code), nil
+		}
+		return newFakeProcess("", "", 0), nil
+	}
 	f.execName, f.execArgv, f.execPTY, f.execDir = name, argv, params.PTY, params.Workdir
 	f.execs = append(f.execs, execCall{argv: argv, dir: params.Workdir})
 	if f.execErr != nil {

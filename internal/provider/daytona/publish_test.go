@@ -48,6 +48,21 @@ func TestPublishAPIStartsServiceAndExposesPort(t *testing.T) {
 	}
 }
 
+func TestPublishAPIEnvOverridesSandboxEnv(t *testing.T) {
+	t.Parallel()
+	p, _, tb := publishFixture(t, func(req runSpec, _ string) fakeResult {
+		return fakeResult{running: isService(req)}
+	})
+	tb.envFile = "MODE=sandbox\nOTHER=keep\n"
+	if err := p.PublishAPI(t.Context(), "api", daytonaHome, 8000, serviceArgv, []string{"MODE=api"}); err != nil {
+		t.Fatalf("PublishAPI: %v", err)
+	}
+	svc := tb.reqs[0]
+	if !slices.Contains(svc.env, "MODE=api") || slices.Contains(svc.env, "MODE=sandbox") || !slices.Contains(svc.env, "OTHER=keep") {
+		t.Fatalf("env = %v", svc.env)
+	}
+}
+
 func TestPublishAPIServiceExitsEarly(t *testing.T) {
 	t.Parallel()
 	p, api, _ := publishFixture(t, func(req runSpec, _ string) fakeResult {

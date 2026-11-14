@@ -37,8 +37,12 @@ type createFormResult struct {
 	APIPort         int
 	APICmd          []string
 	APIEnv          []string
-	cpuInput        string
-	memoryInput     string
+	// EnvText and EnvFile are the wizard inputs. Env is the resolved KEY=VALUE list.
+	EnvText     string
+	EnvFile     string
+	Env         []string
+	cpuInput    string
+	memoryInput string
 	// Wizard-only presets (flags stay numeric). Modal: cpu_preset / memory_preset.
 	// Docker: docker_size. Blaxel: memory_preset only.
 	cpuPreset        string
@@ -122,6 +126,8 @@ func seedCreateFormResult(defaultProvider string, flags createFlags) (createForm
 	result.Template = flags.Template
 	result.NetworkBlockAll = flags.NetworkBlockAll
 	result.NoInstall = flags.NoInstall
+	result.EnvText = flags.Env
+	result.EnvFile = flags.EnvFile
 	if flags.DirSet {
 		result.Dir = flags.Dir
 		result.DirSet = true
@@ -174,7 +180,37 @@ func buildCreateFormPages(
 	}
 	identity := huh.NewGroup(identityFields...).Title("Create sandbox").Description("Step 1 · Provider and name")
 
-	optionsPage := huh.NewGroup(
+	optionsPage := createOptionsGroup(capsOf, result, apiRaw)
+
+	syncPage := huh.NewGroup(
+		shownField(huh.NewConfirm().Title("Skip install").Affirmative("Yes").Negative("No").Value(&result.NoInstall)),
+	).Title("Sync").Description("Step 3 · Install")
+
+	apiPage := huh.NewGroup(
+		shownField(huh.NewInput().Title("API command").Description("Comma-separated argv. The first item is the binary.").Value(&apiRaw.command).
+			Validate(func(s string) error {
+				_, err := parseAPICommand(s)
+				if err != nil {
+					return errors.New(err.Error())
+				}
+				return nil
+			})),
+		shownField(huh.NewInput().Title("API port").Value(&apiRaw.port).Validate(func(s string) error {
+			return validateAPIPortInput(s, result.Running)
+		})),
+		shownField(huh.NewInput().Title("API env").Description("Optional. Comma-separated KEY or KEY=VALUE entries.").Value(&apiRaw.env).
+			Validate(validateCreateAPIEnvInput)),
+	).Title("API").Description("Step 4 · Service")
+
+	return createFormPages{identity: identity, options: optionsPage, sync: syncPage, api: apiPage}
+}
+
+func createOptionsGroup(
+	capsOf func() sandbox.Capabilities,
+	result *createFormResult,
+	apiRaw *createFormAPIRaw,
+) *huh.Group {
+	return huh.NewGroup(
 		conditionalField(capsOf, sandbox.FeatureRunning,
 			huh.NewConfirm().Title("Running").Affirmative("Yes").Negative("No").Value(&result.Running).
 				Validate(func(v bool) error { return validateCreateRunning(v, result) })),
@@ -235,36 +271,21 @@ func buildCreateFormPages(
 				Description("Provider default uses KAXA_BLAXEL_MEMORY or 4096.").
 				Options(blaxelMemorySelectOptions(result)...).
 				Value(&result.memoryPreset)),
-		// Providers with CPU or memory not covered above: freeform fallback.
 		presetConditionalField(result, genericCPUVisible(capsOf),
 			huh.NewInput().Title("CPU (cores)").Description("Empty means the provider default.").Value(&result.cpuInput).
 				Validate(validateCreateCPUInput)),
 		presetConditionalField(result, genericMemVisible(capsOf),
 			huh.NewInput().Title("Memory (MiB)").Description("Empty means the provider default.").Value(&result.memoryInput).
 				Validate(validateCreateMemoryInput)),
+		shownField(huh.NewInput().Title("Environment").
+			Description("Optional. Comma-separated KEY=VALUE entries. A value cannot contain a comma.").
+			Value(&result.EnvText).
+			Validate(validateCreateEnvInput)),
+		shownField(huh.NewInput().Title("Env file").
+			Description("Optional path to a dotenv file. Empty leaves the flag value.").
+			Value(&result.EnvFile).
+			Validate(validateCreateEnvFileInput)),
 	).Title("Provider options").Description("Step 2 · Options this provider supports")
-
-	syncPage := huh.NewGroup(
-		shownField(huh.NewConfirm().Title("Skip install").Affirmative("Yes").Negative("No").Value(&result.NoInstall)),
-	).Title("Sync").Description("Step 3 · Install")
-
-	apiPage := huh.NewGroup(
-		shownField(huh.NewInput().Title("API command").Description("Comma-separated argv. The first item is the binary.").Value(&apiRaw.command).
-			Validate(func(s string) error {
-				_, err := parseAPICommand(s)
-				if err != nil {
-					return errors.New(err.Error())
-				}
-				return nil
-			})),
-		shownField(huh.NewInput().Title("API port").Value(&apiRaw.port).Validate(func(s string) error {
-			return validateAPIPortInput(s, result.Running)
-		})),
-		shownField(huh.NewInput().Title("API env").Description("Optional. Comma-separated KEY or KEY=VALUE entries.").Value(&apiRaw.env).
-			Validate(validateCreateAPIEnvInput)),
-	).Title("API").Description("Step 4 · Service")
-
-	return createFormPages{identity: identity, options: optionsPage, sync: syncPage, api: apiPage}
 }
 
 func validateCreateName(name string) error {
@@ -382,6 +403,19 @@ func validateCreateSyncDir(dir string) error {
 	return err
 }
 
+func validateCreateEnvInput(raw string) error {
+	_, err := sandbox.ParseEnvFlag(raw)
+	return err
+}
+
+func validateCreateEnvFileInput(path string) error {
+	if strings.TrimSpace(path) == "" {
+		return nil
+	}
+	_, err := sandbox.ReadEnvFile(strings.TrimSpace(path))
+	return err
+}
+
 func validateCreateAPIEnvInput(raw string) error {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -425,6 +459,11 @@ func finalizeCreateFormResult(
 		result.Dir = ""
 		result.DirSet = false
 	}
+	env, err := sandbox.ResolveSandboxEnv(result.EnvFile, result.EnvText)
+	if err != nil {
+		return createFormResult{}, err
+	}
+	result.Env = env
 
 	if !result.API {
 		return result, nil
@@ -437,7 +476,7 @@ func finalizeCreateFormResult(
 	if err != nil {
 		return createFormResult{}, err
 	}
-	env, err := lifecycle.ResolveAPIEnv(splitAPIEnvField(apiRaw.env), os.LookupEnv)
+	env, err = lifecycle.ResolveAPIEnv(splitAPIEnvField(apiRaw.env), os.LookupEnv)
 	if err != nil {
 		return createFormResult{}, err
 	}

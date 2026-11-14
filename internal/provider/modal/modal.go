@@ -84,7 +84,10 @@ func (p *Provider) Create(ctx context.Context, spec sandbox.Spec) (sandbox.ID, e
 		return "", err
 	}
 	withTools := slices.Contains(spec.Labels, sandbox.SyncLabel)
-	if _, err := c.Create(ctx, spec.Name, spec.Labels, withTools, spec.CPU, spec.MemoryMiB); err != nil {
+	if _, err := c.Create(ctx, spec.Name, spec.Labels, withTools, spec.CPU, spec.MemoryMiB, sandbox.EnvMap(spec.Env)); err != nil {
+		return "", userErr(err, spec.Name, secrets...)
+	}
+	if err := writeSandboxEnv(ctx, c, spec.Name, spec.Env); err != nil {
 		return "", userErr(err, spec.Name, secrets...)
 	}
 	return sandbox.ID(spec.Name), nil

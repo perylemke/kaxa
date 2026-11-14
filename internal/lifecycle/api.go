@@ -48,18 +48,6 @@ func ValidateAPI(running bool, port int, argv []string) error {
 	return nil
 }
 
-const (
-	maxAPIEnvEntries = 64
-	maxAPIEnvValue   = 8192
-	reservedEnvKaxa  = "KAXA_"
-)
-
-// reservedAPIEnvPrefixes are provider credential families that never reach a service.
-var reservedAPIEnvPrefixes = []string{reservedEnvKaxa, "MODAL_TOKEN_", "FLY_", "SPRITES_"}
-
-// reservedAPIEnv lists variables the provider sets for the service itself.
-var reservedAPIEnv = map[string]struct{}{"HOME": {}, "USER": {}, "PATH": {}}
-
 // ResolveAPIEnv turns --api-env style entries into KEY=VALUE pairs.
 //
 // An entry is KEY=VALUE or KEY. A bare KEY takes its value from lookup, so a
@@ -67,9 +55,9 @@ var reservedAPIEnv = map[string]struct{}{"HOME": {}, "USER": {}, "PATH": {}}
 // provider token never reaches the sandbox. Errors name the key and never the
 // value.
 func ResolveAPIEnv(entries []string, lookup func(string) (string, bool)) ([]string, error) {
-	if len(entries) > maxAPIEnvEntries {
+	if len(entries) > sandbox.MaxEnvEntries {
 		return nil, usererr.New(
-			fmt.Sprintf("too many api env entries (maximum %d)", maxAPIEnvEntries),
+			fmt.Sprintf("too many api env entries (maximum %d)", sandbox.MaxEnvEntries),
 			"pass fewer variables",
 		)
 	}
@@ -103,7 +91,7 @@ func splitAPIEnv(entry string, lookup func(string) (string, bool)) (string, stri
 			"use KEY=VALUE or KEY, with letters, digits, and underscores, not starting with a digit",
 		)
 	}
-	if _, reserved := reservedAPIEnv[key]; reserved || hasReservedPrefix(key) {
+	if sandbox.ReservedEnvKey(key) {
 		return "", "", usererr.New(
 			fmt.Sprintf("api env %s is reserved", key),
 			"choose another variable name",
@@ -122,29 +110,6 @@ func splitAPIEnv(entry string, lookup func(string) (string, bool)) (string, stri
 	return key, got, nil
 }
 
-func hasReservedPrefix(key string) bool {
-	for _, prefix := range reservedAPIEnvPrefixes {
-		if strings.HasPrefix(key, prefix) {
-			return true
-		}
-	}
-	return false
-}
-
 func checkAPIEnvValue(key, value string) error {
-	if len(value) > maxAPIEnvValue {
-		return usererr.New(fmt.Sprintf("api env %s is too long", key), "shorten the value")
-	}
-	if strings.Contains(value, ",") {
-		return usererr.New(
-			fmt.Sprintf("api env %s contains a comma", key),
-			"the provider joins variables with commas; avoid commas in the value",
-		)
-	}
-	for _, r := range value {
-		if r < 0x20 || r == 0x7f {
-			return usererr.New(fmt.Sprintf("api env %s contains a control character", key), "remove it from the value")
-		}
-	}
-	return nil
+	return sandbox.CheckEnvValue("api env", key, value)
 }

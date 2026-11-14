@@ -126,6 +126,21 @@ func TestCreate(t *testing.T) {
 	}
 }
 
+func TestCreateWritesSandboxEnv(t *testing.T) {
+	t.Parallel()
+
+	p, _, envd := newProvider(nil, 0)
+	if _, err := p.Create(context.Background(), sandbox.Spec{Name: testApp, Env: []string{"MODE=sandbox"}}); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if envd.envFile != "MODE=sandbox\n" {
+		t.Fatalf("env file = %q", envd.envFile)
+	}
+	if len(envd.starts) != 0 {
+		t.Fatalf("env file commands were recorded as user commands: %+v", envd.starts)
+	}
+}
+
 func TestCreateTemplate(t *testing.T) {
 	t.Parallel()
 

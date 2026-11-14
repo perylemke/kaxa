@@ -159,6 +159,23 @@ func TestCreateRejectsDuplicate(t *testing.T) {
 	}
 }
 
+func TestCreateStoresSandboxEnv(t *testing.T) {
+	t.Parallel()
+
+	fake := newFakeClient()
+	p := newProvider(t, fake)
+	_, err := p.Create(context.Background(), sandbox.Spec{Name: testName, Env: []string{"MODE=sandbox"}})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if fake.lastEnv["MODE"] != "sandbox" {
+		t.Fatalf("env = %#v", fake.lastEnv)
+	}
+	if len(fake.execs) != 0 {
+		t.Fatalf("env file commands were recorded as user commands: %#v", fake.execs)
+	}
+}
+
 func TestListSortedWithStatusAndLabels(t *testing.T) {
 	t.Parallel()
 

@@ -39,9 +39,16 @@ type Options struct {
 	// APIEnvAllow lists the server environment variables an agent may copy into
 	// a service with a bare KEY in api_env. Empty means none.
 	APIEnvAllow []string
+	// EnvAllow lists the server environment variables an agent may copy into
+	// the sandbox by name. Empty means none.
+	EnvAllow []string
 	// LookupEnv reads the server environment. Nil means os.LookupEnv.
 	LookupEnv func(string) (string, bool)
 }
+
+// EnvSandboxAllow names the variable that holds the comma-separated allowlist of
+// server environment variables an agent may copy into a sandbox by name.
+const EnvSandboxAllow = "KAXA_MCP_ENV"
 
 // EnvAPIEnvAllow names the variable that holds the comma-separated allowlist of
 // server environment variables an agent may copy into a service.
@@ -78,7 +85,10 @@ func Serve(ctx context.Context, reg *registry.Registry, cfg config.Config, stder
 		return err
 	}
 	srv, err := New(reg, cfg, Options{
-		Stderr: stderr, Root: root, APIEnvAllow: ParseAPIEnvAllow(os.Getenv(EnvAPIEnvAllow)),
+		Stderr:      stderr,
+		Root:        root,
+		APIEnvAllow: ParseAPIEnvAllow(os.Getenv(EnvAPIEnvAllow)),
+		EnvAllow:    ParseAPIEnvAllow(os.Getenv(EnvSandboxAllow)),
 	})
 	if err != nil {
 		return err
@@ -110,7 +120,7 @@ func (s *service) register(srv *sdk.Server) {
 		"List the registered sandbox providers, whether each is available, and which optional features it supports (sync, setup, api, public_url, workspace_layout, cpu, memory, snapshot). A provider with snapshot also reports snapshot_restore: in_place or new_sandbox.",
 		readOnly, s.listProviders)
 	addTool(s, srv, "create_sandbox", "Create a sandbox",
-		"Create a sandbox. With sync it copies a local Git repository into the sandbox and installs its dependencies; a failed copy, install or API publish deletes the sandbox. Can take minutes.",
+		"Create a sandbox. With sync it copies a local Git repository into the sandbox and installs its dependencies; a failed copy, install or API publish deletes the sandbox. Can take minutes. env is a list of names copied from the server only when each name is in KAXA_MCP_ENV; never pass KEY=VALUE. env_file is a dotenv path inside the server root; pass the path, do not open the file or paste secrets. The response lists env_keys and never the values.",
 		additive, s.create)
 	addTool(s, srv, "sync_repository", "Copy another repository into a sandbox",
 		"Copy another local Git repository into a sandbox that was created with sync, then install its dependencies. It never replaces a directory: a repository already in the sandbox is an error. A failure keeps the sandbox. Can take minutes.",
