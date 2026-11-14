@@ -54,10 +54,16 @@ func (p *Provider) Exec(ctx context.Context, id sandbox.ID, opts sandbox.ExecOpt
 	if rec.ExitCode != nil {
 		return userErr(ErrNotFound, name, secrets...)
 	}
+	user, err := readSandboxEnv(ctx, c, name)
+	if err != nil {
+		return userErr(err, name, secrets...)
+	}
 	fallback := ""
 	if isSynced(rec) {
-		opts.Command = asModal(nil, opts.Command)
+		opts.Command = asModal(user, opts.Command)
 		fallback = workspaceDir
+	} else if len(user) > 0 {
+		opts.Command = append(append([]string{"env"}, user...), opts.Command...)
 	}
 	dir, err := sandbox.ResolveExecDir(opts.Dir, fallback)
 	if err != nil {

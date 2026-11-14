@@ -94,7 +94,11 @@ func (p *Provider) startService(ctx context.Context, s *session, workDir string,
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	spec := ProcessSpec{Argv: commandOf(argv, slices.Concat(cloudLayout.Env(), env)), Dir: workDir, User: agentUser}
+	user, err := s.readEnv(ctx)
+	if err != nil {
+		return err
+	}
+	spec := ProcessSpec{Argv: commandOf(argv, sandbox.MergeEnv(cloudLayout.Env(), user, env)), Dir: workDir, User: agentUser}
 	proc, err := s.proc.Start(ctx, s.rec.Endpoint, s.cred, spec)
 	if err != nil {
 		return fmt.Errorf("start api service: %w", s.err(err))

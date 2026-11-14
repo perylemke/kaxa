@@ -177,7 +177,21 @@ func (p *Provider) Create(ctx context.Context, spec sandbox.Spec) (sandbox.ID, e
 		return "", errors.Join(userErr(err, spec.Name, secrets...), removeBest(ctx, c, created.ID))
 	}
 	p.rememberRecord(spec.Name, rec)
+	if err := p.storeEnv(ctx, sandbox.ID(spec.Name), spec.Env); err != nil {
+		return "", errors.Join(err, removeBest(ctx, c, created.ID))
+	}
 	return sandbox.ID(spec.Name), nil
+}
+
+func (p *Provider) storeEnv(ctx context.Context, id sandbox.ID, entries []string) error {
+	if len(entries) == 0 {
+		return nil
+	}
+	s, err := p.open(ctx, id)
+	if err != nil {
+		return err
+	}
+	return s.writeEnv(ctx, entries)
 }
 
 // removeBest deletes a sandbox after a failed create and reports why it could not.

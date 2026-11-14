@@ -620,6 +620,21 @@ func TestResolveAPIEnv(t *testing.T) {
 	}
 }
 
+func TestCreatePassesSandboxEnvToProvider(t *testing.T) {
+	t.Parallel()
+
+	p, rec := newFull()
+	_, err := lifecycle.Create(context.Background(), p, lifecycle.Request{
+		Name: boxName, Env: []string{modeProd},
+	}, nil)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if !slices.Equal(rec.created.Env, []string{modeProd}) {
+		t.Fatalf("env = %v", rec.created.Env)
+	}
+}
+
 func TestCreatePassesAPIEnvToPublisher(t *testing.T) {
 	t.Parallel()
 

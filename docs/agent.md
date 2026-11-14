@@ -61,6 +61,8 @@ The tokens stay in the environment of that process. Put `KAXA_DEFAULT_PROVIDER` 
 
 A bare `KEY` in `api_env` copies a variable from the `kaxa mcp` environment, so an agent could ask for any secret that environment holds. kaxa refuses it unless the name is in `KAXA_MCP_API_ENV`, a comma-separated list that you set in the same `env` block, for example `"KAXA_MCP_API_ENV": "DATABASE_URL,REDIS_URL"`. Without it, the agent can only pass `KEY=VALUE`.
 
+`create_sandbox` `env` is a list of names, never `KEY=VALUE`. kaxa copies each name from the server environment only when it is listed in `KAXA_MCP_ENV`, a comma-separated list in that same `env` block, for example `"KAXA_MCP_ENV": "LOG_LEVEL,SHARED"`. An empty list refuses every name. `env_file` is a dotenv path inside `KAXA_MCP_ROOT` (or the server working directory). Pass the path. Do not open the file, paste a secret, or print the environment with `exec`. Names in `env` replace the same key from the file. The result lists `env_keys` and never the values.
+
 After the server is connected, ask the agent to call `list_providers`. Sprites, Modal, E2B, Docker, Daytona, and Blaxel are available. Each provider reports the features it supports as `capabilities`; any feature not listed below is false.
 
 | Provider | Supports | `capabilities` true |
@@ -260,10 +262,12 @@ A request that needs a missing capability fails before anything is created, with
 | `api_cmd` | Argv of the service as a list. The first item is the binary |
 | `api_port` | Port the service listens on. Default `8000`. `8080` is reserved with `running` |
 | `api_env` | Service environment as a list. Each item is `KEY=VALUE`, or `KEY` to copy the value from the server environment, but only for names the user listed in `KAXA_MCP_API_ENV`. No commas in values. `HOME`, `USER`, `PATH`, and names that start with `KAXA_`, `MODAL_TOKEN_`, `FLY_`, or `SPRITES_` are reserved. Requires `api` |
+| `env` | Names of server environment variables to copy into the sandbox. Each item is a name, never `KEY=VALUE`. The name must be listed in `KAXA_MCP_ENV`. These names replace the same key from `env_file` |
+| `env_file` | Path of a dotenv file inside the server root. A relative path is inside that root. Pass the path; do not open the file or paste its contents |
 | `public` | Make the URL reachable without a provider account. Refused with `running` unless `api` is set, because the tmux terminal has no login |
 | `block_all_network_access` | Block all outbound network access. Daytona only. Toolchain downloads fail while it is on |
 
-The result has `id`, `provider`, `work_dir`, `url` and `auth`. `work_dir` is where the repository lives inside the sandbox and is set only with `sync`. Use it instead of assuming a path.
+The result has `id`, `provider`, `work_dir`, `url`, `auth`, and `env_keys` when the sandbox has environment variables. `env_keys` is names only. `work_dir` is where the repository lives inside the sandbox and is set only with `sync`. Use it instead of assuming a path.
 
 A failed copy, install or API publish deletes the sandbox. A failed `public` change keeps it, and the error says so. Create can take minutes when `sync` installs toolchains. The server writes each step to stderr while it waits. When the client sends a progress token, the same lines are also progress notifications.
 

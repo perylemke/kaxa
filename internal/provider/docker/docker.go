@@ -225,7 +225,21 @@ func (p *Provider) Create(ctx context.Context, spec sandbox.Spec) (sandbox.ID, e
 		// not be used, so it is removed.
 		return "", errors.Join(p.fail(api, err, spec.Name), p.removeBest(ctx, api, rec))
 	}
+	if err := p.storeEnv(ctx, sandbox.ID(spec.Name), spec.Env); err != nil {
+		return "", errors.Join(err, p.removeBest(ctx, api, rec))
+	}
 	return sandbox.ID(spec.Name), nil
+}
+
+func (p *Provider) storeEnv(ctx context.Context, id sandbox.ID, entries []string) error {
+	if len(entries) == 0 {
+		return nil
+	}
+	s, err := p.open(ctx, id)
+	if err != nil {
+		return err
+	}
+	return s.writeEnv(ctx, entries)
 }
 
 // removeBest deletes a sandbox after a failed create and reports why it could not.

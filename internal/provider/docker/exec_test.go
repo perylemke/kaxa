@@ -38,6 +38,27 @@ func TestCommandOf(t *testing.T) {
 	}
 }
 
+func TestExecAppliesSandboxEnv(t *testing.T) {
+	t.Parallel()
+	p, _, proc := newTestProvider(t)
+	createBox(t, p)
+	proc.envFile = "MODE=sandbox\n"
+	var stdout bytes.Buffer
+	if err := p.Exec(context.Background(), testSandbox, sandbox.ExecOptions{Command: []string{"id"}, Stdout: &stdout}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(stdout.String(), "sandbox") {
+		t.Fatalf("stdout = %q", stdout.String())
+	}
+	spec := proc.lastSpec(t)
+	if !slices.Contains(spec.Argv, "MODE=sandbox") || !slices.Contains(spec.Argv, "HOME="+agentHome) {
+		t.Fatalf("argv = %v", spec.Argv)
+	}
+	if slices.Index(spec.Argv, "MODE=sandbox") < slices.Index(spec.Argv, "HOME="+agentHome) {
+		t.Fatalf("toolchain env must stay first: %v", spec.Argv)
+	}
+}
+
 func TestPrepareWorkspaceCreatesDirectory(t *testing.T) {
 	t.Parallel()
 	p, _, proc := newTestProvider(t)

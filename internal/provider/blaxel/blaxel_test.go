@@ -85,6 +85,21 @@ func TestCreateWaitsUntilRunning(t *testing.T) {
 	}
 }
 
+func TestCreateWritesSandboxEnv(t *testing.T) {
+	t.Parallel()
+	api := newFakeAPI()
+	p := newTestProvider(t, api)
+	if _, err := p.Create(t.Context(), sandbox.Spec{Name: boxName, Env: []string{"MODE=sandbox"}}); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if api.envFile != "MODE=sandbox\n" {
+		t.Fatalf("env file = %q", api.envFile)
+	}
+	if len(api.commands) != 0 {
+		t.Fatalf("env file commands were recorded as user commands: %v", api.commands)
+	}
+}
+
 func TestCreateValidation(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

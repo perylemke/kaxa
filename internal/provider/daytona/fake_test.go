@@ -278,6 +278,8 @@ type fakeToolbox struct {
 	startErr  error
 	// holdForResize keeps a terminal command alive until a resize arrives.
 	holdForResize bool
+	// envFile is what cat of the sandbox env file returns.
+	envFile string
 	// afterRun runs at the start of Run, before the command is recorded.
 	afterRun func()
 }
@@ -305,6 +307,9 @@ func (f *fakeToolbox) Run(_ context.Context, _ string, spec runSpec) (int, error
 	if spec.stdin != nil && !spec.tty {
 		data, _ := io.ReadAll(spec.stdin)
 		stdin = string(data)
+	}
+	if sandboxEnvArgv(spec.argv) {
+		return f.answerEnv(spec, stdin)
 	}
 	res := f.record(spec, stdin)
 	if res.err != nil {
@@ -365,6 +370,40 @@ func (f *fakeToolbox) Upload(_ context.Context, _, path string, r io.Reader) err
 }
 
 // argvs returns the commands that were run.
+func sandboxEnvArgv(argv []string) bool {
+	cmd := argv
+	for len(cmd) > 0 && (cmd[0] == "env" || strings.Contains(cmd[0], "=")) {
+		cmd = cmd[1:]
+	}
+	if len(cmd) == 3 && cmd[0] == "mkdir" && cmd[1] == "-p" && strings.HasSuffix(cmd[2], "/.config/kaxa") {
+		return true
+	}
+	for _, arg := range cmd {
+		if strings.HasSuffix(arg, "/sandbox.env") {
+			return true
+		}
+	}
+	return false
+}
+
+func (f *fakeToolbox) answerEnv(spec runSpec, stdin string) (int, error) {
+	line := strings.Join(spec.argv, " ")
+	if strings.Contains(line, " tee ") || strings.HasPrefix(line, "tee ") {
+		f.envFile = stdin
+		return 0, nil
+	}
+	if strings.Contains(line, "cat") && strings.Contains(line, "sandbox.env") {
+		if f.envFile == "" {
+			return 1, nil
+		}
+		if spec.stdout != nil {
+			_, _ = io.WriteString(spec.stdout, f.envFile)
+		}
+		return 0, nil
+	}
+	return 0, nil
+}
+
 func (f *fakeToolbox) argvs() [][]string {
 	f.mu.Lock()
 	defer f.mu.Unlock()

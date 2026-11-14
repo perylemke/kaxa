@@ -36,6 +36,9 @@ type createFlags struct {
 	MemoryMiB int
 	// NetworkBlockAll blocks every outbound connection from the sandbox.
 	NetworkBlockAll bool
+	// Env is the raw --env value. EnvFile is the --env-file path.
+	Env     string
+	EnvFile string
 }
 
 func applyAPIFlags(req *createRequest, flags createFlags, portSet bool) error {

@@ -23,6 +23,7 @@ const (
 	testBig    = "big"
 	testTeam   = "team"
 	probeName  = "kaxa"
+	envCommand = "env"
 )
 
 // fakeAPI is an in-memory E2B control plane.
@@ -159,6 +160,8 @@ type fakeEnvd struct {
 	script    func(req e2b.StartRequest) *fakeProc
 	startErr  error
 	uploadErr error
+	// envFile is what cat of the sandbox env file returns.
+	envFile string
 }
 
 type upload struct {
@@ -172,6 +175,9 @@ func (f *fakeEnvd) Start(_ context.Context, _ e2b.Connection, req e2b.StartReque
 	defer f.mu.Unlock()
 	if f.startErr != nil {
 		return nil, f.startErr
+	}
+	if sandboxEnvStart(req) {
+		return f.envProc(req), nil
 	}
 	f.starts = append(f.starts, req)
 	p := exited(0)
@@ -212,13 +218,16 @@ type fakeProc struct {
 	mu     sync.Mutex
 	events []e2b.Event
 	// block makes Next wait after the events, until Close.
-	block    chan struct{}
-	nextErr  error
-	input    bytes.Buffer
-	stdinEnd bool
-	resizes  [][2]uint16
-	inputErr error
-	closed   bool
+	block       chan struct{}
+	exitOnStdin bool
+	onStdin     func(string)
+	stdinOnce   sync.Once
+	nextErr     error
+	input       bytes.Buffer
+	stdinEnd    bool
+	resizes     [][2]uint16
+	inputErr    error
+	closed      bool
 }
 
 func exited(code int) *fakeProc {
@@ -281,9 +290,65 @@ func (p *fakeProc) SendInput(_ context.Context, data []byte) error {
 
 func (p *fakeProc) CloseStdin(context.Context) error {
 	p.mu.Lock()
-	defer p.mu.Unlock()
+	body := p.input.String()
 	p.stdinEnd = true
+	cb, exit := p.onStdin, p.exitOnStdin
+	p.mu.Unlock()
+	if !exit {
+		if cb != nil {
+			cb(body)
+		}
+		return nil
+	}
+	p.stdinOnce.Do(func() {
+		if cb != nil {
+			cb(body)
+		}
+		p.mu.Lock()
+		p.events = append(p.events, e2b.Event{Kind: e2b.EventEnd, ExitCode: 0})
+		if p.block != nil {
+			close(p.block)
+			p.block = nil
+		}
+		p.mu.Unlock()
+	})
 	return nil
+}
+
+func sandboxEnvStart(req e2b.StartRequest) bool {
+	return sandboxEnvArgv(append([]string{req.Cmd}, req.Args...))
+}
+
+func sandboxEnvArgv(argv []string) bool {
+	cmd := argv
+	for len(cmd) > 0 && (cmd[0] == envCommand || strings.Contains(cmd[0], "=")) {
+		cmd = cmd[1:]
+	}
+	if len(cmd) == 3 && cmd[0] == "mkdir" && cmd[1] == "-p" && strings.HasSuffix(cmd[2], "/.config/kaxa") {
+		return true
+	}
+	for _, arg := range cmd {
+		if strings.HasSuffix(arg, "/sandbox.env") {
+			return true
+		}
+	}
+	return false
+}
+
+func (f *fakeEnvd) envProc(req e2b.StartRequest) *fakeProc {
+	line := req.Cmd + " " + strings.Join(req.Args, " ")
+	if strings.Contains(line, " tee ") || strings.HasPrefix(line, "tee ") {
+		p := &fakeProc{block: make(chan struct{}), exitOnStdin: true}
+		p.onStdin = func(body string) { f.envFile = body }
+		return p
+	}
+	if strings.Contains(line, " cat ") || strings.HasPrefix(line, "cat ") {
+		if f.envFile == "" {
+			return exited(1)
+		}
+		return output(f.envFile, "", 0)
+	}
+	return exited(0)
 }
 
 func (p *fakeProc) Resize(_ context.Context, rows, cols uint16) error {

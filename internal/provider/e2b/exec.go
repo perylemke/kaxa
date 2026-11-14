@@ -95,11 +95,16 @@ func (p *Provider) Exec(ctx context.Context, id sandbox.ID, opts sandbox.ExecOpt
 	if err != nil {
 		return err
 	}
+	user, err := s.readEnv(ctx)
+	if err != nil {
+		return err
+	}
 	spec := runSpec{
 		argv: opts.Command, dir: dir, stdin: opts.Stdin, stdout: opts.Stdout, stderr: opts.Stderr,
 		tty: opts.TTY, size: opts.Size, resize: opts.Resize,
-		// The toolchains are on PATH in every sandbox.
-		env: e2bLayout.Env(),
+		// The toolchains are on PATH in every sandbox. The sandbox environment
+		// follows them, so a later exec still sees the variables from create.
+		env: sandbox.MergeEnv(e2bLayout.Env(), user),
 	}
 	return s.run(ctx, spec)
 }

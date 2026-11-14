@@ -34,11 +34,33 @@ func TestExecRunsArgvWithoutShell(t *testing.T) {
 		t.Fatalf("starts = %+v", envd.starts)
 	}
 	req := envd.starts[0]
-	if req.Cmd != "env" || !slices.Equal(req.Args[len(req.Args)-3:], []string{"echo", "a; rm -rf /", "$HOME"}) || req.Cwd != "" || req.User != testUser || req.PTY || req.Stdin {
+	if req.Cmd != envCommand || !slices.Equal(req.Args[len(req.Args)-3:], []string{"echo", "a; rm -rf /", "$HOME"}) || req.Cwd != "" || req.User != testUser || req.PTY || req.Stdin {
 		t.Fatalf("request = %+v", req)
 	}
 	if len(api.connect) != 1 || api.connect[0].reboot {
 		t.Fatalf("connect calls = %+v, want one plain resume", api.connect)
+	}
+}
+
+func TestExecAppliesSandboxEnv(t *testing.T) {
+	t.Parallel()
+
+	p, _, envd := newProvider([]string{testKaxa}, 0)
+	envd.envFile = "MODE=sandbox\n"
+	envd.script = func(e2b.StartRequest) *fakeProc { return output("ok\n", "", 0) }
+	var stdout bytes.Buffer
+	if err := p.Exec(context.Background(), testBox, sandbox.ExecOptions{Command: []string{"id"}, Stdout: &stdout}); err != nil {
+		t.Fatalf("exec: %v", err)
+	}
+	if stdout.String() != "ok\n" || strings.Contains(stdout.String(), "sandbox") {
+		t.Fatalf("stdout = %q", stdout.String())
+	}
+	req := envd.starts[0]
+	if !slices.Contains(req.Args, "MODE=sandbox") || !slices.Contains(req.Args, "HOME=/home/user") {
+		t.Fatalf("args = %v", req.Args)
+	}
+	if slices.Index(req.Args, "MODE=sandbox") < slices.Index(req.Args, "HOME=/home/user") {
+		t.Fatalf("toolchain env must stay first: %v", req.Args)
 	}
 }
 
@@ -76,7 +98,7 @@ func TestExecInSyncedSandboxUsesWorkspaceAndToolchainPath(t *testing.T) {
 		t.Fatalf("exec: %v", err)
 	}
 	req := envd.starts[0]
-	if req.Cmd != "env" || req.Cwd != "/home/user/workspace" {
+	if req.Cmd != envCommand || req.Cwd != "/home/user/workspace" {
 		t.Fatalf("request = %+v", req)
 	}
 	tail := req.Args[len(req.Args)-3:]

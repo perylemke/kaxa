@@ -32,7 +32,9 @@ type service struct {
 	// envAllow holds the names a bare KEY of api_env may copy from the server
 	// environment, so an agent cannot read the rest of it.
 	envAllow map[string]struct{}
-	hostEnv  func(string) (string, bool)
+	// sandboxEnv holds the names create_sandbox may copy into the sandbox.
+	sandboxEnv map[string]struct{}
+	hostEnv    func(string) (string, bool)
 }
 
 func newService(reg *registry.Registry, cfg config.Config, opts Options) (*service, error) {
@@ -53,13 +55,14 @@ func newService(reg *registry.Registry, cfg config.Config, opts Options) (*servi
 		hostEnv = os.LookupEnv
 	}
 	return &service{
-		reg:      reg,
-		cfg:      cfg,
-		root:     root,
-		stderr:   stderr,
-		log:      slog.New(slog.NewTextHandler(stderr, nil)),
-		envAllow: nameSet(opts.APIEnvAllow),
-		hostEnv:  hostEnv,
+		reg:        reg,
+		cfg:        cfg,
+		root:       root,
+		stderr:     stderr,
+		log:        slog.New(slog.NewTextHandler(stderr, nil)),
+		envAllow:   nameSet(opts.APIEnvAllow),
+		sandboxEnv: nameSet(opts.EnvAllow),
+		hostEnv:    hostEnv,
 	}, nil
 }
 
@@ -152,7 +155,10 @@ func (s *service) create(ctx context.Context, in createIn) (createOut, error) {
 		}
 		return createOut{}, err
 	}
-	out := createOut{ID: string(res.ID), Provider: p.Name(), WorkDir: res.WorkDir, SkippedCommands: res.Skipped}
+	out := createOut{
+		ID: string(res.ID), Provider: p.Name(), WorkDir: res.WorkDir, SkippedCommands: res.Skipped,
+		EnvKeys: sandboxEnvKeys(req.Env),
+	}
 	detail, err := p.Inspect(ctx, res.ID)
 	if err != nil {
 		s.log.Warn("inspect after create failed", "sandbox", res.ID, "error", err)
@@ -173,6 +179,11 @@ func (s *service) createRequest(name string, in createIn) (lifecycle.Request, er
 		Name: name, Running: in.Running, Sync: in.Sync, Public: in.Public, Template: in.Template, NoInstall: in.NoInstall,
 		CPU: in.CPU, MemoryMiB: in.MemoryMiB, NetworkBlockAll: in.NetworkBlockAll,
 	}
+	env, err := s.resolveSandboxEnv(in)
+	if err != nil {
+		return lifecycle.Request{}, err
+	}
+	req.Env = env
 	if err := s.applyAPI(&req, in); err != nil {
 		return lifecycle.Request{}, err
 	}

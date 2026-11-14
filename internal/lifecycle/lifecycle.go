@@ -50,6 +50,9 @@ type Request struct {
 	MemoryMiB int
 	// NetworkBlockAll blocks every outbound connection from the sandbox.
 	NetworkBlockAll bool
+	// Env is resolved KEY=VALUE entries for the sandbox itself. See ResolveSandboxEnv
+	// in the sandbox package. Empty means none.
+	Env []string
 }
 
 // Labels returns the provider labels for the sandbox.
@@ -222,6 +225,7 @@ func createSandbox(ctx context.Context, p sandbox.Provider, req Request, run Run
 			CPU:             req.CPU,
 			MemoryMiB:       req.MemoryMiB,
 			NetworkBlockAll: req.NetworkBlockAll,
+			Env:             req.Env,
 		})
 		if createErr != nil {
 			return createErr

@@ -31,6 +31,8 @@ Docker sandboxes run in Docker's cloud, created through the Docker Sandboxes API
 | `--api` | Publish one HTTP service on the Sprites URL, on the E2B sandbox URL for the API port, on the Docker URL that Docker gives the published port, on the public preview URL of the API port on Daytona, or on a public preview named `kaxa-api` on Blaxel. Requires `--api-cmd` |
 | `--api-cmd` | Comma-separated argv. The first item is the binary |
 | `--api-port` | Port the process listens on. Default `8000`. `8080` is reserved when `--running` is also set |
+| `--env` | Comma-separated `KEY=VALUE` variables for the sandbox. A value cannot contain a comma. A bare `KEY` is rejected |
+| `--env-file` | Dotenv file of sandbox variables. `--env` wins on the same key |
 | `--api-env` | Environment variable for the service: `KEY=VALUE`, or `KEY` to copy the value from your shell. Repeat for more. Requires `--api` |
 | `--public` | Make the Sprites URL reachable without an account. Refused with `--running` unless `--api` is set |
 | `--template` | E2B, Docker, Daytona, and Blaxel: the template to start the sandbox from. Default: `KAXA_E2B_TEMPLATE`, `KAXA_DOCKER_TEMPLATE`, `KAXA_DAYTONA_TEMPLATE`, or `KAXA_BLAXEL_TEMPLATE`, then the base image. See [Templates on E2B](#templates-on-e2b) and [Templates on Docker](#templates-on-docker) |
@@ -206,6 +208,22 @@ kaxa list --provider blaxel   # the detail view shows the URL
 On Blaxel, `--api` runs the service as `root` in the repository directory (or `/root` without `--sync`), waits for the port to accept connections, for up to 90 seconds, and then creates a public preview named `kaxa-api`. If the process exits first, kaxa deletes the sandbox and shows the reason. The service log is not kept.
 
 Ports 80, 443, and 8080 are reserved by the sandbox. The process must listen on `0.0.0.0` and on `--api-port`. Blaxel also accepts `$HOST` or `::`. The preview URL is public, so treat anyone who has it as able to call the service. There is no private preview. Standby keeps the process. `--public` and `--running` do not apply, and there is no `restart`.
+
+## Sandbox environment
+
+`--env` and `--env-file` set variables for the life of the sandbox. `exec` and `console` see them, and with `--api` the service sees them too. `--api-env` still applies only to the service and wins on the same key. Neither flag requires `--api` or `--sync`.
+
+`--env` is one comma-separated string of `KEY=VALUE` entries. A value cannot contain a comma. `KEY` alone is an error. `KEY=` sets an empty value. The last entry for a key wins. `--env-file` is a dotenv file: blank lines and `#` comments are skipped, `export KEY=VALUE` is accepted, and one pair of single or double quotes around the value is removed. There is no interpolation and no command substitution. A missing file, a directory, or a symlink is rejected before create. The same key in both uses the `--env` value.
+
+The wizard asks for **Environment** and **Env file** on the options step for every provider. A flag you already passed is the initial text. Enter keeps it.
+
+`HOME`, `USER`, `PATH`, and names that start with `KAXA_`, `MODAL_TOKEN_`, `FLY_`, or `SPRITES_` are reserved. At most 64 variables, and 8192 bytes per value. Values cannot contain commas or control characters. Errors name the variable and never print the value. `list` and `inspect` do not show the values.
+
+On Blaxel, `exec` and the HTTP service see these variables. The interactive console attaches to the terminal Blaxel starts, so that shell does not.
+
+```bash
+kaxa create --env LOG_LEVEL=info --env-file .env my-sprite
+```
 
 ## API environment
 

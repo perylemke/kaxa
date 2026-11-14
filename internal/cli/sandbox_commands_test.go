@@ -137,7 +137,7 @@ func TestCreateInteractiveForm(t *testing.T) {
 	errOut := new(bytes.Buffer)
 	cmd.SetOut(out)
 	cmd.SetErr(errOut)
-	cmd.SetIn(strings.NewReader(strings.Join([]string{"1", "demo", "y", "n", "n", "n", ""}, "\n")))
+	cmd.SetIn(strings.NewReader(strings.Join([]string{"1", "demo", "y", "", ""}, "\n")))
 	cmd.SetArgs([]string{testCmdCreate})
 	t.Setenv("KAXA_SPRITES_TOKEN", "tok")
 	t.Setenv("KAXA_DEFAULT_PROVIDER", "")

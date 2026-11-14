@@ -198,6 +198,9 @@ func (p *Provider) Create(ctx context.Context, spec sandbox.Spec) (sandbox.ID, e
 		return "", errors.Join(userErr(err, spec.Name, secrets...), removeBest(ctx, c, spec.Name))
 	}
 	p.recent.Store(spec.Name, rec)
+	if err := p.writeEnv(ctx, spec.Name, spec.Env); err != nil {
+		return "", errors.Join(userErr(err, spec.Name, secrets...), removeBest(ctx, c, spec.Name))
+	}
 	return sandbox.ID(spec.Name), nil
 }
 
