@@ -1,0 +1,50 @@
+@import "tailwindcss" source(none);
+@source "./index.html";
+@source "./app.js";
+
+@theme {
+  --color-kx-bg: #07111f;
+  --color-kx-surface: #0e1c33;
+  --color-kx-surface-2: #12243f;
+  --color-kx-hover: #183056;
+  --color-kx-line: rgba(231, 238, 248, 0.14);
+  --color-kx-text: #e7eef8;
+  --color-kx-muted: #93a4bd;
+  --color-kx-accent: #7eb6ff;
+  --color-kx-button: #2f6fed;
+  --color-kx-on-button: #f4f8ff;
+  --color-kx-danger: #f0a8a8;
+  --color-kx-danger-bg: #3a1d28;
+  --font-sans: "Familjen Grotesk", "Avenir Next", "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Code", monospace;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-kx-accent);
+    outline-offset: 3px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

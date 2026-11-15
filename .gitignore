@@ -35,6 +35,9 @@ bin/
 # env file
 .env
 
+# Tailwind for kaxa ui; the generated CSS is committed
+internal/web/node_modules/
+
 # Editor/IDE
 # .idea/
 # .vscode/

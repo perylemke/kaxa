@@ -120,6 +120,9 @@ kaxa new my-sprite               # alias of create
 
 kaxa list                        # interactive table in a terminal; plain columns when piped
 kaxa ls                          # alias of list
+kaxa ui                          # local page on 127.0.0.1; the address is printed on stderr
+kaxa ui --no-open                # serve the page without opening a browser
+kaxa ui --port 4000              # listen on 127.0.0.1:4000
 
 kaxa exec my-sprite -- ls -la    # run a command; remote exit code is propagated
 kaxa console my-sprite           # interactive bash (requires a terminal)
@@ -179,6 +182,10 @@ On a sandbox created with `--sync`, `exec` and `console` start in `/home/sprite/
 
 With no sandboxes, `list` prints `no sandboxes created` and exits. In a terminal, highlight a row and press Enter for details. From the detail view, Enter opens the URL auth form, `r` restarts, `u` upgrades, `d` destroys, and `q` quits.
 
+### ui
+
+`ui` serves a page on `127.0.0.1` for the same list, create, restart, upgrade, URL auth, and destroy actions. The port is random unless `--port` is set, and the address is printed on stderr. `--no-open` skips the browser. `--provider` limits the page to one provider; without it, a provider that is not available is shown disabled. See [ui](docs/ui.md).
+
 ### restart, upgrade, and destroy
 
 `restart` and `upgrade` without a name open a picker. `restart` works on Sprites, E2B, Docker, and Daytona (on E2B, Docker, and Daytona it reboots the sandbox from its disk and stops running processes); `upgrade` is Sprites only. `destroy` without a name opens a form with the sandboxes of every configured provider (name, status, provider), where you can select one or more. When stdin is not a terminal, enter numbers to toggle and `0` to confirm. A named sandbox asks for `[y/N]`. `destroy --all` removes every sandbox of every provider and asks twice; `--provider` narrows it to one provider and one question. `--force` or `-f` skips the questions.
@@ -207,6 +214,7 @@ Point `command` at the installed binary when you edit the entry by hand. `go ins
 | [version](docs/version.md) | `kaxa version` |
 | [create](docs/create.md) | `kaxa create` (`new`) |
 | [list](docs/list.md) | `kaxa list` (`ls`) |
+| [ui](docs/ui.md) | `kaxa ui` |
 | [exec](docs/exec.md) | `kaxa exec` |
 | [console](docs/console.md) | `kaxa console` (`ssh`) |
 | [sync](docs/sync.md) | `kaxa sync` |

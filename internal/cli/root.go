@@ -69,6 +69,7 @@ Configure the credentials of each provider via KAXA_* environment variables (see
 	root.AddCommand(newVersionCmd())
 	root.AddCommand(newCreateCmd(reg))
 	root.AddCommand(newListCmd(reg))
+	root.AddCommand(newUICmd(reg))
 	root.AddCommand(newExecCmd(reg))
 	root.AddCommand(newConsoleCmd(reg))
 	root.AddCommand(newSyncCmd(reg))

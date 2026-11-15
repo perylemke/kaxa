@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="kaxa-session" content="{{.Session}}">
+  <meta name="kaxa-csrf" content="{{.CSRF}}">
+  <title>kaxa</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body class="mx-auto min-h-screen max-w-3xl bg-kx-bg px-5 pb-16 pt-8 font-sans text-kx-text antialiased">
+  <header class="mb-8 flex flex-wrap items-center justify-between gap-4">
+    <p class="text-2xl tracking-tight">kaxa</p>
+    <nav class="flex gap-2">
+      <button type="button" id="nav-list" class="rounded-lg border border-transparent bg-kx-button px-3.5 py-2 text-sm text-kx-on-button">Sandboxes</button>
+      <button type="button" id="nav-create" class="rounded-lg border border-kx-line bg-kx-surface-2 px-3.5 py-2 text-sm text-kx-text hover:bg-kx-hover">Create</button>
+    </nav>
+  </header>
+  <main class="grid gap-6">
+    <p id="notice" class="break-words rounded-lg border border-kx-button bg-kx-button/15 px-3.5 py-3 text-sm" hidden></p>
+    <div id="warnings" class="grid gap-3"></div>
+    <section id="view-list"></section>
+    <section id="view-detail" hidden></section>
+    <section id="view-create" class="grid gap-6" hidden>
+      <h1 class="text-xl tracking-tight">Create sandbox</h1>
+      <form id="create-form" class="grid gap-4">
+        <label class="grid gap-1.5 text-sm">Name
+          <input name="name" required autocomplete="off" spellcheck="false" class="w-full rounded-lg border border-kx-line bg-kx-surface px-3 py-2.5 placeholder:text-kx-muted">
+        </label>
+        <label class="grid gap-1.5 text-sm">Provider
+          <select name="provider" id="create-provider" class="w-full rounded-lg border border-kx-line bg-kx-surface px-3 py-2.5"></select>
+        </label>
+        <fieldset data-cap="running" class="grid gap-3 border-t border-kx-line pt-4" hidden>
+          <legend class="text-sm font-medium">Running</legend>
+          <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="running" class="size-4 accent-kx-button"> Keep running for 1 hour</label>
+        </fieldset>
+        <fieldset data-cap="sync" class="grid gap-3 border-t border-kx-line pt-4" hidden>
+          <legend class="text-sm font-medium">Repository</legend>
+          <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="sync" id="create-sync" class="size-4 accent-kx-button"> Copy a Git repository</label>
+          <div id="sync-extra" class="grid gap-3" hidden>
+            <label class="grid gap-1.5 text-sm">Directories
+              <input name="dir" placeholder="current directory" autocomplete="off" class="w-full rounded-lg border border-kx-line bg-kx-surface px-3 py-2.5 placeholder:text-kx-muted">
+            </label>
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="no_install" class="size-4 accent-kx-button"> Skip toolchain and dependency install</label>
+          </div>
+        </fieldset>
+        <fieldset data-cap="api" class="grid gap-3 border-t border-kx-line pt-4" hidden>
+          <legend class="text-sm font-medium">HTTP service</legend>
+          <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="api" id="create-api" class="size-4 accent-kx-button"> Publish an HTTP service</label>
+          <div id="api-extra" class="grid gap-3" hidden>
+            <label class="grid gap-1.5 text-sm">Command
+              <input name="api_cmd" placeholder="binary,arg,arg" autocomplete="off" spellcheck="false" class="w-full rounded-lg border border-kx-line bg-kx-surface px-3 py-2.5 placeholder:text-kx-muted">
+            </label>
+            <label class="grid gap-1.5 text-sm">Port
+              <input name="api_port" inputmode="numeric" placeholder="8000" class="w-full rounded-lg border border-kx-line bg-kx-surface px-3 py-2.5 placeholder:text-kx-muted">
+            </label>
+            <label class="grid gap-1.5 text-sm">Environment
+              <textarea name="api_env" placeholder="KEY=VALUE or KEY" spellcheck="false" class="min-h-24 w-full resize-y rounded-lg border border-kx-line bg-kx-surface px-3 py-2.5 placeholder:text-kx-muted"></textarea>
+            </label>
+          </div>
+        </fieldset>
+        <fieldset data-cap="public" class="grid gap-3 border-t border-kx-line pt-4" hidden>
+          <legend class="text-sm font-medium">URL</legend>
+          <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="public" class="size-4 accent-kx-button"> Public URL</label>
+        </fieldset>
+        <button type="submit" id="create-submit" class="justify-self-start rounded-lg border border-transparent bg-kx-button px-3.5 py-2 text-sm text-kx-on-button disabled:cursor-not-allowed disabled:opacity-45">Create sandbox</button>
+      </form>
+      <div id="create-result" class="grid gap-3 border-t border-kx-line pt-6" hidden></div>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>
