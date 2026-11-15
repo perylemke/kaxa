@@ -40,6 +40,7 @@ Every command except `version` and `--help` loads configuration before it runs.
 | `kaxa version` | [version](version.md) |
 | `kaxa create` (`new`) | [create](create.md) |
 | `kaxa list` (`ls`) | [list](list.md) |
+| `kaxa ui` | [ui](ui.md) |
 | `kaxa exec` | [exec](exec.md) |
 | `kaxa console` (`ssh`) | [console](console.md) |
 | `kaxa sync` | [sync](sync.md) |
