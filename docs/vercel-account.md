@@ -42,7 +42,7 @@ An empty project prints `no sandboxes created`. A rejected token prints a messag
 
 ## What works on Vercel
 
-`create` (with `--sync`, `--template`, `--api`, `--cpu`, and `--block-all-network-access`), `list`, `exec`, `sync`, `restart`, `snapshot`, `destroy`, and the detail view in `list`. `console`, `upgrade`, `url`, `--public`, and `--running` are not available; `console` says so.
+`create` (with `--sync`, `--template`, `--api`, `--cpu`, and `--block-all-network-access`), `list`, `exec`, `console` (also `ssh`), `sync`, `restart`, `snapshot`, `destroy`, and the detail view in `list`. `upgrade`, `url`, `--public`, and `--running` are not available. See [console](console.md#vercel).
 
 ## How sandboxes live
 
@@ -52,7 +52,7 @@ An empty project prints `no sandboxes created`. A rejected token prints a messag
 - The workspace is `/vercel/sandbox/workspace/<repo>`, as user `vercel-sandbox`. Without `--sync`, commands start in the home directory.
 - kaxa tags every sandbox it creates (`kaxa-managed`) and only lists and destroys those. Names are lowercase letters, digits, `-`, and `_`, up to 63 characters, starting with a letter or digit.
 - `exec` passes each argument as a separate argv item, so a space, a quote, or `$(...)` stays one argument. Use `sh -c` for pipes. The toolchain `PATH` is set.
-- `console` is rejected: the API has no interactive terminal.
+- `console` (and `ssh`) opens the terminal Vercel hosts, over a secure WebSocket. It is not SSH and needs no key.
 - `destroy` deletes the sandbox and its automatic snapshots. Manual snapshots stay until you delete them.
 
 ## Snapshots

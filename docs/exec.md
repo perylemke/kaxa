@@ -69,7 +69,7 @@ Standard output, standard error, and standard input are passed through, and the 
 
 ## Vercel
 
-Pick the provider with `--provider vercel`. A stopped sandbox resumes for the command. Standard output and standard error are streamed, and standard input is sent when it is not a terminal. The remote exit code is the kaxa exit code. Commands run as `vercel-sandbox`, starting in `/vercel/sandbox/workspace` with `--sync` and in `/vercel/sandbox` without it. The toolchain `PATH` is set. Each argument stays one argument. Use `sh -c` for pipes. There is no interactive terminal, so `console` is rejected.
+Pick the provider with `--provider vercel`. A stopped sandbox resumes for the command. Standard output and standard error are streamed, and standard input is sent when it is not a terminal. The remote exit code is the kaxa exit code. Commands run as `vercel-sandbox`, starting in `/vercel/sandbox/workspace` with `--sync` and in `/vercel/sandbox` without it. The toolchain `PATH` is set. Each argument stays one argument. Use `sh -c` for pipes. For an interactive shell, use [kaxa console](console.md#vercel).
 
 ```bash
 kaxa --provider vercel exec my-box -- ls -la

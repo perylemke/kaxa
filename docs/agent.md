@@ -334,4 +334,4 @@ A failed tool call returns an error result with the message and, when there is o
 
 ### Vercel
 
-Set `KAXA_VERCEL_TOKEN` and `KAXA_VERCEL_PROJECT` (and optionally `KAXA_VERCEL_TEAM` and `KAXA_VERCEL_TEMPLATE`) in the environment of `kaxa mcp`. Vercel supports create (with `sync`, `template`, `api`, and `cpu`), list, inspect, exec, sync, restart, snapshots (restored `in_place`), and destroy. `console`, `upgrade`, and URL auth are not available, and `list_providers` reports them as false. See [Vercel](vercel-account.md).
+Set `KAXA_VERCEL_TOKEN` and `KAXA_VERCEL_PROJECT` (and optionally `KAXA_VERCEL_TEAM` and `KAXA_VERCEL_TEMPLATE`) in the environment of `kaxa mcp`. Vercel supports create (with `sync`, `template`, `api`, and `cpu`), list, inspect, exec, sync, restart, snapshots (restored `in_place`), and destroy. `upgrade` and URL auth are not available, and `list_providers` reports them as false. The interactive console is a CLI and `kaxa ui` feature; MCP uses `exec`. See [Vercel](vercel-account.md).
