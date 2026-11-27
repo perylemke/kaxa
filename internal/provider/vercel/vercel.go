@@ -96,6 +96,12 @@ func (*Provider) SupportsTemplate() {}
 // SupportsCPU marks Vercel as a provider that honors Spec.CPU.
 func (*Provider) SupportsCPU() {}
 
+// ComputeOptions lists the vCPU choices Vercel offers a form. Memory follows
+// the vCPUs, so only the CPU is a choice.
+func (*Provider) ComputeOptions() sandbox.ComputeOptions {
+	return sandbox.ComputeOptions{CPUs: slices.Clone(sandbox.VercelCPUs), CustomCPU: true}
+}
+
 // SupportsNetworkBlock marks Vercel as a provider that can deny outbound traffic.
 func (*Provider) SupportsNetworkBlock() {}
 

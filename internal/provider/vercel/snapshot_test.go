@@ -110,7 +110,7 @@ func TestRestoreRejects(t *testing.T) {
 	}
 	f.mu.Lock()
 	autoID := f.nextID("snap")
-	f.snaps = append(f.snaps, &fakeSnap{id: autoID, sandbox: boxName, status: snapshotCreated, method: "automatic"})
+	f.snaps = append(f.snaps, &fakeSnap{id: autoID, sandbox: boxName, status: snapshotCreated, method: methodAutomatic})
 	f.mu.Unlock()
 	for _, tt := range []struct {
 		name string

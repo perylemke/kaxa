@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/perylemke/kaxa/internal/provider/vercel"
 	"github.com/perylemke/kaxa/internal/registry"
 )
 
@@ -73,5 +74,28 @@ func TestCreateRefusesBadCompute(t *testing.T) {
 				t.Fatalf("status = %d %s", rec.Code, rec.Body)
 			}
 		})
+	}
+}
+
+func TestVercelPublishesComputeOptions(t *testing.T) {
+	t.Parallel()
+
+	reg := registry.New()
+	mustRegister(t, reg, vercel.New())
+	s, h := newServer(t, nil, Options{Registry: reg})
+	rec := do(t, h, s, http.MethodGet, "/api/providers", nil)
+	var payload struct {
+		Providers []providerInfo `json:"providers"`
+	}
+	decode(t, rec, &payload)
+	if len(payload.Providers) != 1 {
+		t.Fatalf("providers = %+v", payload.Providers)
+	}
+	got := payload.Providers[0]
+	if got.Compute == nil || len(got.Compute.CPUs) != 4 || !got.Compute.CustomCPU || len(got.Compute.MemoryMiB) != 0 || got.Compute.CustomMemory {
+		t.Fatalf("compute = %+v, want 1, 2, 4, 8 vCPUs and no memory choice", got.Compute)
+	}
+	if !got.Capabilities.Template {
+		t.Fatalf("capabilities = %+v, want the image field", got.Capabilities)
 	}
 }

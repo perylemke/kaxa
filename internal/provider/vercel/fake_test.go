@@ -39,6 +39,8 @@ type fakeSandbox struct {
 	lag      int
 }
 
+const methodAutomatic = "automatic"
+
 type fakeSnap struct {
 	id, sandbox, status, method string
 	created                     time.Time
@@ -369,7 +371,7 @@ func (f *fakeVercel) bySession(sid string) *fakeSandbox {
 }
 
 func (f *fakeVercel) stopLocked(sb *fakeSandbox) {
-	f.snaps = append(f.snaps, &fakeSnap{id: f.nextID("snap"), sandbox: sb.name, status: snapshotCreated, method: "automatic", created: time.Now()})
+	f.snaps = append(f.snaps, &fakeSnap{id: f.nextID("snap"), sandbox: sb.name, status: snapshotCreated, method: methodAutomatic, created: time.Now()})
 	sb.status = statusStopping
 	sb.lag = f.lagStop
 	if sb.lag == 0 {

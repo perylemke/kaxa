@@ -78,9 +78,14 @@ func (p *Provider) manualSnapshots(ctx context.Context, id sandbox.ID) ([]Snapsh
 	if err != nil {
 		return nil, userErr(err, string(id), secrets...)
 	}
+	return onlyManual(rows), nil
+}
+
+// onlyManual keeps the snapshots that are ready and were taken on purpose.
+func onlyManual(rows []Snapshot) []Snapshot {
 	return slices.DeleteFunc(rows, func(s Snapshot) bool {
 		return s.Status != snapshotCreated || s.Method != snapshotManual
-	}), nil
+	})
 }
 
 // Restore returns the sandbox to a snapshot. It stops the session, points the

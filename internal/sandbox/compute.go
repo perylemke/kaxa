@@ -52,6 +52,10 @@ var (
 	ModalCPUs = []float64{0.5, 1, 2, 4}
 	// ModalMemoryMiB are the memory sizes offered for Modal.
 	ModalMemoryMiB = []int{1024, 2048, 4096, 8192}
+	// VercelCPUs are the vCPUs offered for Vercel. Each vCPU includes 2 GB of
+	// memory, so there is no memory choice. A plan allows up to 4 (Hobby), 8 (Pro),
+	// or 32 (Enterprise); other even numbers go through the custom field.
+	VercelCPUs = []float64{1, 2, 4, 8}
 	// BlaxelMemoryMiB are the memory sizes offered for Blaxel.
 	BlaxelMemoryMiB = []int{1024, 2048, 4096, 8192}
 )
