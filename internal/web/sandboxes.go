@@ -190,11 +190,49 @@ func (s *Server) destroySandbox(w http.ResponseWriter, r *http.Request) {
 		))
 		return
 	}
+	target := p.Name() + "/" + name
+	s.event(levelInfo, "destroy", target, "started")
+	s.event(levelInfo, "destroy", target, "confirmation matches "+name)
+	s.destroyLookup(r.Context(), p, name, target)
+	s.event(levelInfo, "destroy", target, "destroying on "+p.Name())
 	if err := p.Destroy(r.Context(), sandbox.ID(name)); err != nil {
 		s.writeErr(w, err)
 		return
 	}
+	s.event(levelInfo, "destroy", target, "provider accepted the destroy")
+	s.destroyVerify(r.Context(), p, name, target)
 	s.writeJSON(w, http.StatusOK, okJSON{OK: true})
+}
+
+// destroyLookup logs what the sandbox is before it goes. A failed lookup does not
+// stop the destroy, because a broken sandbox is often the one to remove.
+func (s *Server) destroyLookup(ctx context.Context, p sandbox.Provider, name, target string) {
+	s.event(levelInfo, "destroy", target, "looking up the sandbox")
+	detail, err := p.Inspect(ctx, sandbox.ID(name))
+	if err != nil {
+		_, message, _ := s.describe(err)
+		s.event(levelWarn, "destroy", target, "lookup failed, destroying anyway: "+message)
+		return
+	}
+	s.event(levelInfo, "destroy", target, "found, status "+detail.Status)
+}
+
+// destroyVerify asks the provider again and logs whether the sandbox is gone.
+func (s *Server) destroyVerify(ctx context.Context, p sandbox.Provider, name, target string) {
+	s.event(levelInfo, "destroy", target, "checking that it is gone")
+	infos, err := p.List(ctx)
+	if err != nil {
+		_, message, _ := s.describe(err)
+		s.event(levelWarn, "destroy", target, "could not verify: "+message)
+		return
+	}
+	for _, info := range infos {
+		if string(info.ID) == name {
+			s.event(levelWarn, "destroy", target, "still listed with status "+info.Status+"; the provider may finish removing it")
+			return
+		}
+	}
+	s.event(levelInfo, "destroy", target, "gone from "+p.Name())
 }
 
 func (s *Server) sandboxFromPath(w http.ResponseWriter, r *http.Request) (sandbox.Provider, string, bool) {

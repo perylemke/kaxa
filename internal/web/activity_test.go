@@ -228,3 +228,61 @@ func TestAuditIgnoresUnknownRoutes(t *testing.T) {
 		t.Fatalf("log = %s", out.String())
 	}
 }
+
+func TestDestroyLogsEveryStep(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		fp   *fakeProvider
+		want []string
+	}{
+		{
+			name: "gone",
+			fp:   &fakeProvider{name: testProvider},
+			want: []string{
+				"destroy   lab/box                   started\n",
+				"confirmation matches box\n",
+				"looking up the sandbox\n",
+				"found, status " + testStatus + "\n",
+				"destroying on lab\n",
+				"provider accepted the destroy\n",
+				"checking that it is gone\n",
+				"gone from lab\n",
+				"done in 0s\n",
+			},
+		},
+		{
+			name: "lookup and list fail",
+			fp:   &fakeProvider{name: testProvider, inspectErr: stringError("inspect down"), listErr: stringError("list down")},
+			want: []string{"warn   destroy   lab/box                   lookup failed, destroying anyway: inspect down\n", "could not verify: list down\n", "done in 0s\n"},
+		},
+		{
+			name: "still listed",
+			fp:   &fakeProvider{name: testProvider, list: []sandbox.Info{{ID: testSandbox, Status: "stopping"}}},
+			want: []string{"still listed with status stopping; the provider may finish removing it\n"},
+		},
+		{
+			name: "provider refuses",
+			fp:   &fakeProvider{name: testProvider, destroyErr: stringError("destroy refused")},
+			want: []string{"destroying on lab\n", "error  destroy   lab/box                   destroy refused\n"},
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			s, h, stderr := loggedServer(t, tt.fp, Options{})
+			do(t, h, s, http.MethodPost, "/api/sandboxes/lab/box/destroy", destroyBody{Confirm: testSandbox})
+			log := stderr.String()
+			for _, want := range tt.want {
+				if !strings.Contains(log, want) {
+					t.Fatalf("log is missing %q\n%s", want, log)
+				}
+			}
+			if tt.name == "provider refuses" && strings.Contains(log, "provider accepted") {
+				t.Fatalf("a refused destroy logged success\n%s", log)
+			}
+		})
+	}
+}
