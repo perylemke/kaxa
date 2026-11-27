@@ -222,6 +222,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /vendor/xterm.css", s.serveXtermCSS)
 	mux.HandleFunc("GET /vendor/addon-fit.js", s.serveFitAddon)
 	mux.HandleFunc("GET /api/providers", s.listProviders)
+	mux.HandleFunc("GET /api/providers/{name}/templates", s.listTemplates)
 	mux.HandleFunc("GET /api/dirs", s.listDirs)
 	mux.HandleFunc("GET /api/sandboxes", s.listSandboxes)
 	mux.HandleFunc("POST /api/sandboxes", s.createSandbox)

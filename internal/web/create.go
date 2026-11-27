@@ -13,6 +13,7 @@ import (
 )
 
 const (
+	maxTemplateLen = 255
 	defaultAPIPort = 8000
 	contentNDJSON  = "application/x-ndjson"
 )
@@ -33,6 +34,8 @@ type createBody struct {
 	CPU         float64 `json:"cpu"`
 	MemoryMiB   int     `json:"memory_mib"`
 	DiskPercent int     `json:"disk_percent"`
+	// Template is the image or template to start from. Empty is the provider default.
+	Template string `json:"template"`
 }
 
 type createOut struct {
@@ -103,6 +106,9 @@ func (s *Server) streamCreate(w http.ResponseWriter, r *http.Request, p sandbox.
 	}
 	started := s.clock()
 	s.event(levelInfo, "create", target, "started")
+	if req.Template != "" {
+		s.event(levelInfo, "create", target, "image "+req.Template)
+	}
 	run := func(ctx context.Context, label string, task func(context.Context) error) error {
 		s.event(levelInfo, "create", target, label)
 		send(createEvent{Step: s.redact(label)})
@@ -156,6 +162,9 @@ func (s *Server) buildCreateRequest(body createBody) (lifecycle.Request, error) 
 	if err := applyCompute(&req, body); err != nil {
 		return lifecycle.Request{}, err
 	}
+	if err := applyTemplate(&req, body); err != nil {
+		return lifecycle.Request{}, err
+	}
 	return req, nil
 }
 
@@ -171,6 +180,17 @@ func applyCompute(req *lifecycle.Request, body createBody) error {
 	req.CPU = body.CPU
 	req.MemoryMiB = body.MemoryMiB
 	req.DiskPercent = body.DiskPercent
+	return nil
+}
+
+// applyTemplate copies the image. The provider checks its format; lifecycle.Check
+// refuses it for a provider that cannot start from one.
+func applyTemplate(req *lifecycle.Request, body createBody) error {
+	template := strings.TrimSpace(body.Template)
+	if len(template) > maxTemplateLen {
+		return usererr.New("the image reference is too long", "use an image reference of up to 255 characters")
+	}
+	req.Template = template
 	return nil
 }
 
