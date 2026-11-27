@@ -66,3 +66,5 @@ Reading the list or one sandbox does not log unless it fails. Requests rejected 
 The folder browser lists names of folders under your home directory, never file contents. Symlinks that leave your home directory are hidden and refused.
 
 Provider tokens stay in the `kaxa ui` process. They are not sent to the browser, written into the address, or included in errors. A request whose `Host` header is not the printed address is rejected.
+
+On Vercel, the Resources section offers vCPUs (1 or an even number); the Image field is a snapshot ID, as text.

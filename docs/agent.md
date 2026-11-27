@@ -331,3 +331,7 @@ The result has `sandbox` (the one that holds the restored state), `snapshot`, `p
 ## Errors
 
 A failed tool call returns an error result with the message and, when there is one, the next step in parentheses. Tokens never appear in tool arguments or results. Provider errors are redacted before they reach the agent.
+
+### Vercel
+
+Set `KAXA_VERCEL_TOKEN` and `KAXA_VERCEL_PROJECT` (and optionally `KAXA_VERCEL_TEAM` and `KAXA_VERCEL_TEMPLATE`) in the environment of `kaxa mcp`. Vercel supports create (with `sync`, `template`, `api`, and `cpu`), list, inspect, exec, sync, restart, snapshots (restored `in_place`), and destroy. `console`, `upgrade`, and URL auth are not available, and `list_providers` reports them as false. See [Vercel](vercel-account.md).

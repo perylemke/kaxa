@@ -63,3 +63,7 @@ Fifteen minutes without input closes the terminal, and the sandbox can return to
 ```bash
 kaxa --provider blaxel console my-box
 ```
+
+## Vercel
+
+`console` is not available on Vercel: the Sandbox API has no interactive terminal. kaxa says so and names the providers that have it. Use [exec](exec.md#vercel) instead.

@@ -12,7 +12,7 @@ kaxa rm [name]
 | Flag | Meaning |
 | --- | --- |
 | `--all` | Destroy every sandbox. Takes no name. Covers every configured provider unless `--provider` is set |
-| `--provider` | Limit the scope to one provider (`sprites`, `modal`, `e2b`, `docker`, `daytona`, `blaxel`). Without `--all` it also picks the provider for a name |
+| `--provider` | Limit the scope to one provider (`sprites`, `modal`, `e2b`, `docker`, `daytona`, `blaxel`, `vercel`). Without `--all` it also picks the provider for a name |
 | `--force`, `-f` | Skip every confirmation |
 
 ## How a target is chosen
@@ -67,3 +67,5 @@ On Daytona, destroy deletes the sandbox through the API and everything in it; im
 On Blaxel, destroy deletes the sandbox through the API and everything in it. kaxa only destroys sandboxes it created. kaxa does not delete snapshots during destroy. Restore is in place, so it needs the sandbox.
 
 On Docker, destroy deletes the sandbox through the API and waits until Docker no longer lists it, which frees its place in the quota. kaxa only destroys sandboxes it created.
+
+On Vercel, destroy deletes the sandbox and its automatic snapshots through the API. kaxa only destroys sandboxes it created (`kaxa-managed`). Manual snapshots stay until you run `kaxa snapshot delete`.

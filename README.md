@@ -11,7 +11,7 @@
 [![Lint](https://github.com/perylemke/kaxa/actions/workflows/lint.yml/badge.svg)](https://github.com/perylemke/kaxa/actions/workflows/lint.yml)
 [![Sec](https://github.com/perylemke/kaxa/actions/workflows/sec.yml/badge.svg)](https://github.com/perylemke/kaxa/actions/workflows/sec.yml)
 
-Wrapper CLI for sandbox providers. **kaxa** puts isolated execution environments behind one command-line interface. Sprites, Modal, Daytona, and Blaxel go through their official Go SDKs, E2B through kaxa's own HTTP client, and Docker Sandboxes through the Docker Sandboxes API. Providers: [Fly.io Sprites](https://docs.fly.io/sprites), [Modal Sandboxes](https://modal.com/docs/guide/sdk-javascript-go), [E2B](https://e2b.dev), [Docker Sandboxes](https://docs.docker.com/ai/sandboxes/), [Daytona](https://www.daytona.io), and [Blaxel](https://blaxel.ai).
+Wrapper CLI for sandbox providers. **kaxa** puts isolated execution environments behind one command-line interface. Sprites, Modal, Daytona, and Blaxel go through their official Go SDKs, E2B through kaxa's own HTTP client, and Docker Sandboxes through the Docker Sandboxes API. Providers: [Fly.io Sprites](https://docs.fly.io/sprites), [Modal Sandboxes](https://modal.com/docs/guide/sdk-javascript-go), [E2B](https://e2b.dev), [Docker Sandboxes](https://docs.docker.com/ai/sandboxes/), [Daytona](https://www.daytona.io), [Blaxel](https://blaxel.ai), and [Vercel Sandbox](https://vercel.com/docs/sandbox). Vercel goes through kaxa's own REST client.
 
 Provider support:
 
@@ -20,6 +20,7 @@ Provider support:
 - **E2B** (`--provider e2b`): `create` (with `--sync` and `--api`), `list`, `exec`, `console`, `restart`, `sync`, `destroy`. Set it up with [E2B account and API key](docs/e2b-account.md).
 - **Docker** (`--provider docker`): `create` (with `--sync`, `--template`, and `--api`), `list`, `exec`, `console`, `restart`, `sync`, `snapshot`, `destroy`, on Docker's cloud through the Docker Sandboxes API (experimental; needs a Docker Agentic Platform subscription). Set it up with [Docker Sandboxes](docs/docker-account.md).
 - **Daytona** (`--provider daytona`): `create` (with `--sync`, `--template`, and `--api`), `list`, `exec`, `console`, `restart`, `sync`, `snapshot`, `destroy`, through the Daytona Go SDK. Set it up with [Daytona](docs/daytona-account.md).
+- **Vercel** (`--provider vercel`): `create` (with `--sync`, `--template`, `--api`, `--cpu`, and `--block-all-network-access`), `list`, `exec`, `sync`, `restart`, `snapshot`, `destroy`, through the Vercel Sandbox REST API. `console` is rejected. Set it up with [Vercel](docs/vercel-account.md).
 - **Blaxel** (`--provider blaxel`): `create` (with `--sync`, `--template`, `--api`, and `--disk-percent`), `list`, `exec`, `console`, `sync`, `snapshot`, `unarchive`, `destroy`, through the Blaxel Go SDK. Set it up with [Blaxel](docs/blaxel-account.md).
 
 Features that only exist for Sprites (`restart`, `upgrade`, `url`, `--running`) print that they are not available for Modal, E2B, Docker, Daytona, or Blaxel and name the providers that have them (`restart` also works on E2B, Docker, and Daytona). `--public` on Blaxel makes the preview public; without it the preview is private and the token is printed once. `kaxa url` stays Sprites-only. `--sync` works on Modal, E2B, Docker, Daytona, and Blaxel too, with the workspace in `/home/modal/workspace`, `/home/user/workspace`, `/home/agent/workspace`, `/home/daytona/workspace`, and `/root/workspace`.
@@ -27,7 +28,7 @@ Features that only exist for Sprites (`restart`, `upgrade`, `url`, `--running`) 
 ## Requirements
 
 - Go 1.27+ (only to build from source)
-- Accounts and API tokens for Sprites, Modal, and/or E2B, a Docker ID and personal access token for Docker, an API key for Daytona, or an API key and workspace for Blaxel, when you start using provider commands
+- Accounts and API tokens for Sprites, Modal, and/or E2B, a Docker ID and personal access token for Docker, an API key for Daytona, an API key and workspace for Blaxel, or an access token and project for Vercel, when you start using provider commands
 
 ## Install
 
@@ -76,7 +77,7 @@ Never commit real tokens.
 
 | Variable | Description |
 | --- | --- |
-| `KAXA_DEFAULT_PROVIDER` | Default provider (`sprites`, `modal`, `e2b`, `docker`, `daytona`, or `blaxel`) |
+| `KAXA_DEFAULT_PROVIDER` | Default provider (`sprites`, `modal`, `e2b`, `docker`, `daytona`, `blaxel`, or `vercel`) |
 | `KAXA_SPRITES_TOKEN` | Sprites API token |
 | `KAXA_MODAL_TOKEN_ID` | Modal token ID |
 | `KAXA_MODAL_TOKEN_SECRET` | Modal token secret |
@@ -87,6 +88,10 @@ Never commit real tokens.
 | `KAXA_DOCKER_TEMPLATE` | Docker image for new sandboxes (optional; default the shell agent image). `create --template` overrides it |
 | `KAXA_DAYTONA_API_KEY` | Daytona API key |
 | `KAXA_DAYTONA_TEMPLATE` | Daytona snapshot for new sandboxes (optional; default the Daytona default snapshot). `create --template` overrides it |
+| `KAXA_VERCEL_TOKEN` | Vercel access token |
+| `KAXA_VERCEL_PROJECT` | Vercel project name or ID |
+| `KAXA_VERCEL_TEAM` | Vercel team ID or slug (optional) |
+| `KAXA_VERCEL_TEMPLATE` | Vercel snapshot ID for new sandboxes (optional). `create --template` overrides it |
 | `KAXA_BLAXEL_API_KEY` | Blaxel API key |
 | `KAXA_BLAXEL_WORKSPACE` | Blaxel workspace name |
 | `KAXA_BLAXEL_TEMPLATE` | Blaxel image for new sandboxes (optional; default `blaxel/base-image:latest`). `create --template` overrides it |

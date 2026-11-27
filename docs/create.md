@@ -36,10 +36,10 @@ Docker sandboxes run in Docker's cloud, created through the Docker Sandboxes API
 | `--api-env` | Environment variable for the service: `KEY=VALUE`, or `KEY` to copy the value from your shell. Repeat for more. Requires `--api` |
 | `--public` | On Sprites, make the URL reachable without an account. On Blaxel, make the `kaxa-api` preview public. Without it, a Blaxel preview is private and the token is printed once. Refused with `--running` unless `--api` is set |
 | `--template` | E2B, Docker, Daytona, and Blaxel: the template to start the sandbox from. Default: `KAXA_E2B_TEMPLATE`, `KAXA_DOCKER_TEMPLATE`, `KAXA_DAYTONA_TEMPLATE`, or `KAXA_BLAXEL_TEMPLATE`, then the base image. See [Templates on E2B](#templates-on-e2b) and [Templates on Docker](#templates-on-docker) |
-| `--cpu` | CPU cores for the sandbox (Modal and Docker; fractional values are allowed on Modal; integer-only on Docker). Omit for the provider default. Unsupported providers reject the flag |
+| `--cpu` | CPU cores for the sandbox (Modal, Docker, and Vercel; fractional values are allowed on Modal; integer-only on Docker). Omit for the provider default. Unsupported providers reject the flag |
 | `--memory` | Memory in MiB (Modal, Docker, Blaxel). Overrides `KAXA_BLAXEL_MEMORY` for that Blaxel create only. Omit for the provider default |
 | `--disk-percent` | Share of Blaxel memory for the filesystem, from 10 to 95. Overrides `KAXA_BLAXEL_DISK_PERCENT` for that create. Omit it, and an empty environment variable, and the API uses 50 |
-| `--block-all-network-access` | Block all outbound network access from the sandbox. Daytona only. The default is off |
+| `--block-all-network-access` | Block all outbound network access from the sandbox. Daytona and Vercel. The default is off |
 
 `--api-cmd`, `--api-env`, and a changed `--api-port` require `--api`. `--dir` requires `--sync`.
 
@@ -245,3 +245,7 @@ Values cannot contain commas or control characters, because the provider joins v
 ## What gets deleted
 
 A failed sync, dependency install, or API publish deletes the sandbox. A failed `--public` update does not.
+
+### Vercel
+
+Vercel sandboxes are created through the Sandbox REST API with `KAXA_VERCEL_TOKEN` and `KAXA_VERCEL_PROJECT`. Names are lowercase letters, digits, `-`, and `_`, up to 63 characters. `--sync` copies the repository to `/vercel/sandbox/workspace/<repo>` as `vercel-sandbox`. `--template` is a snapshot ID (`KAXA_VERCEL_TEMPLATE` sets a default). `--cpu` is 1 or an even number of vCPUs. `--api` publishes one port on a Vercel URL; the port is declared at create, port `23456` is reserved, and kaxa waits up to 90 seconds for it to listen. `--public` and `--running` are rejected. See [Vercel](vercel-account.md).

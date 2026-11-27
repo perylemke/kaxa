@@ -1,10 +1,10 @@
 # kaxa documentation
 
-kaxa is a CLI for sandbox providers. Sprites is fully implemented. Modal supports create (including --sync), list, exec, console, snapshot, and destroy. E2B supports create (including --sync and --api), list, exec, console, restart, sync, and destroy. Docker supports create (including --sync, --template, and --api), list, exec, console, restart, sync, snapshot, and destroy through the Docker Sandboxes API. Daytona supports create (including --sync, --template, and --api), list, exec, console, restart, sync, snapshot, and destroy through the Daytona API. Blaxel supports create (including --sync, --template, and --api), list, exec, console, sync, and destroy through the Blaxel API. Features that only exist for Sprites are rejected for Modal, E2B, Docker, Daytona, and Blaxel with a message that names the providers that have them. Create, destroy, and the list URL auth prompt use the Dracula theme.
+kaxa is a CLI for sandbox providers. Sprites is fully implemented. Modal supports create (including --sync), list, exec, console, snapshot, and destroy. E2B supports create (including --sync and --api), list, exec, console, restart, sync, and destroy. Docker supports create (including --sync, --template, and --api), list, exec, console, restart, sync, snapshot, and destroy through the Docker Sandboxes API. Daytona supports create (including --sync, --template, and --api), list, exec, console, restart, sync, snapshot, and destroy through the Daytona API. Blaxel supports create (including --sync, --template, and --api), list, exec, console, sync, and destroy through the Blaxel API. Vercel supports create (including --sync, --template, --api, and --cpu), list, exec, restart, sync, snapshot, and destroy through the Vercel Sandbox REST API. Features that only exist for Sprites are rejected for Modal, E2B, Docker, Daytona, Blaxel, and Vercel with a message that names the providers that have them. Create, destroy, and the list URL auth prompt use the Dracula theme.
 
 Install kaxa with Homebrew, a curl download, or from source: [install](install.md).
 
-Set up an account and token in [Sprites account and token](sprites-account.md) [Modal account and token](modal-account.md), [E2B account and API key](e2b-account.md), [Docker Sandboxes](docker-account.md), [Daytona](daytona-account.md), or [Blaxel](blaxel-account.md).
+Set up an account and token in [Sprites account and token](sprites-account.md) [Modal account and token](modal-account.md), [E2B account and API key](e2b-account.md), [Docker Sandboxes](docker-account.md), [Daytona](daytona-account.md), [Blaxel](blaxel-account.md), or [Vercel](vercel-account.md).
 
 ## Configuration
 
@@ -12,7 +12,7 @@ Every command except `version` and `--help` loads configuration before it runs.
 
 | Source | What it sets |
 | --- | --- |
-| `--provider` | `sprites`, `modal`, `e2b`, `docker`, `daytona`, or `blaxel` for this invocation. `list` shows every provider when it is omitted |
+| `--provider` | `sprites`, `modal`, `e2b`, `docker`, `daytona`, `blaxel`, or `vercel` for this invocation. `list` shows every provider when it is omitted |
 | `KAXA_DEFAULT_PROVIDER` | Provider when `--provider` is omitted, except for `list` |
 | `KAXA_SPRITES_TOKEN` | Sprites API token |
 | `KAXA_MODAL_TOKEN_ID` | Modal token ID (`ak-...`) |
@@ -24,6 +24,10 @@ Every command except `version` and `--help` loads configuration before it runs.
 | `KAXA_DOCKER_TEMPLATE` | Docker image for new sandboxes. Optional; default the shell agent image |
 | `KAXA_DAYTONA_API_KEY` | Daytona API key |
 | `KAXA_DAYTONA_TEMPLATE` | Daytona snapshot for new sandboxes. Optional; default the Daytona default snapshot |
+| `KAXA_VERCEL_TOKEN` | Vercel access token |
+| `KAXA_VERCEL_PROJECT` | Vercel project name or ID |
+| `KAXA_VERCEL_TEAM` | Vercel team ID or slug. Optional |
+| `KAXA_VERCEL_TEMPLATE` | Vercel snapshot ID for new sandboxes. Optional |
 | `KAXA_BLAXEL_API_KEY` | Blaxel API key |
 | `KAXA_BLAXEL_WORKSPACE` | Blaxel workspace name |
 | `KAXA_BLAXEL_TEMPLATE` | Blaxel image for new sandboxes. Optional; default `blaxel/base-image:latest` |

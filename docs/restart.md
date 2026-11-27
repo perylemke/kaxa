@@ -15,7 +15,7 @@ kaxa restart my-sprite
 kaxa restart
 ```
 
-Restart is not available for Modal or Blaxel. A Modal sandbox cannot be rebooted in place, and Blaxel standby is not a restart: a deployed sandbox already resumes with its files and processes. An archived Blaxel sandbox is a different state; bring it back with [unarchive](unarchive.md). kaxa says so and lists the providers that support restart, such as Sprites, E2B, Docker, and Daytona.
+Restart on Vercel stops the sandbox, which saves its filesystem, and resumes it; running processes do not survive. Restart is not available for Modal or Blaxel. A Modal sandbox cannot be rebooted in place, and Blaxel standby is not a restart: a deployed sandbox already resumes with its files and processes. An archived Blaxel sandbox is a different state; bring it back with [unarchive](unarchive.md). kaxa says so and lists the providers that support restart, such as Sprites, E2B, Docker, and Daytona.
 
 On E2B, restart pauses the sandbox and boots it again from its disk. Files stay; running processes, including a service published with `--api`, stop. Start the service again with `exec`. See [E2B account and API key](e2b-account.md).
 
