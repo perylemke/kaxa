@@ -10,6 +10,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/perylemke/kaxa/internal/lifecycle"
 	"github.com/perylemke/kaxa/internal/sandbox"
@@ -53,6 +54,7 @@ type listInteractiveModel struct {
 	detail     sandbox.Detail
 	detailErr  error
 	detailMsg  string
+	consoleErr string
 	postAction listPostAction
 	postID     sandbox.ID
 	postProv   string
@@ -64,12 +66,22 @@ type detailLoadedMsg struct {
 	err    error
 }
 
-func newListInteractiveModel(ctx context.Context, providers map[string]sandbox.Provider, infos []sandbox.Info, startCursor int) listInteractiveModel {
+// listStart is where the interactive list opens: on a row, or on the detail of
+// that row with the error of a console that did not open.
+type listStart struct {
+	cursor     int
+	consoleErr string
+}
+
+// consoleErrStyle paints a console error red, like the error box.
+var consoleErrStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
+
+func newListInteractiveModel(ctx context.Context, providers map[string]sandbox.Provider, infos []sandbox.Info, start listStart) listInteractiveModel {
 	tbl := newListTable(infos, true, listTableHeight(len(infos)))
-	if startCursor > 0 && startCursor < len(infos) {
-		tbl.SetCursor(startCursor)
+	if start.cursor > 0 && start.cursor < len(infos) {
+		tbl.SetCursor(start.cursor)
 	}
-	return listInteractiveModel{
+	m := listInteractiveModel{
 		inspect: func(info sandbox.Info) tea.Cmd {
 			return inspectCmd(ctx, providers[info.Provider], info)
 		},
@@ -78,6 +90,11 @@ func newListInteractiveModel(ctx context.Context, providers map[string]sandbox.P
 		table:     tbl,
 		mode:      listModeTable,
 	}
+	if start.consoleErr != "" && len(infos) > 0 {
+		m.consoleErr = start.consoleErr
+		m.mode = listModeDetailLoading
+	}
+	return m
 }
 
 func listTableHeight(rowCount int) int {
@@ -89,7 +106,16 @@ func listTableHeight(rowCount int) int {
 	return h
 }
 
-func (m listInteractiveModel) Init() tea.Cmd { return nil }
+func (m listInteractiveModel) Init() tea.Cmd {
+	if m.mode != listModeDetailLoading {
+		return nil
+	}
+	row := m.table.Cursor()
+	if row < 0 || row >= len(m.infos) {
+		return nil
+	}
+	return m.inspect(m.infos[row])
+}
 
 func (m listInteractiveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -158,6 +184,7 @@ func (m listInteractiveModel) updateDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cm
 		m.mode = listModeTable
 		m.detailErr = nil
 		m.detailMsg = ""
+		m.consoleErr = ""
 		return m, nil
 	case "q", keyInterrupt:
 		return m, tea.Quit
@@ -256,6 +283,7 @@ func (m listInteractiveModel) View() string {
 func (m listInteractiveModel) detailView() string {
 	var b strings.Builder
 	b.WriteString("Sandbox detail\n\n")
+	m.writeConsoleErr(&b)
 	if m.detailErr != nil {
 		fmt.Fprintf(&b, "Could not load detail: %s\n\n", plainText(m.detailErr.Error()))
 		b.WriteString("esc back • q quit\n")
@@ -287,6 +315,14 @@ func (m listInteractiveModel) detailView() string {
 	b.WriteString(listDetailHelp(caps))
 	b.WriteString("\n")
 	return b.String()
+}
+
+func (m listInteractiveModel) writeConsoleErr(b *strings.Builder) {
+	if m.consoleErr == "" {
+		return
+	}
+	b.WriteString(consoleErrStyle.Render("Could not open console: " + plainText(m.consoleErr)))
+	b.WriteString("\n\n")
 }
 
 func writeDetailField(b *strings.Builder, f sandbox.Field) {
@@ -324,8 +360,8 @@ func formatRelativeTime(t time.Time) string {
 	return fmt.Sprintf("%s ago", time.Since(t).Truncate(time.Second))
 }
 
-func runListInteractive(ctx context.Context, providers map[string]sandbox.Provider, infos []sandbox.Info, startCursor int) (listTUIResult, error) {
-	program := tea.NewProgram(newListInteractiveModel(ctx, providers, infos, startCursor), tea.WithAltScreen())
+func runListInteractive(ctx context.Context, providers map[string]sandbox.Provider, infos []sandbox.Info, start listStart) (listTUIResult, error) {
+	program := tea.NewProgram(newListInteractiveModel(ctx, providers, infos, start), tea.WithAltScreen())
 	final, err := program.Run()
 	if err != nil {
 		return listTUIResult{}, err
@@ -376,7 +412,7 @@ func runListURLAuth(ctx context.Context, in io.Reader, errOut, out io.Writer, p 
 	return WriteSuccess(out, "url", msg)
 }
 
-type listInteractiveRunner func(context.Context, map[string]sandbox.Provider, []sandbox.Info, int) (listTUIResult, error)
+type listInteractiveRunner func(context.Context, map[string]sandbox.Provider, []sandbox.Info, listStart) (listTUIResult, error)
 
 type listConsoleOpener func(context.Context, sandbox.Provider, sandbox.ID, io.Writer, io.Writer) error
 
@@ -389,9 +425,9 @@ func runListWithConsoleLoop(
 	run listInteractiveRunner,
 	open listConsoleOpener,
 ) error {
-	cursor := 0
+	start := listStart{}
 	for {
-		res, err := run(ctx, providers, infos, cursor)
+		res, err := run(ctx, providers, infos, start)
 		if err != nil {
 			return err
 		}
@@ -405,10 +441,10 @@ func runListWithConsoleLoop(
 		if !ok {
 			return fmt.Errorf("provider %q is not configured", res.provider)
 		}
+		start = listStart{cursor: max(0, listInfoIndex(infos, res.provider, res.id))}
 		if err := open(ctx, p, res.id, out, errOut); err != nil {
-			_, _ = fmt.Fprintln(errOut, err)
+			start.consoleErr = err.Error()
 		}
-		cursor = max(0, listInfoIndex(infos, res.provider, res.id))
 	}
 }
 

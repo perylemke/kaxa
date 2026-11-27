@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/perylemke/kaxa/internal/config"
 	"github.com/perylemke/kaxa/internal/registry"
@@ -40,19 +41,31 @@ func ListTargets(reg *registry.Registry, cfg config.Config) (map[string]sandbox.
 	return providers, names, nil
 }
 
-// CollectSandboxes lists every named provider, in order. A provider that fails
-// is returned in failures and skipped while another succeeds; if all fail, err
-// joins their errors.
+// CollectSandboxes lists every named provider at the same time and returns the
+// result in the order of names. A provider that fails is returned in failures
+// and skipped while another succeeds; if all fail, err joins their errors.
 func CollectSandboxes(ctx context.Context, providers map[string]sandbox.Provider, names []string) (infos []sandbox.Info, failures []error, err error) {
+	type listed struct {
+		infos []sandbox.Info
+		err   error
+	}
+	results := make([]listed, len(names))
+	var wg sync.WaitGroup
+	for i, name := range names {
+		wg.Go(func() {
+			results[i].infos, results[i].err = providers[name].List(ctx)
+		})
+	}
+	wg.Wait()
+
 	ok := 0
-	for _, name := range names {
-		listed, listErr := providers[name].List(ctx)
-		if listErr != nil {
-			failures = append(failures, fmt.Errorf("%s: %w", name, listErr))
+	for i, name := range names {
+		if results[i].err != nil {
+			failures = append(failures, fmt.Errorf("%s: %w", name, results[i].err))
 			continue
 		}
 		ok++
-		for _, info := range listed {
+		for _, info := range results[i].infos {
 			if info.Provider == "" {
 				info.Provider = name
 			}

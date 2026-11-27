@@ -8,6 +8,23 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 
 ## [Unreleased]
 
+### Added
+
+- `kaxa ui` opens a shell in a sandbox in a browser tab that is the whole terminal, the same bash as `kaxa console`, and shows the `kaxa ssh` command to copy for your own terminal.
+- `kaxa ui` serves a local page on 127.0.0.1 to list, create, restart, upgrade, change URL auth, and destroy sandboxes. The port is random unless `--port` is set, and the address is printed on stderr. `--no-open` skips the browser. `--provider` limits the page to one provider. Repositories to copy are chosen in a folder browser limited to your home directory. Each view has its own address, a create shows its steps as they run, and `kaxa ui` logs creates, actions, and provider errors on stderr. The create form sets CPU and memory (and Blaxel disk share) for the providers that allow it, with the same choices as the `kaxa create` wizard. A destroy logs each step on stderr: the confirmation, the lookup, the provider call, and a check that the sandbox is gone.
+
+### Changed
+
+- `kaxa ui`, `kaxa list`, and the MCP `list_sandboxes` tool ask the providers at the same time, so the list appears in the time of the slowest provider instead of the sum of all.
+- Ctrl+C stops `kaxa ui`, `kaxa create`, `kaxa exec`, and `kaxa mcp` gracefully. `kaxa ui` closes the open terminals and cancels the creates in progress, `kaxa create` deletes the sandbox it was making, and `kaxa create` and `kaxa exec` exit with 130. A second Ctrl+C ends the process at once.
+
+### Fixed
+
+- `kaxa ui` tells you when a destroyed sandbox is still listed as stopped, as Blaxel does while it finishes the delete: the message is "still listed with status stopped; the provider may finish removing it".
+- `kaxa list` shows the error of a console that does not open, such as on a stopped sandbox, in red on the sandbox detail screen instead of printing it behind the table.
+- `kaxa console` on Sprites sets `TERM`, so `clear`, `vim`, and other programs that need a terminal type work.
+- `kaxa destroy` on Blaxel no longer fails with "still exists after delete" when Blaxel accepts the delete but is slow to finish it. The sandbox shows as `DELETING` until Blaxel removes it.
+
 ## [0.2.1] - 2026-11-14
 
 ### Fixed

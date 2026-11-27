@@ -3,9 +3,6 @@ package cli
 import (
 	"context"
 	"errors"
-	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/spf13/cobra"
 
@@ -57,7 +54,7 @@ func runMCP(cmd *cobra.Command, reg *registry.Registry) error {
 	if err != nil {
 		return err
 	}
-	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := signalContext(cmd.Context(), cmd.ErrOrStderr())
 	defer stop()
 	err = mcpServe(ctx, reg, cfg, cmd.ErrOrStderr())
 	if errors.Is(err, context.Canceled) {

@@ -5,3 +5,4 @@
 - Examples: `feat: add sprites provider stub`, `ci: run govulncheck on pull requests`.
 - Before a commit or push, `make test` and `make coverage` must pass.
 - Every Go package touched by the commit must stay at or above 90% statement coverage (`go tool cover -func`); untouched packages are out of scope.
+- The pre-commit hook (`make hooks`, `.githooks/pre-commit`) checks gofmt, vet, lint, `make test`, and the 90% gate on changed packages. `SKIP_COVERAGE=1` skips only the gate; `--no-verify` is an exception.

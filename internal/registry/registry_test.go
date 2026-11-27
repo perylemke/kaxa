@@ -6,6 +6,7 @@ import (
 	"github.com/perylemke/kaxa/internal/provider/modal"
 	"github.com/perylemke/kaxa/internal/provider/sprites"
 	"github.com/perylemke/kaxa/internal/registry"
+	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
 func TestRegisterGetNames(t *testing.T) {
@@ -43,5 +44,26 @@ func TestGetUnknown(t *testing.T) {
 	reg := registry.New()
 	if _, err := reg.Get("nope"); err == nil {
 		t.Fatal("expected error for unknown provider")
+	}
+}
+
+func TestAllIsSortedByName(t *testing.T) {
+	t.Parallel()
+
+	reg := registry.New()
+	if got := reg.All(); len(got) != 0 {
+		t.Fatalf("empty registry returned %d providers", len(got))
+	}
+	for _, p := range []sandbox.Provider{sprites.New(), modal.New()} {
+		if err := reg.Register(p); err != nil {
+			t.Fatalf("register: %v", err)
+		}
+	}
+	if !reg.Has("modal") || reg.Has("missing") {
+		t.Fatal("Has must report registered names only")
+	}
+	all := reg.All()
+	if len(all) != 2 || all[0].Name() != "modal" || all[1].Name() != "sprites" {
+		t.Fatalf("all = %v", all)
 	}
 }

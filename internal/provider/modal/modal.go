@@ -74,6 +74,16 @@ func (*Provider) SupportsCPU() {}
 // SupportsMemory marks Modal as honoring sandbox memory (MiB) when non-zero.
 func (*Provider) SupportsMemory() {}
 
+// ComputeOptions lists the CPU and memory choices Modal offers.
+func (*Provider) ComputeOptions() sandbox.ComputeOptions {
+	return sandbox.ComputeOptions{
+		CPUs:         slices.Clone(sandbox.ModalCPUs),
+		MemoryMiB:    slices.Clone(sandbox.ModalMemoryMiB),
+		CustomCPU:    true,
+		CustomMemory: true,
+	}
+}
+
 // Create starts a sandbox that lives for up to 24 hours and stops after one idle hour.
 func (p *Provider) Create(ctx context.Context, spec sandbox.Spec) (sandbox.ID, error) {
 	if err := validateName(spec.Name); err != nil {

@@ -21,6 +21,7 @@ If you have questions about kaxa, open a [GitHub Discussion](https://github.com/
 ## Submitting changes
 
 1. **Tests:** Include tests for new behavior. Run `make test` at minimum; before opening a PR, run `make ci` or the checks listed in [.github/pull_request_template.md](.github/pull_request_template.md).
+1. **Pre-commit hook:** Run `make hooks` once per clone. Each commit with Go changes then runs `gofmt`, `go vet`, `golangci-lint`, and `make test`, and requires at least 90% statement coverage in every Go package the commit touches. `make hooks-check` runs it on the staged changes without committing. `SKIP_COVERAGE=1 git commit` skips only the coverage gate, and `git commit --no-verify` skips the whole hook; use them as exceptions.
 1. **Format and lint:** Run `make fmt` and `make lint` so Go code stays consistent.
 1. **Changelog:** When a change is visible to users (new command or flag, behavior change, fix, security fix), add a line under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md), in the matching `Added`, `Changed`, `Fixed`, `Removed`, or `Security` subsection.
 1. **Commits:** Use [Conventional Commits](https://www.conventionalcommits.org/)—one line, English, no trailing period (e.g. `feat: add sprites list command`, `fix: validate provider name`).

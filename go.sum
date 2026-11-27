@@ -58,8 +58,8 @@ github.com/aymanbagabas/go-udiff v0.4.1 h1:OEIrQ8maEeDBXQDoGCbbTTXYJMYRCRO1fnodZ
 github.com/aymanbagabas/go-udiff v0.4.1/go.mod h1:0L9PGwj20lrtmEMeyw4WKJ/TMyDtvAoK9bf2u/mNo3w=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
-github.com/blaxel-ai/sdk-go v0.33.2 h1:6Xd9p4hneBl7OYBbaCIZiI5FOybZlxuVctyTD7po0ck=
-github.com/blaxel-ai/sdk-go v0.33.2/go.mod h1:16T4C74vB/02MV8JjB3Uf9Ag4RbFbDKjdatrorX9E/U=
+github.com/blaxel-ai/sdk-go v0.33.1 h1:CmDyw3XobEejSVROKveIxw7lStRrKqfg9ScgHzO+/dw=
+github.com/blaxel-ai/sdk-go v0.33.1/go.mod h1:16T4C74vB/02MV8JjB3Uf9Ag4RbFbDKjdatrorX9E/U=
 github.com/catppuccin/go v0.2.0 h1:ktBeIrIP42b/8FGiScP9sgrWOss3lw0Z5SktRoithGA=
 github.com/catppuccin/go v0.2.0/go.mod h1:8IHJuMGaUUjQM82qBrGNBv7LFq6JI3NnQCF6MOlZjpc=
 github.com/cenkalti/backoff/v5 v5.0.3 h1:ZN+IMa753KfX5hd8vVaMixjnqRZ3y8CuJKRKj1xcsSM=

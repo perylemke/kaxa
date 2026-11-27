@@ -25,7 +25,7 @@ In a terminal, list opens a table. Highlight a row and press Enter to show detai
 | `enter` | Open the URL auth form when the provider supports it (`public` or `sprite`; Sprites only today) |
 | `r` | Restart when the provider supports it |
 | `u` | Upgrade when the provider supports it (Sprites only today) |
-| `c` | Open an interactive shell, the same as [kaxa console](console.md) (`ssh`); when the shell closes, list returns to the table on that row |
+| `c` | Open an interactive shell, the same as [kaxa console](console.md) (`ssh`); when the shell closes, list returns to the table on that row; if the shell cannot open (for example the sandbox is stopped), list returns to that sandbox's detail and shows the error in red |
 | `d` | Destroy, after confirmation |
 | `esc` | Back to the table |
 | `q` | Quit |

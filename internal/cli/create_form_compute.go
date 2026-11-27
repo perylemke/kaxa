@@ -38,28 +38,41 @@ type dockerSizePreset struct {
 	Label string
 }
 
-var dockerWizardSizes = []dockerSizePreset{
-	{Key: "micro", CPUs: 1, Mem: 2048, Label: "micro (1 CPU, 2048 MiB)"},
-	{Key: "small", CPUs: 2, Mem: 4096, Label: "small (2 CPUs, 4096 MiB)"},
-	{Key: "medium", CPUs: 4, Mem: 8192, Label: "medium (4 CPUs, 8192 MiB)"},
-	{Key: "large", CPUs: 8, Mem: 16384, Label: "large (8 CPUs, 16384 MiB)"},
-	{Key: "xl", CPUs: 16, Mem: 32768, Label: "xl (16 CPUs, 32768 MiB)"},
+// The wizard lists come from internal/sandbox, the same source kaxa ui reads.
+var dockerWizardSizes = dockerSizePresets(sandbox.DockerSizes)
+
+var modalWizardCPUs = modalCPUPresets(sandbox.ModalCPUs)
+
+var modalWizardMemoryMiB = sandbox.ModalMemoryMiB
+
+var blaxelWizardMemoryMiB = sandbox.BlaxelMemoryMiB
+
+func dockerSizePresets(sizes []sandbox.ComputeSize) []dockerSizePreset {
+	out := make([]dockerSizePreset, 0, len(sizes))
+	for _, s := range sizes {
+		out = append(out, dockerSizePreset{Key: s.Key, CPUs: int(s.CPU), Mem: s.MemoryMiB, Label: s.Label})
+	}
+	return out
 }
 
-var modalWizardCPUs = []struct {
+type modalCPUPreset struct {
 	Key   string
 	Value float64
 	Label string
-}{
-	{"0.5", 0.5, "0.5 cores"},
-	{"1", 1, "1 core"},
-	{"2", 2, "2 cores"},
-	{"4", 4, "4 cores"},
 }
 
-var modalWizardMemoryMiB = []int{1024, 2048, 4096, 8192}
-
-var blaxelWizardMemoryMiB = []int{1024, 2048, 4096, 8192}
+func modalCPUPresets(cpus []float64) []modalCPUPreset {
+	out := make([]modalCPUPreset, 0, len(cpus))
+	for _, c := range cpus {
+		key := strconv.FormatFloat(c, 'f', -1, 64)
+		label := key + " cores"
+		if c == 1 {
+			label = key + " core"
+		}
+		out = append(out, modalCPUPreset{Key: key, Value: c, Label: label})
+	}
+	return out
+}
 
 func dockerSizeKeyFor(cpu float64, mem int) string {
 	for _, s := range dockerWizardSizes {

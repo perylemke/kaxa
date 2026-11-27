@@ -190,6 +190,11 @@ func (*Provider) SupportsCPU() {}
 // SupportsMemory marks Docker as honoring sandbox memory (MiB) when set.
 func (*Provider) SupportsMemory() {}
 
+// ComputeOptions lists the fixed CPU and memory pairs Docker accepts.
+func (*Provider) ComputeOptions() sandbox.ComputeOptions {
+	return sandbox.ComputeOptions{Sizes: slices.Clone(sandbox.DockerSizes)}
+}
+
 // Create starts a sandbox from spec.Template, then the default template, then
 // the image of the shell agent, and waits until it runs.
 func (p *Provider) Create(ctx context.Context, spec sandbox.Spec) (sandbox.ID, error) {

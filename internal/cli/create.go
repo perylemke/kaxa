@@ -109,7 +109,9 @@ func runCreate(cmd *cobra.Command, reg *registry.Registry, args []string, flags 
 		return err
 	}
 	errOut := cmd.ErrOrStderr()
-	res, err := lifecycle.Create(cmd.Context(), p, req, func(ctx context.Context, label string, task func(context.Context) error) error {
+	ctx, stop := signalContext(cmd.Context(), errOut)
+	defer stop()
+	res, err := lifecycle.Create(ctx, p, req, func(ctx context.Context, label string, task func(context.Context) error) error {
 		return runTaskWithSpinner(ctx, errOut, label, task)
 	})
 	if err != nil {

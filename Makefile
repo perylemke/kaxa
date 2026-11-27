@@ -30,10 +30,23 @@ help: ## List targets
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make \033[36m<target>\033[0m\n\nTargets:\n"} \
 		/^[a-zA-Z0-9_-]+:.*##/ {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
+.PHONY: hooks
+hooks: ## Enable the pre-commit hook in .githooks (run once per clone)
+	git config core.hooksPath .githooks
+
+.PHONY: hooks-check
+hooks-check: ## Run the pre-commit hook on the staged changes without committing
+	.githooks/pre-commit
+
 .PHONY: build
 build: ## Build binary to ./bin/kaxa (quick local test)
 	@mkdir -p bin
 	CGO_ENABLED=0 $(GO) build -ldflags "$(LDFLAGS)" -o $(BIN) $(CMD)
+
+.PHONY: ui-css
+ui-css: ## Rebuild internal/web/assets/app.css with Tailwind; commit the result
+	npm --prefix internal/web ci --ignore-scripts
+	npm --prefix internal/web exec -- tailwindcss -i internal/web/assets/tailwind.css -o internal/web/assets/app.css --minify
 
 .PHONY: install
 install: ## Install kaxa to $$GOBIN or $$GOPATH/bin
