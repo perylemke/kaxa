@@ -84,6 +84,8 @@ type fakeVercel struct {
 	killedID chan string
 	// lagStop is how many reads still report "stopping" after a stop.
 	lagStop int
+	// pty is the terminal server the interactive endpoint points at.
+	pty *fakePTY
 }
 
 func newFake(t *testing.T) *fakeVercel {
@@ -102,6 +104,7 @@ func newFake(t *testing.T) *fakeVercel {
 	f.route(mux, "GET /v2/sandboxes/{name}", f.get)
 	f.route(mux, "PATCH /v2/sandboxes/{name}", f.patch)
 	f.route(mux, "DELETE /v2/sandboxes/{name}", f.remove)
+	f.route(mux, "POST /v2/sandboxes/sessions/{sid}/interactive", f.interactive)
 	f.route(mux, "POST /v2/sandboxes/sessions/{sid}/stop", f.stop)
 	f.route(mux, "POST /v2/sandboxes/sessions/{sid}/extend-timeout", f.extend)
 	f.route(mux, "POST /v2/sandboxes/sessions/{sid}/fs/mkdir", f.mkdir)
@@ -588,7 +591,8 @@ func asFloat(v any) float64 { f, _ := v.(float64); return f }
 func asStr(v any) string { s, _ := v.(string); return s }
 
 const (
-	shellBash   = "bash"
-	wrapperArg0 = "kaxa"
-	keyName     = "name"
+	keyName    = "name"
+	keyCode    = "code"
+	keyMessage = "message"
+	keyType    = "type"
 )

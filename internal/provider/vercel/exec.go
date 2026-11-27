@@ -12,6 +12,9 @@ import (
 )
 
 const (
+	// shellBash and wrapperArg0 name the shell and the $0 of the wrapper scripts.
+	shellBash   = "bash"
+	wrapperArg0 = "kaxa"
 	// stdinChunk is the most input sent per request. Vercel accepts 1 MB of
 	// base64 per request, which is about 700 KB of data.
 	stdinChunk = 256 << 10
@@ -37,12 +40,9 @@ type runSpec struct {
 //
 // A sandbox created with --sync runs the command in the workspace; any other
 // runs it in the home directory. opts.Dir replaces that directory. Vercel
-// resumes a stopped sandbox first. The REST API has no terminal, so TTY is
-// rejected.
+// resumes a stopped sandbox first. With TTY set, the command runs in an
+// interactive terminal hosted by Vercel; see console.go.
 func (p *Provider) Exec(ctx context.Context, id sandbox.ID, opts sandbox.ExecOptions) error {
-	if opts.TTY {
-		return &sandbox.UnsupportedError{Provider: ProviderName, Feature: sandbox.FeatureConsole}
-	}
 	if len(opts.Command) == 0 {
 		return errors.New("vercel exec: empty command")
 	}
@@ -60,6 +60,9 @@ func (p *Provider) Exec(ctx context.Context, id sandbox.ID, opts sandbox.ExecOpt
 	dir, err := sandbox.ResolveExecDir(opts.Dir, fallback)
 	if err != nil {
 		return err
+	}
+	if opts.TTY {
+		return s.console(ctx, consoleSpecFor(opts, dir))
 	}
 	return s.run(ctx, runSpec{
 		argv: opts.Command, dir: dir, stdin: opts.Stdin, stdout: opts.Stdout, stderr: opts.Stderr,
@@ -79,8 +82,8 @@ func (spec runSpec) request() CmdRequest {
 		}
 	}
 	if _, hasPath := req.Env["PATH"]; !hasPath {
-		req.Args = append([]string{"-c", pathScript, "kaxa", toolPath()}, spec.argv...)
-		req.Command = "bash"
+		req.Args = append([]string{"-c", pathScript, wrapperArg0, toolPath()}, spec.argv...)
+		req.Command = shellBash
 	}
 	return req
 }

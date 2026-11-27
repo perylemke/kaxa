@@ -35,7 +35,7 @@ func TestPublishAPIOnExistingRoute(t *testing.T) {
 		t.Fatalf("service env = %v", svc["env"])
 	}
 	args := asList(cmdOf(f, 1)["args"])
-	if args[len(args)-1] != "8000" || args[len(args)-5] != "bash" {
+	if args[len(args)-1] != "8000" || args[len(args)-5] != shellBash {
 		t.Fatalf("probe args = %v", args)
 	}
 }

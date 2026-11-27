@@ -151,6 +151,16 @@ type apiClient interface {
 	CreateSnapshot(ctx context.Context, sessionID string) (Snapshot, error)
 	ListSnapshots(ctx context.Context, name string) ([]Snapshot, error)
 	DeleteSnapshot(ctx context.Context, id string) error
+	// OpenInteractive asks the controller for a terminal and returns where to
+	// connect.
+	OpenInteractive(ctx context.Context, sessionID string) (Interactive, error)
+}
+
+// Interactive is the WebSocket endpoint of a controller-hosted terminal. The
+// token is a credential: it is never logged or printed.
+type Interactive struct {
+	URL   string `json:"url"`
+	Token string `json:"token"`
 }
 
 type restClient struct {
@@ -368,6 +378,14 @@ func (c *restClient) ExtendTimeout(ctx context.Context, sessionID string, d time
 	body := map[string]int64{"duration": d.Milliseconds()}
 	_, err := c.do(ctx, http.MethodPost, sessionPath(sessionID, "/extend-timeout"), nil, body, nil)
 	return notFound(err)
+}
+
+func (c *restClient) OpenInteractive(ctx context.Context, sessionID string) (Interactive, error) {
+	var out Interactive
+	if _, err := c.do(ctx, http.MethodPost, sessionPath(sessionID, "/interactive"), nil, map[string]any{}, &out); err != nil {
+		return Interactive{}, err
+	}
+	return out, nil
 }
 
 func (c *restClient) Mkdir(ctx context.Context, sessionID, dir string) error {

@@ -100,7 +100,7 @@ func (p *Provider) startService(ctx context.Context, s *session, workDir string,
 }
 
 func (s *session) listening(ctx context.Context, port int) bool {
-	_, err := s.capture(ctx, "", nil, []string{"bash", "-c", probeScript, "kaxa", strconv.Itoa(port)}, nil)
+	_, err := s.capture(ctx, "", nil, []string{shellBash, "-c", probeScript, wrapperArg0, strconv.Itoa(port)}, nil)
 	return err == nil
 }
 

@@ -89,11 +89,6 @@ func TestExecRejects(t *testing.T) {
 	p, f := newTestProvider(t)
 	createBox(t, p)
 	ctx := context.Background()
-	err := p.Exec(ctx, boxName, sandbox.ExecOptions{Command: []string{"bash"}, TTY: true})
-	var unsupported *sandbox.UnsupportedError
-	if !errors.As(err, &unsupported) || unsupported.Feature != sandbox.FeatureConsole || !errors.Is(err, sandbox.ErrUnsupported) {
-		t.Fatalf("TTY error = %v", err)
-	}
 	if err := p.Exec(ctx, boxName, sandbox.ExecOptions{}); err == nil {
 		t.Fatal("empty command accepted")
 	}
