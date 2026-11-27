@@ -8,6 +8,7 @@ const views = {
   list: document.querySelector("#view-list"),
   detail: document.querySelector("#view-detail"),
   new: document.querySelector("#view-new"),
+  terminal: document.querySelector("#view-terminal"),
 };
 const state = {
   route: { name: "list" },
@@ -28,6 +29,7 @@ const state = {
   picker: { path: "", parent: "" },
   timer: null,
   focusPending: false,
+  term: null,
 };
 
 const navOn = "rounded-lg border border-transparent bg-kx-button px-3.5 py-2 text-sm text-kx-on-button";
@@ -35,6 +37,13 @@ const navOff = "rounded-lg border border-kx-line bg-kx-surface-2 px-3.5 py-2 tex
 const primaryClass = "justify-self-start rounded-lg border border-transparent bg-kx-button px-3.5 py-2 text-sm font-medium text-kx-on-button disabled:cursor-not-allowed disabled:opacity-45";
 const quietClass = "rounded-lg border border-kx-line bg-kx-surface-2 px-3.5 py-2 text-sm text-kx-text hover:bg-kx-hover disabled:cursor-not-allowed disabled:opacity-45";
 const dangerClass = "justify-self-start rounded-lg border border-transparent bg-kx-danger-bg px-3.5 py-2 text-sm font-medium text-kx-danger disabled:cursor-not-allowed disabled:opacity-45";
+const termTheme = { background: "#07111f", foreground: "#e7eef8", cursor: "#7eb6ff", selectionBackground: "#183056" };
+const termPageClass = "h-screen overflow-hidden bg-kx-bg";
+const termHostClass = "fixed inset-0 bg-kx-bg p-1";
+const pageClass = document.body.className;
+const codeBoxClass = "block min-w-0 flex-1 overflow-x-auto rounded-lg border border-kx-line bg-kx-bg px-3 py-2 font-mono text-sm";
+let xtermReady = null;
+
 const linkButtonClass = "inline-flex w-fit items-center rounded-lg border border-transparent bg-kx-button px-3.5 py-2 text-sm font-medium text-kx-on-button";
 const textButtonClass = "w-fit text-sm text-kx-accent underline decoration-kx-accent/40 underline-offset-2 disabled:opacity-45";
 const linkClass = "break-all text-sm text-kx-accent underline decoration-kx-accent/40 underline-offset-2";
@@ -210,6 +219,9 @@ function parseRoute() {
     if (parts.length === 1 && parts[0] === "new") {
       return { name: "new" };
     }
+    if (parts.length === 3 && parts[0] === "terminal") {
+      return { name: "terminal", provider: decodeURIComponent(parts[1]), id: decodeURIComponent(parts[2]) };
+    }
     if (parts.length === 3 && parts[0] === "sandboxes") {
       return { name: "detail", provider: decodeURIComponent(parts[1]), id: decodeURIComponent(parts[2]) };
     }
@@ -224,6 +236,7 @@ function route() {
   state.route = next;
   state.focusPending = true;
   state.destroyArmed = false;
+  closeTerminal();
   clearNotice();
   if (next.name !== "list") {
     document.querySelector("#warnings").replaceChildren();
@@ -233,6 +246,8 @@ function route() {
     loadList(false).catch(showError);
   } else if (next.name === "new") {
     openCreate().catch(showError);
+  } else if (next.name === "terminal") {
+    openTerminalTab(next.provider, next.id);
   } else {
     openDetail(next.provider, next.id);
   }
@@ -247,8 +262,12 @@ function showView(next) {
   document.querySelector("#nav-new").className = next.name === "new" ? navOn : navOff;
   setCurrent("#nav-list", onList);
   setCurrent("#nav-new", next.name === "new");
-  const titles = { list: "Sandboxes", new: "New sandbox", detail: next.id };
+  const titles = { list: "Sandboxes", new: "New sandbox", detail: next.id, terminal: `${next.id} · terminal` };
   document.title = `${titles[next.name]} · kaxa`;
+  const full = next.name === "terminal";
+  document.body.className = full ? termPageClass : pageClass;
+  document.querySelector("header").hidden = full;
+  document.querySelector("#main").className = full ? "outline-none" : "grid gap-6 outline-none";
 }
 
 function setCurrent(selector, on) {
@@ -536,6 +555,7 @@ function renderDetail() {
   if (fields) {
     root.append(fields);
   }
+  root.append(shellPanel(detail));
   root.append(destroyZone(detail));
   settle(root);
 }
@@ -1366,3 +1386,159 @@ function hideCreateError() {
 }
 
 route();
+
+// The shell opens in its own browser tab, at #/terminal/{provider}/{name}. The tab
+// connects on load and ends the shell when it is closed.
+function closeTerminal() {
+  const live = state.term;
+  state.term = null;
+  if (live) {
+    if (live.socket) {
+      live.socket.close();
+    }
+    live.term.dispose();
+    live.watch.disconnect();
+  }
+}
+
+window.addEventListener("pagehide", closeTerminal);
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = src;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error("Could not load the terminal."));
+    document.head.append(script);
+  });
+}
+
+function loadXterm() {
+  if (!xtermReady) {
+    xtermReady = loadScript("/vendor/xterm.js")
+      .then(() => loadScript("/vendor/addon-fit.js"))
+      .catch((err) => {
+        xtermReady = null;
+        throw err;
+      });
+  }
+  return xtermReady;
+}
+
+function shellCommandText(provider, id) {
+  return `kaxa --provider ${provider} ssh ${id}`;
+}
+
+// shellPanel is the Shell section of the sandbox page.
+function shellPanel(detail) {
+  const panel = el("section", panelClass);
+  panel.setAttribute("aria-label", "Shell");
+  panel.append(el("p", "text-sm font-medium", "Shell"));
+  panel.append(el("p", mutedClass, "Opens a bash shell in this sandbox, in a new browser tab."));
+  const link = el("a", linkButtonClass, "Open terminal");
+  link.href = `#/terminal/${encodeURIComponent(detail.provider)}/${encodeURIComponent(detail.id)}`;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  panel.append(link);
+  panel.append(commandBlock(detail.shell_command || shellCommandText(detail.provider, detail.id)));
+  return panel;
+}
+
+function commandBlock(command) {
+  const wrap = el("div", "grid gap-2 border-t border-kx-line pt-3");
+  wrap.append(el("p", mutedClass, "Prefer your own terminal? Run this command."));
+  const row = el("div", "flex flex-wrap items-center gap-3");
+  const code = el("code", codeBoxClass, command);
+  const copy = el("button", quietClass, "Copy");
+  copy.type = "button";
+  copy.addEventListener("click", () => copyText(code.textContent, copy));
+  row.append(code, copy);
+  wrap.append(row);
+  return wrap;
+}
+
+function openTerminalTab(provider, id) {
+  closeTerminal();
+  const root = views.terminal;
+  root.replaceChildren();
+  root.className = termHostClass;
+  loadXterm().then(
+    () => {
+      if (state.route.name === "terminal" && state.route.id === id) {
+        startTerminal(root, provider, id);
+      }
+    },
+    (err) => {
+      root.className = "p-4 text-sm text-kx-danger";
+      root.textContent = messageOf(err);
+    },
+  );
+}
+
+function startTerminal(root, provider, id) {
+  const term = new Terminal({ cursorBlink: true, fontFamily: "IBM Plex Mono, ui-monospace, monospace", fontSize: 14, theme: termTheme });
+  const fit = new FitAddon.FitAddon();
+  term.loadAddon(fit);
+  term.open(root);
+  fit.fit();
+  const watch = new ResizeObserver(() => fit.fit());
+  watch.observe(root);
+  const live = { term, watch, socket: null, waiting: false };
+  state.term = live;
+  const encoder = new TextEncoder();
+  term.onData((data) => {
+    if (live.socket && live.socket.readyState === WebSocket.OPEN) {
+      live.socket.send(encoder.encode(data));
+    } else if (live.waiting && data === "\r") {
+      connectTerminal(live, provider, id);
+    }
+  });
+  term.onResize(({ rows, cols }) => {
+    if (live.socket && live.socket.readyState === WebSocket.OPEN) {
+      live.socket.send(JSON.stringify({ resize: { rows, cols } }));
+    }
+  });
+  connectTerminal(live, provider, id);
+}
+
+// notifyTerminal writes a kaxa line in the terminal and waits for Enter.
+function notifyTerminal(live, text, failed) {
+  live.waiting = true;
+  live.term.write(`\r\n\x1b[${failed ? 31 : 90}m[kaxa] ${text} Press Enter to open a new shell.\x1b[0m\r\n`);
+}
+
+async function connectTerminal(live, provider, id) {
+  live.waiting = false;
+  live.term.reset();
+  try {
+    const grant = await api(sandboxPath({ provider, id }, "terminal"), { method: "POST", body: {} });
+    if (state.term === live) {
+      attachTerminal(live, grant);
+    }
+  } catch (err) {
+    if (state.term === live) {
+      notifyTerminal(live, messageOf(err), true);
+    }
+  }
+}
+
+function attachTerminal(live, grant) {
+  const { term } = live;
+  const query = `ticket=${encodeURIComponent(grant.ticket)}&rows=${term.rows}&cols=${term.cols}`;
+  const socket = new WebSocket(`ws://${location.host}/ws/terminal?${query}`);
+  socket.binaryType = "arraybuffer";
+  live.socket = socket;
+  let opened = false;
+  socket.addEventListener("open", () => {
+    opened = true;
+    term.focus();
+  });
+  socket.addEventListener("message", (event) => term.write(new Uint8Array(event.data)));
+  socket.addEventListener("close", () => {
+    if (state.term !== live || live.socket !== socket) {
+      return;
+    }
+    live.socket = null;
+    notifyTerminal(live, opened ? "Shell closed." : "Could not open the terminal.", !opened);
+  });
+}

@@ -92,7 +92,7 @@ func TestMalformedRequestsAreRefused(t *testing.T) {
 		{name: "restart path", method: http.MethodPost, path: "/api/sandboxes/LAB/box/restart", want: http.StatusBadRequest},
 		{name: "url auth path", method: http.MethodPost, path: "/api/sandboxes/LAB/box/url-auth", body: map[string]string{"auth": "public"}, want: http.StatusBadRequest},
 		{name: "url auth body", method: http.MethodPost, path: "/api/sandboxes/lab/box/url-auth", body: []string{"x"}, want: http.StatusBadRequest},
-		{name: "destroy path", method: http.MethodPost, path: "/api/sandboxes/LAB/box/destroy", body: map[string]string{"confirm": "box"}, want: http.StatusBadRequest},
+		{name: "destroy path", method: http.MethodPost, path: "/api/sandboxes/LAB/box/destroy", body: map[string]string{"confirm": testSandbox}, want: http.StatusBadRequest},
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {

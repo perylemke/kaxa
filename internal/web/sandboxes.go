@@ -39,6 +39,8 @@ type detailJSON struct {
 	CreatedAt    string               `json:"created_at,omitempty"`
 	UpdatedAt    string               `json:"updated_at,omitempty"`
 	Capabilities sandbox.Capabilities `json:"capabilities"`
+	// ShellCommand opens the tmux shell of this sandbox from a local terminal.
+	ShellCommand string `json:"shell_command"`
 }
 
 type okJSON struct {
@@ -301,6 +303,7 @@ func newDetail(p sandbox.Provider, detail sandbox.Detail) detailJSON {
 	if out.Provider == "" {
 		out.Provider = p.Name()
 	}
+	out.ShellCommand = shellCommand(out.Provider, out.ID)
 	if !detail.CreatedAt.IsZero() {
 		out.CreatedAt = detail.CreatedAt.UTC().Format(time.RFC3339)
 	}

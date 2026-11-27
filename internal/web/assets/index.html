@@ -8,6 +8,7 @@
   <title>kaxa</title>
   <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="stylesheet" href="/app.css">
+  <link rel="stylesheet" href="/vendor/xterm.css">
 </head>
 <body class="mx-auto min-h-screen max-w-3xl bg-kx-bg px-5 pb-24 pt-8 font-sans text-kx-text antialiased">
   <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:rounded-lg focus:bg-kx-surface focus:px-3 focus:py-2 focus:text-sm">Skip to content</a>
@@ -23,6 +24,7 @@
     <div id="warnings" class="grid gap-3"></div>
     <section id="view-list" aria-labelledby="list-title"></section>
     <section id="view-detail" hidden></section>
+    <section id="view-terminal" hidden></section>
     <section id="view-new" class="grid gap-6" aria-labelledby="new-title" hidden>
       <h1 id="new-title" tabindex="-1" class="text-xl tracking-tight outline-none">New sandbox</h1>
       <form id="create-form" class="grid gap-5" novalidate>

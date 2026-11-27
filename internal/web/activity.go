@@ -31,6 +31,7 @@ var actions = map[string]action{
 	"POST /api/sandboxes/{provider}/{name}/upgrade":  {name: "upgrade"},
 	"POST /api/sandboxes/{provider}/{name}/url-auth": {name: "url-auth"},
 	"POST /api/sandboxes/{provider}/{name}/destroy":  {name: "destroy"},
+	"POST /api/sandboxes/{provider}/{name}/terminal": {name: "terminal", quiet: true},
 }
 
 // recorder remembers what a handler answered so the log can say what happened.

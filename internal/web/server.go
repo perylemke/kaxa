@@ -61,6 +61,7 @@ type Server struct {
 	now        func() time.Time
 	home       string
 	workDir    string
+	term       terminals
 }
 
 // listen opens the TCP listener; tests replace it to reach the failure paths.
@@ -187,6 +188,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /app.js", s.serveJS)
 	mux.HandleFunc("GET /kaxa-logo.png", s.serveLogo)
 	mux.HandleFunc("GET /favicon.png", s.serveFavicon)
+	mux.HandleFunc("GET /vendor/xterm.js", s.serveXterm)
+	mux.HandleFunc("GET /vendor/xterm.css", s.serveXtermCSS)
+	mux.HandleFunc("GET /vendor/addon-fit.js", s.serveFitAddon)
 	mux.HandleFunc("GET /api/providers", s.listProviders)
 	mux.HandleFunc("GET /api/dirs", s.listDirs)
 	mux.HandleFunc("GET /api/sandboxes", s.listSandboxes)
@@ -196,6 +200,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/sandboxes/{provider}/{name}/upgrade", s.upgradeSandbox)
 	mux.HandleFunc("POST /api/sandboxes/{provider}/{name}/url-auth", s.urlAuth)
 	mux.HandleFunc("POST /api/sandboxes/{provider}/{name}/destroy", s.destroySandbox)
+	mux.HandleFunc("POST /api/sandboxes/{provider}/{name}/terminal", s.openTerminal)
+	mux.HandleFunc("GET /ws/terminal", s.terminalSocket)
 	return s.protect(mux)
 }
 

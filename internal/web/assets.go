@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-//go:embed assets/index.html assets/app.css assets/app.js assets/kaxa-logo.png assets/favicon.png
+//go:embed assets/index.html assets/app.css assets/app.js assets/kaxa-logo.png assets/favicon.png assets/vendor/xterm.js assets/vendor/xterm.css assets/vendor/addon-fit.js
 var assetFS embed.FS
 
 var indexPage = template.Must(template.ParseFS(assetFS, "assets/index.html"))
@@ -48,4 +48,16 @@ func (s *Server) serveAsset(w http.ResponseWriter, r *http.Request, name, conten
 	}
 	w.Header().Set("Content-Type", contentType)
 	_, _ = w.Write(data)
+}
+
+func (s *Server) serveXterm(w http.ResponseWriter, r *http.Request) {
+	s.serveAsset(w, r, "assets/vendor/xterm.js", contentJS)
+}
+
+func (s *Server) serveXtermCSS(w http.ResponseWriter, r *http.Request) {
+	s.serveAsset(w, r, "assets/vendor/xterm.css", contentCSS)
+}
+
+func (s *Server) serveFitAddon(w http.ResponseWriter, r *http.Request) {
+	s.serveAsset(w, r, "assets/vendor/addon-fit.js", contentJS)
 }

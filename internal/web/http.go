@@ -12,16 +12,18 @@ import (
 )
 
 const (
-	maxBody         = 1 << 20
-	contentJSON     = "application/json; charset=utf-8"
-	contentHTML     = "text/html; charset=utf-8"
-	contentCSS      = "text/css; charset=utf-8"
-	contentJS       = "text/javascript; charset=utf-8"
-	contentPNG      = "image/png"
-	headerCSP       = "Content-Security-Policy"
-	headerNosniff   = "X-Content-Type-Options"
-	headerCache     = "Cache-Control"
-	cspValue        = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+	maxBody       = 1 << 20
+	contentJSON   = "application/json; charset=utf-8"
+	contentHTML   = "text/html; charset=utf-8"
+	contentCSS    = "text/css; charset=utf-8"
+	contentJS     = "text/javascript; charset=utf-8"
+	contentPNG    = "image/png"
+	headerCSP     = "Content-Security-Policy"
+	headerNosniff = "X-Content-Type-Options"
+	headerCache   = "Cache-Control"
+	// style-src allows inline styles only because xterm.js writes its theme into a
+	// <style> element at run time. Scripts stay limited to this origin.
+	cspValue        = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
 	cacheNoStore    = "no-store"
 	contentTypeOpts = "nosniff"
 )
