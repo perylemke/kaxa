@@ -102,10 +102,10 @@ func (f *fakeSDKClient) answerEnv(argv []string, stdin io.Reader, stdout io.Writ
 func sandboxEnvKind(argv []string) (string, bool) {
 	path := sandbox.EnvFilePath("/home/sprite")
 	dir := sandbox.EnvDirPath("/home/sprite")
-	if len(argv) == 3 && argv[0] == "mkdir" && argv[1] == "-p" && argv[2] == dir {
+	if len(argv) == 3 && argv[0] == cmdMkdir && argv[1] == "-p" && argv[2] == dir {
 		return "mkdir", true
 	}
-	if len(argv) == 3 && argv[0] == "chmod" && argv[2] == path {
+	if len(argv) == 3 && argv[0] == cmdChmod && argv[2] == path {
 		return "chmod", true
 	}
 	if len(argv) == 2 && argv[1] == path && (argv[0] == "tee" || argv[0] == "cat") {

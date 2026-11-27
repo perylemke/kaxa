@@ -41,6 +41,15 @@
           <legend class="text-sm font-medium">Lifetime</legend>
           <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="running" class="size-4 accent-kx-button"> Keep running for 1 hour</label>
         </fieldset>
+        <fieldset id="template-fields" class="grid gap-3 border-t border-kx-line pt-4" hidden>
+          <legend class="text-sm font-medium">Image</legend>
+          <div class="grid gap-1.5">
+            <label for="create-template" class="text-sm" id="template-label">Image</label>
+            <select id="create-template" class="w-full rounded-lg border border-kx-line bg-kx-surface px-3 py-2.5" hidden></select>
+            <input id="create-template-other" autocomplete="off" spellcheck="false" placeholder="registry/name:tag" aria-label="Image reference" aria-describedby="template-help" class="w-full rounded-lg border border-kx-line bg-kx-surface px-3 py-2.5 placeholder:text-kx-muted aria-invalid:border-kx-danger">
+            <p id="template-help" class="text-xs text-kx-muted">Empty keeps the provider default image. Use an image reference such as registry/name:tag.</p>
+          </div>
+        </fieldset>
         <fieldset id="compute-fields" class="grid gap-3 border-t border-kx-line pt-4" hidden>
           <legend class="text-sm font-medium">Resources</legend>
           <div id="size-field" class="grid gap-1.5" hidden>

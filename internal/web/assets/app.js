@@ -23,6 +23,8 @@ const state = {
   destroyArmed: false,
   fresh: null,
   creating: false,
+  templateFor: "",
+  templates: {},
   runningStep: null,
   startedAt: 0,
   repos: [],
@@ -67,6 +69,8 @@ document.querySelector("#create-form").addEventListener("submit", onCreate);
 document.querySelector("#create-name").addEventListener("input", () => checkName(false));
 document.querySelector("#create-sync").addEventListener("change", syncCreateFields);
 document.querySelector("#create-api").addEventListener("change", syncCreateFields);
+document.querySelector("#create-template").addEventListener("change", syncTemplateOther);
+document.querySelector("#create-template-other").addEventListener("input", () => checkTemplate(true));
 for (const id of ["create-cpu", "create-memory"]) {
   document.querySelector("#" + id).addEventListener("change", syncOther);
 }
@@ -860,6 +864,9 @@ function providerTags(caps) {
   if (caps.cpu || caps.memory) {
     tags.push("CPU and memory");
   }
+  if (caps.template) {
+    tags.push("Custom image");
+  }
   return tags;
 }
 
@@ -980,6 +987,90 @@ function checkCompute(show) {
   return disk ? computeEl("create-disk") : null;
 }
 
+/* Image */
+
+const imageRef = /^[A-Za-z0-9][A-Za-z0-9._:/@-]*$/;
+
+function templateEl(id) {
+  return document.querySelector("#" + id);
+}
+
+// syncTemplate shows the image field for a provider that starts from an image.
+// The catalog is fetched once per provider; without one, the field stays a text input.
+function syncTemplate(provider, caps) {
+  const name = provider && provider.available && caps.template ? provider.name : "";
+  templateEl("template-fields").hidden = name === "";
+  if (state.templateFor === name) {
+    return;
+  }
+  state.templateFor = name;
+  templateEl("create-template-other").value = "";
+  renderTemplates([]);
+  if (name === "") {
+    return;
+  }
+  templateEl("template-help").textContent = "Loading images…";
+  loadTemplates(name).then((list) => {
+    if (state.templateFor === name) {
+      renderTemplates(list);
+    }
+  });
+}
+
+async function loadTemplates(name) {
+  if (!state.templates[name]) {
+    try {
+      const out = await api(`/api/providers/${encodeURIComponent(name)}/templates`);
+      state.templates[name] = out.templates || [];
+    } catch {
+      state.templates[name] = [];
+    }
+  }
+  return state.templates[name];
+}
+
+const templateHelp = "Empty keeps the provider default image. Use an image reference such as registry/name:tag.";
+
+function renderTemplates(list) {
+  const select = templateEl("create-template");
+  templateEl("template-help").textContent = templateHelp;
+  select.hidden = list.length === 0;
+  templateEl("template-label").htmlFor = list.length === 0 ? "create-template-other" : "create-template";
+  if (list.length > 0) {
+    fillSelect(select, list.map((item) => [item.name, item.label || item.name]), true);
+  }
+  syncTemplateOther();
+}
+
+function syncTemplateOther() {
+  const select = templateEl("create-template");
+  templateEl("create-template-other").hidden = !select.hidden && select.value !== OTHER;
+  checkTemplate(false);
+}
+
+// templateValue is the image reference the form names, empty for the provider default.
+function templateValue() {
+  if (templateEl("template-fields").hidden) {
+    return "";
+  }
+  const select = templateEl("create-template");
+  if (select.hidden || select.value === OTHER) {
+    return templateEl("create-template-other").value.trim();
+  }
+  return select.value;
+}
+
+// checkTemplate flags characters an image reference cannot hold; the provider checks the rest.
+function checkTemplate(show) {
+  const input = templateEl("create-template-other");
+  const raw = templateValue();
+  const bad = !input.hidden && raw !== "" && (!imageRef.test(raw) || raw.includes(".."));
+  input.setAttribute("aria-invalid", bad && show ? "true" : "false");
+  templateEl("template-help").textContent = bad && show ? "Use letters, digits, and . _ : / @ - in an image reference." : templateHelp;
+  templateEl("template-help").className = bad && show ? "text-xs text-kx-danger" : "text-xs text-kx-muted";
+  return bad ? input : null;
+}
+
 function computeBody() {
   const out = {};
   if (computeEl("compute-fields").hidden) {
@@ -1019,6 +1110,7 @@ function syncCreateFields() {
   document.querySelector("#sync-extra").hidden = !caps.sync || !syncOn;
   document.querySelector("#api-extra").hidden = !caps.api || !apiOn;
   syncCompute(provider, caps);
+  syncTemplate(provider, caps);
   document.querySelector("#create-submit").disabled = !provider || !provider.available || state.creating;
 }
 
@@ -1174,7 +1266,8 @@ function createBody(form) {
     body.api_port = port ? Number(port) : 0;
     body.api_env = String(data.get("api_env") || "").split("\n").map((line) => line.trim()).filter(Boolean);
   }
-  return { ...body, ...computeBody() };
+  const template = templateValue();
+  return { ...body, ...computeBody(), ...(template ? { template } : {}) };
 }
 
 function guardUnload(event) {
@@ -1190,7 +1283,7 @@ async function onCreate(event) {
     document.querySelector("#create-name").focus();
     return;
   }
-  const invalid = checkCompute(true);
+  const invalid = checkCompute(true) || checkTemplate(true);
   if (invalid) {
     invalid.focus();
     return;

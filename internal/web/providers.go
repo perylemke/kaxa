@@ -1,7 +1,9 @@
 package web
 
 import (
+	"context"
 	"net/http"
+	"time"
 
 	"github.com/perylemke/kaxa/internal/lifecycle"
 	"github.com/perylemke/kaxa/internal/sandbox"
@@ -53,4 +55,46 @@ func (s *Server) providerInfos() ([]providerInfo, error) {
 		out = append(out, info)
 	}
 	return out, nil
+}
+
+// templateTTL bounds a catalog request, which goes over the network.
+const templateTTL = 10 * time.Second
+
+type templateJSON struct {
+	Name  string `json:"name"`
+	Label string `json:"label"`
+}
+
+// listTemplates answers with the ready-made images of one provider. A provider
+// without a catalog, or whose catalog fails, answers an empty list, and the page
+// keeps its free-text field.
+func (s *Server) listTemplates(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	if !dnsLabel.MatchString(name) {
+		s.writeErr(w, usererr.New("invalid provider name", "use the provider name"))
+		return
+	}
+	p, err := s.openProvider(name)
+	if err != nil {
+		s.writeErr(w, err)
+		return
+	}
+	out := struct {
+		Templates []templateJSON `json:"templates"`
+		Warning   string         `json:"warning,omitempty"`
+	}{Templates: []templateJSON{}}
+	if catalog, ok := p.(sandbox.TemplateCatalog); ok {
+		ctx, cancel := context.WithTimeout(r.Context(), templateTTL)
+		defer cancel()
+		options, listErr := catalog.ListTemplates(ctx)
+		if listErr != nil {
+			_, message, _ := s.describe(listErr)
+			s.event(levelWarn, "templates", name, message)
+			out.Warning = message
+		}
+		for _, option := range options {
+			out.Templates = append(out.Templates, templateJSON{Name: option.Name, Label: option.Label})
+		}
+	}
+	s.writeJSON(w, http.StatusOK, out)
 }
