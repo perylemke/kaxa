@@ -10,6 +10,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/perylemke/kaxa/internal/lifecycle"
 	"github.com/perylemke/kaxa/internal/sandbox"
@@ -117,7 +118,7 @@ func TestListInteractiveListViewShowsHelp(t *testing.T) {
 
 	m := newListInteractiveModel(context.TODO(), nil, []sandbox.Info{
 		{ID: "a", Status: fixtureWarm, Provider: spritesProviderName},
-	}, 0)
+	}, listStart{})
 	m.mode = listModeTable
 	view := stripANSI(m.View())
 	if !strings.Contains(view, "enter detail") || !strings.Contains(view, "a") {
@@ -141,7 +142,7 @@ func TestListInteractiveUpdateDetailLoadedMsg(t *testing.T) {
 	ctx := context.Background()
 	providers := map[string]sandbox.Provider{spritesProviderName: idleProvider{}}
 	infos := []sandbox.Info{{ID: "a", Status: fixtureWarm, Provider: spritesProviderName}}
-	m := newListInteractiveModel(ctx, providers, infos, 0)
+	m := newListInteractiveModel(ctx, providers, infos, listStart{})
 	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if cmd == nil {
 		t.Fatal("expected inspect cmd")
@@ -163,7 +164,7 @@ func TestListInteractiveUpdateIgnoresUnknownMsg(t *testing.T) {
 
 	m := newListInteractiveModel(context.Background(), nil, []sandbox.Info{
 		{ID: "a", Status: fixtureWarm, Provider: spritesProviderName},
-	}, 0)
+	}, listStart{})
 	next, cmd := m.Update(struct{ x int }{1})
 	if cmd != nil {
 		t.Fatalf("cmd = %v", cmd)
@@ -174,7 +175,7 @@ func TestListInteractiveUpdateIgnoresUnknownMsg(t *testing.T) {
 func TestListInteractiveTableEnterNoSandboxes(t *testing.T) {
 	t.Parallel()
 
-	m := newListInteractiveModel(context.Background(), nil, []sandbox.Info{}, 0)
+	m := newListInteractiveModel(context.Background(), nil, []sandbox.Info{}, listStart{})
 	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	if cmd != nil {
 		t.Fatal("expected no cmd")
@@ -390,16 +391,19 @@ func TestListConsoleLoopReopensTable(t *testing.T) {
 		formModalProvider:   modalListStub{},
 	}
 	calls := 0
-	run := func(_ context.Context, _ map[string]sandbox.Provider, _ []sandbox.Info, startCursor int) (listTUIResult, error) {
+	run := func(_ context.Context, _ map[string]sandbox.Provider, _ []sandbox.Info, start listStart) (listTUIResult, error) {
 		calls++
 		if calls == 1 {
-			if startCursor != 0 {
-				t.Fatalf("start cursor = %d", startCursor)
+			if start.cursor != 0 {
+				t.Fatalf("start cursor = %d", start.cursor)
 			}
 			return listTUIResult{postAction: listPostConsole, id: fixtureDemo, provider: formModalProvider}, nil
 		}
-		if startCursor != 1 {
-			t.Fatalf("second start cursor = %d, want 1", startCursor)
+		if start.consoleErr != "" {
+			t.Fatalf("consoleErr = %q", start.consoleErr)
+		}
+		if start.cursor != 1 {
+			t.Fatalf("second start cursor = %d, want 1", start.cursor)
 		}
 		return listTUIResult{}, nil
 	}
@@ -426,11 +430,13 @@ func TestListConsoleLoopOpenErrorContinues(t *testing.T) {
 	infos := []sandbox.Info{{ID: fixtureDemo, Provider: formModalProvider}}
 	providers := map[string]sandbox.Provider{formModalProvider: modalListStub{}}
 	calls := 0
-	run := func(_ context.Context, _ map[string]sandbox.Provider, _ []sandbox.Info, _ int) (listTUIResult, error) {
+	var second listStart
+	run := func(_ context.Context, _ map[string]sandbox.Provider, _ []sandbox.Info, start listStart) (listTUIResult, error) {
 		calls++
 		if calls == 1 {
 			return listTUIResult{postAction: listPostConsole, id: fixtureDemo, provider: formModalProvider}, nil
 		}
+		second = start
 		return listTUIResult{}, nil
 	}
 	open := func(context.Context, sandbox.Provider, sandbox.ID, io.Writer, io.Writer) error {
@@ -441,8 +447,59 @@ func TestListConsoleLoopOpenErrorContinues(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if calls != 2 || !strings.Contains(errOut.String(), "console failed") {
-		t.Fatalf("calls=%d stderr=%q", calls, errOut.String())
+	if calls != 2 || second.consoleErr != "console failed" || second.cursor != 0 || errOut.Len() != 0 {
+		t.Fatalf("calls=%d start=%+v stderr=%q", calls, second, errOut.String())
+	}
+}
+
+func TestListConsoleErrStartsInDetail(t *testing.T) {
+	t.Parallel()
+
+	providers := map[string]sandbox.Provider{spritesProviderName: idleProvider{}}
+	infos := []sandbox.Info{{ID: "a", Provider: spritesProviderName}}
+	m := newListInteractiveModel(context.Background(), providers, infos, listStart{consoleErr: "sandbox \"a\" is stopped"})
+	if m.mode != listModeDetailLoading {
+		t.Fatalf("mode = %d", m.mode)
+	}
+	cmd := m.Init()
+	if cmd == nil {
+		t.Fatal("expected inspect cmd")
+	}
+	next, _ := m.Update(cmd())
+	got := authModel(t, next)
+	if got.mode != listModeDetail {
+		t.Fatalf("mode = %d", got.mode)
+	}
+	view := stripANSI(got.View())
+	if !strings.Contains(view, "Could not open console: sandbox \"a\" is stopped") {
+		t.Fatalf("view = %q", view)
+	}
+
+	failed := got.applyDetail(detailLoadedMsg{err: errors.New("boom")})
+	if !strings.Contains(stripANSI(failed.View()), "Could not open console") {
+		t.Fatalf("view = %q", failed.View())
+	}
+
+	back, _ := got.updateDetailKey(tea.KeyMsg{Type: tea.KeyEsc})
+	if authModel(t, back).consoleErr != "" {
+		t.Fatal("esc must clear consoleErr")
+	}
+}
+
+func TestListConsoleErrStyleIsRed(t *testing.T) {
+	t.Parallel()
+
+	if got := consoleErrStyle.GetForeground(); got != lipgloss.Color("9") {
+		t.Fatalf("foreground = %v", got)
+	}
+}
+
+func TestListNoConsoleErrInitIsNil(t *testing.T) {
+	t.Parallel()
+
+	m := newListInteractiveModel(context.Background(), nil, []sandbox.Info{{ID: "a"}}, listStart{})
+	if m.Init() != nil {
+		t.Fatal("Init must be nil without consoleErr")
 	}
 }
 
@@ -601,7 +658,7 @@ func TestListDetailActionKeepsRowProvider(t *testing.T) {
 
 	m := newListInteractiveModel(context.TODO(), nil, []sandbox.Info{
 		{ID: "a", Status: fixtureWarm, Provider: spritesProviderName},
-	}, 0)
+	}, listStart{})
 	m.mode = listModeDetail
 	m.detail = sandbox.Detail{ID: "a"}
 
