@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/perylemke/kaxa/internal/config"
 	"github.com/perylemke/kaxa/internal/lifecycle"
@@ -24,6 +25,9 @@ type listProvider struct {
 	infos        []sandbox.Info
 	listErr      error
 	notConfigure bool
+	// started and proceed hold List until every provider has started.
+	started chan struct{}
+	proceed chan struct{}
 }
 
 func newListProvider(name string) *listProvider {
@@ -44,6 +48,14 @@ func (l *listProvider) ConfigureCredentials(string, string) error {
 }
 
 func (l *listProvider) List(context.Context) ([]sandbox.Info, error) {
+	if l.started != nil {
+		l.started <- struct{}{}
+		select {
+		case <-l.proceed:
+		case <-time.After(5 * time.Second):
+			return nil, errors.New("the other provider never started: the listing is not concurrent")
+		}
+	}
 	return l.infos, l.listErr
 }
 
@@ -130,5 +142,51 @@ func TestCollectSandboxes(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestCollectSandboxesListsProvidersAtTheSameTime(t *testing.T) {
+	t.Parallel()
+
+	started := make(chan struct{}, 2)
+	proceed := make(chan struct{})
+	first, second := newListProvider(listSprites), newListProvider(listModal)
+	first.infos = []sandbox.Info{{ID: "a"}}
+	second.infos = []sandbox.Info{{ID: "b"}}
+	for _, p := range []*listProvider{first, second} {
+		p.started, p.proceed = started, proceed
+	}
+	go func() {
+		for range 2 {
+			select {
+			case <-started:
+			case <-time.After(5 * time.Second):
+				return
+			}
+		}
+		close(proceed)
+	}()
+
+	byName := map[string]sandbox.Provider{listSprites: first, listModal: second}
+	infos, failures, err := lifecycle.CollectSandboxes(context.Background(), byName, []string{listSprites, listModal})
+	if err != nil || len(failures) != 0 || len(infos) != 2 {
+		t.Fatalf("infos = %v failures = %v err = %v", infos, failures, err)
+	}
+}
+
+func TestCollectSandboxesKeepsTheOrderOfNames(t *testing.T) {
+	t.Parallel()
+
+	slow, fast := newListProvider(listSprites), newListProvider(listModal)
+	slow.infos = []sandbox.Info{{ID: "slow"}}
+	fast.infos = []sandbox.Info{{ID: "fast"}}
+	// fast starts and ends first; slow waits for it, then finishes.
+	slow.started, slow.proceed = make(chan struct{}, 1), make(chan struct{})
+	close(slow.proceed)
+
+	byName := map[string]sandbox.Provider{listSprites: slow, listModal: fast}
+	infos, _, err := lifecycle.CollectSandboxes(context.Background(), byName, []string{listSprites, listModal})
+	if err != nil || len(infos) != 2 || infos[0].ID != "slow" || infos[1].ID != "fast" {
+		t.Fatalf("infos = %v err = %v", infos, err)
 	}
 }
