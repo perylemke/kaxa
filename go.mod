@@ -14,6 +14,7 @@ require (
 	github.com/charmbracelet/x/ansi v0.11.10
 	github.com/creack/pty v1.1.24
 	github.com/daytona/clients/sdk-go v0.233.0
+	github.com/fxamacker/cbor/v2 v2.9.0
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
 	github.com/modal-labs/modal-client/go v0.11.2
 	github.com/modelcontextprotocol/go-sdk v1.8.0
@@ -61,7 +62,6 @@ require (
 	github.com/daytona/clients/toolbox-api-client-go v0.233.0 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
-	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
