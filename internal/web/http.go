@@ -17,6 +17,7 @@ const (
 	contentHTML     = "text/html; charset=utf-8"
 	contentCSS      = "text/css; charset=utf-8"
 	contentJS       = "text/javascript; charset=utf-8"
+	contentPNG      = "image/png"
 	headerCSP       = "Content-Security-Policy"
 	headerNosniff   = "X-Content-Type-Options"
 	headerCache     = "Cache-Control"

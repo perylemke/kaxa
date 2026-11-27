@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-//go:embed assets/index.html assets/app.css assets/app.js
+//go:embed assets/index.html assets/app.css assets/app.js assets/kaxa-logo.png assets/favicon.png
 var assetFS embed.FS
 
 var indexPage = template.Must(template.ParseFS(assetFS, "assets/index.html"))
@@ -30,6 +30,14 @@ func (s *Server) serveCSS(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) serveJS(w http.ResponseWriter, r *http.Request) {
 	s.serveAsset(w, r, "assets/app.js", contentJS)
+}
+
+func (s *Server) serveLogo(w http.ResponseWriter, r *http.Request) {
+	s.serveAsset(w, r, "assets/kaxa-logo.png", contentPNG)
+}
+
+func (s *Server) serveFavicon(w http.ResponseWriter, r *http.Request) {
+	s.serveAsset(w, r, "assets/favicon.png", contentPNG)
 }
 
 func (s *Server) serveAsset(w http.ResponseWriter, r *http.Request, name, contentType string) {

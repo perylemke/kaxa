@@ -185,6 +185,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /{$}", s.serveIndex)
 	mux.HandleFunc("GET /app.css", s.serveCSS)
 	mux.HandleFunc("GET /app.js", s.serveJS)
+	mux.HandleFunc("GET /kaxa-logo.png", s.serveLogo)
+	mux.HandleFunc("GET /favicon.png", s.serveFavicon)
 	mux.HandleFunc("GET /api/providers", s.listProviders)
 	mux.HandleFunc("GET /api/dirs", s.listDirs)
 	mux.HandleFunc("GET /api/sandboxes", s.listSandboxes)
