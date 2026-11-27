@@ -16,7 +16,13 @@ const (
 	dockerProvider  = "docker"
 	daytonaProvider = "daytona"
 	blaxelProvider  = "blaxel"
+	vercelProvider  = "vercel"
 )
+
+// vercelAccount is a provider configured with a Vercel token, project, and team.
+type vercelAccount interface {
+	Configure(token, project, team string) error
+}
 
 type tokenConfigurer interface {
 	Configure(token string) error
@@ -85,6 +91,10 @@ func configureProvider(p sandbox.Provider, name string, cfg config.Config) error
 		if err := configureBlaxel(p, cfg.Blaxel); err != nil {
 			return err
 		}
+	case vercelProvider:
+		if err := configureVercel(p, cfg.Vercel); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -112,6 +122,20 @@ func configureDaytona(p sandbox.Provider, cfg config.DaytonaConfig) error {
 		return fmt.Errorf("daytona provider %T does not support Configure", p)
 	}
 	if err := c.Configure(cfg.APIKey); err != nil {
+		return err
+	}
+	if d, ok := p.(templateDefaulter); ok {
+		return d.SetDefaultTemplate(cfg.Template)
+	}
+	return nil
+}
+
+func configureVercel(p sandbox.Provider, cfg config.VercelConfig) error {
+	c, ok := p.(vercelAccount)
+	if !ok {
+		return fmt.Errorf("vercel provider %T does not support Configure", p)
+	}
+	if err := c.Configure(cfg.Token, cfg.Project, cfg.Team); err != nil {
 		return err
 	}
 	if d, ok := p.(templateDefaulter); ok {

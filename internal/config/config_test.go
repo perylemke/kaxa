@@ -99,6 +99,24 @@ func TestLoadBlaxelFromEnv(t *testing.T) {
 	}
 }
 
+func TestLoadVercelFromEnv(t *testing.T) {
+	reg := testRegistry(t)
+	t.Setenv("KAXA_DEFAULT_PROVIDER", "")
+	t.Setenv("KAXA_VERCEL_TOKEN", "vc-token")
+	t.Setenv("KAXA_VERCEL_PROJECT", "my-project")
+	t.Setenv("KAXA_VERCEL_TEAM", "team_abc")
+	t.Setenv("KAXA_VERCEL_TEMPLATE", "team/image:1")
+
+	cfg, err := config.Load(config.LoadOptions{}, reg)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	want := config.VercelConfig{Token: "vc-token", Project: "my-project", Team: "team_abc", Template: "team/image:1"}
+	if cfg.Vercel != want {
+		t.Fatalf("vercel config = %+v, want %+v", cfg.Vercel, want)
+	}
+}
+
 func TestLoadRejectsBadBlaxelDiskPercent(t *testing.T) {
 	reg := testRegistry(t)
 	t.Setenv("KAXA_BLAXEL_DISK_PERCENT", "5")
