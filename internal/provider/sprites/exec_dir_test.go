@@ -89,3 +89,17 @@ func execCmd(t *testing.T, labels []string) *spritesdk.Cmd {
 	}
 	return cmd
 }
+
+func TestPrepareExecCmdSetsTermOnlyWithATerminal(t *testing.T) {
+	t.Parallel()
+
+	sprite := spritesdk.New("token").Sprite("box")
+	tty, err := prepareExecCmd(context.Background(), sprite, sandbox.ExecOptions{Command: []string{testShell}, TTY: true}, []string{spriteLabel}, nil)
+	if err != nil || !slices.Contains(tty.Env, "TERM=xterm-256color") {
+		t.Fatalf("tty env = %v, %v", tty.Env, err)
+	}
+	plain, err := prepareExecCmd(context.Background(), sprite, sandbox.ExecOptions{Command: []string{testShell}}, []string{spriteLabel}, nil)
+	if err != nil || slices.Contains(plain.Env, "TERM=xterm-256color") {
+		t.Fatalf("plain env = %v, %v", plain.Env, err)
+	}
+}

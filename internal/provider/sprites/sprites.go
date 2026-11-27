@@ -13,6 +13,9 @@ import (
 	"github.com/perylemke/kaxa/internal/sandbox"
 )
 
+// termName is the TERM of an interactive shell.
+const termName = "xterm-256color"
+
 // Provider implements sandbox.Provider for Fly.io Sprites.
 type Provider struct {
 	mu     sync.Mutex
@@ -181,6 +184,8 @@ func prepareExecCmd(ctx context.Context, sprite *spritesdk.Sprite, opts sandbox.
 	cmd.Env = sandbox.MergeEnv(spriteLayout.Env(), sandbox.EnvFromMap(sandbox.EnvMap(env)))
 	if opts.TTY {
 		cmd.SetTTY(true)
+		// Without TERM, programs such as tmux, clear, and vim refuse to start.
+		cmd.Env = append(cmd.Env, "TERM="+termName)
 		if opts.Size.Rows > 0 && opts.Size.Cols > 0 {
 			if err := cmd.SetTTYSize(opts.Size.Rows, opts.Size.Cols); err != nil {
 				return nil, err
