@@ -6,12 +6,13 @@
   <meta name="kaxa-session" content="{{.Session}}">
   <meta name="kaxa-csrf" content="{{.CSRF}}">
   <title>kaxa</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="stylesheet" href="/app.css">
 </head>
 <body class="mx-auto min-h-screen max-w-3xl bg-kx-bg px-5 pb-24 pt-8 font-sans text-kx-text antialiased">
   <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:rounded-lg focus:bg-kx-surface focus:px-3 focus:py-2 focus:text-sm">Skip to content</a>
   <header class="mb-8 flex flex-wrap items-center justify-between gap-4">
-    <a href="#/" class="text-2xl tracking-tight">kaxa</a>
+    <a href="#/" aria-label="kaxa, sandboxes" class="rounded-lg"><img src="/kaxa-logo.png" alt="kaxa" width="80" height="80" class="size-20"></a>
     <nav aria-label="Main" class="flex gap-2">
       <a href="#/" id="nav-list" class="rounded-lg border border-transparent bg-kx-button px-3.5 py-2 text-sm text-kx-on-button">Sandboxes</a>
       <a href="#/new" id="nav-new" class="rounded-lg border border-kx-line bg-kx-surface-2 px-3.5 py-2 text-sm text-kx-text hover:bg-kx-hover">New sandbox</a>
@@ -37,6 +38,31 @@
         <fieldset data-cap="running" class="grid gap-3 border-t border-kx-line pt-4" hidden>
           <legend class="text-sm font-medium">Lifetime</legend>
           <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="running" class="size-4 accent-kx-button"> Keep running for 1 hour</label>
+        </fieldset>
+        <fieldset id="compute-fields" class="grid gap-3 border-t border-kx-line pt-4" hidden>
+          <legend class="text-sm font-medium">Resources</legend>
+          <div id="size-field" class="grid gap-1.5" hidden>
+            <label for="create-size" class="text-sm">Size</label>
+            <select id="create-size" class="w-full rounded-lg border border-kx-line bg-kx-surface px-3 py-2.5"></select>
+            <p class="text-xs text-kx-muted">CPU and memory come as one of the sizes this provider accepts.</p>
+          </div>
+          <div id="cpu-field" class="grid gap-1.5" hidden>
+            <label for="create-cpu" class="text-sm">CPU</label>
+            <select id="create-cpu" class="w-full rounded-lg border border-kx-line bg-kx-surface px-3 py-2.5"></select>
+            <input id="create-cpu-other" type="number" min="0.25" step="0.25" inputmode="decimal" placeholder="cores, for example 1.5" aria-label="CPU cores" aria-describedby="cpu-help" class="w-full rounded-lg border border-kx-line bg-kx-surface px-3 py-2.5 placeholder:text-kx-muted aria-invalid:border-kx-danger" hidden>
+            <p id="cpu-help" class="text-xs text-kx-muted" hidden></p>
+          </div>
+          <div id="memory-field" class="grid gap-1.5" hidden>
+            <label for="create-memory" class="text-sm">Memory</label>
+            <select id="create-memory" class="w-full rounded-lg border border-kx-line bg-kx-surface px-3 py-2.5"></select>
+            <input id="create-memory-other" type="number" min="1" step="1" inputmode="numeric" placeholder="MiB, for example 3072" aria-label="Memory in MiB" aria-describedby="memory-help" class="w-full rounded-lg border border-kx-line bg-kx-surface px-3 py-2.5 placeholder:text-kx-muted aria-invalid:border-kx-danger" hidden>
+            <p id="memory-help" class="text-xs text-kx-muted" hidden></p>
+          </div>
+          <div id="disk-field" class="grid gap-1.5" hidden>
+            <label for="create-disk" class="text-sm">Disk share of memory (%)</label>
+            <input id="create-disk" type="number" min="10" max="95" step="1" inputmode="numeric" placeholder="provider default" aria-describedby="disk-help" class="w-full rounded-lg border border-kx-line bg-kx-surface px-3 py-2.5 placeholder:text-kx-muted aria-invalid:border-kx-danger">
+            <p id="disk-help" class="text-xs text-kx-muted">From 10 to 95. Empty keeps the provider default.</p>
+          </div>
         </fieldset>
         <fieldset data-cap="sync" class="grid gap-3 border-t border-kx-line pt-4" hidden>
           <legend class="text-sm font-medium">Repository</legend>

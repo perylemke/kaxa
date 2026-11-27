@@ -13,6 +13,8 @@ type providerInfo struct {
 	Available    bool                 `json:"available"`
 	Default      bool                 `json:"default"`
 	Capabilities sandbox.Capabilities `json:"capabilities"`
+	// Compute lists the CPU and memory choices, for a provider that publishes them.
+	Compute *sandbox.ComputeOptions `json:"compute,omitempty"`
 }
 
 func (s *Server) listProviders(w http.ResponseWriter, _ *http.Request) {
@@ -39,12 +41,16 @@ func (s *Server) providerInfos() ([]providerInfo, error) {
 	for _, p := range providers {
 		name := p.Name()
 		_, _ = lifecycle.ResolveProvider(s.reg, s.cfg, name)
-		out = append(out, providerInfo{
+		info := providerInfo{
 			Name:         name,
 			Available:    sandbox.IsAvailable(p),
 			Default:      name == s.cfg.Provider,
 			Capabilities: sandbox.CapabilitiesOf(p),
-		})
+		}
+		if options, ok := sandbox.ComputeOptionsOf(p); ok {
+			info.Compute = &options
+		}
+		out = append(out, info)
 	}
 	return out, nil
 }

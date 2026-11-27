@@ -29,6 +29,10 @@ type createBody struct {
 	APIPort   int      `json:"api_port"`
 	APIEnv    []string `json:"api_env"`
 	Public    bool     `json:"public"`
+	// CPU, MemoryMiB, and DiskPercent are zero for the provider default.
+	CPU         float64 `json:"cpu"`
+	MemoryMiB   int     `json:"memory_mib"`
+	DiskPercent int     `json:"disk_percent"`
 }
 
 type createOut struct {
@@ -149,7 +153,25 @@ func (s *Server) buildCreateRequest(body createBody) (lifecycle.Request, error) 
 	if err := applyAPI(&req, body); err != nil {
 		return lifecycle.Request{}, err
 	}
+	if err := applyCompute(&req, body); err != nil {
+		return lifecycle.Request{}, err
+	}
 	return req, nil
+}
+
+// applyCompute copies the compute fields. lifecycle.Check later refuses a field
+// the provider does not support, and a disk percent outside 10 to 95.
+func applyCompute(req *lifecycle.Request, body createBody) error {
+	if body.CPU < 0 {
+		return usererr.New("cpu must be greater than zero", "choose a size from the list, or leave it on the provider default")
+	}
+	if body.MemoryMiB < 0 {
+		return usererr.New("memory must be a whole number of MiB greater than zero", "choose a size from the list, or leave it on the provider default")
+	}
+	req.CPU = body.CPU
+	req.MemoryMiB = body.MemoryMiB
+	req.DiskPercent = body.DiskPercent
+	return nil
 }
 
 func (s *Server) applySync(req *lifecycle.Request, body createBody) error {

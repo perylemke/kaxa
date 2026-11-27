@@ -58,6 +58,12 @@ document.querySelector("#create-form").addEventListener("submit", onCreate);
 document.querySelector("#create-name").addEventListener("input", () => checkName(false));
 document.querySelector("#create-sync").addEventListener("change", syncCreateFields);
 document.querySelector("#create-api").addEventListener("change", syncCreateFields);
+for (const id of ["create-cpu", "create-memory"]) {
+  document.querySelector("#" + id).addEventListener("change", syncOther);
+}
+for (const id of ["create-cpu-other", "create-memory-other", "create-disk"]) {
+  document.querySelector("#" + id).addEventListener("input", () => checkCompute(true));
+}
 document.querySelector("#repo-open").addEventListener("click", () => openPicker(""));
 document.querySelector("#picker-close").addEventListener("click", closePicker);
 document.querySelector("#picker-up").addEventListener("click", () => openPicker(state.picker.parent));
@@ -827,7 +833,154 @@ function providerTags(caps) {
   if (caps.public_url || caps.public_preview) {
     tags.push("Public URL");
   }
+  if (caps.cpu || caps.memory) {
+    tags.push("CPU and memory");
+  }
   return tags;
+}
+
+const OTHER = "other";
+
+function computeEl(id) {
+  return document.querySelector("#" + id);
+}
+
+function memoryLabel(mib) {
+  return mib >= 1024 && mib % 1024 === 0 ? mib / 1024 + " GiB (" + mib + " MiB)" : mib + " MiB";
+}
+
+function fillSelect(select, choices, withOther) {
+  select.replaceChildren();
+  const rows = [["", "Provider default"], ...choices];
+  if (withOther) {
+    rows.push([OTHER, "Other"]);
+  }
+  for (const [value, label] of rows) {
+    const option = el("option", "", label);
+    option.value = value;
+    select.append(option);
+  }
+}
+
+// syncCompute shows the resource fields the selected provider accepts. The
+// choices are refilled only when the provider changes, so a pick survives the
+// other toggles of the form.
+function syncCompute(provider, caps) {
+  const options = provider && provider.available ? provider.compute || {} : {};
+  const sizes = options.sizes || [];
+  const cpus = options.cpus || [];
+  const memory = options.memory_mib || [];
+  const name = provider ? provider.name : "";
+  if (state.computeFor !== name) {
+    state.computeFor = name;
+    fillSelect(computeEl("create-size"), sizes.map((size) => [size.key, size.label]), false);
+    fillSelect(computeEl("create-cpu"), cpus.map((cpu) => [String(cpu), cpu + (cpu === 1 ? " core" : " cores")]), Boolean(options.custom_cpu));
+    fillSelect(computeEl("create-memory"), memory.map((mib) => [String(mib), memoryLabel(mib)]), Boolean(options.custom_memory));
+    for (const id of ["create-cpu-other", "create-memory-other", "create-disk"]) {
+      computeEl(id).value = "";
+    }
+    syncOther();
+  }
+  const showSize = sizes.length > 0;
+  const showCPU = cpus.length > 0 || Boolean(options.custom_cpu);
+  const showMemory = memory.length > 0 || Boolean(options.custom_memory);
+  const showDisk = Boolean(caps.disk_percent);
+  computeEl("size-field").hidden = !showSize;
+  computeEl("cpu-field").hidden = !showCPU;
+  computeEl("memory-field").hidden = !showMemory;
+  computeEl("disk-field").hidden = !showDisk;
+  computeEl("compute-fields").hidden = !(showSize || showCPU || showMemory || showDisk);
+}
+
+function syncOther() {
+  computeEl("create-cpu-other").hidden = computeEl("create-cpu").value !== OTHER;
+  computeEl("create-memory-other").hidden = computeEl("create-memory").value !== OTHER;
+  checkCompute(false);
+}
+
+function computeFieldHidden(id) {
+  return computeEl(id).closest("[id$='-field']").hidden || computeEl("compute-fields").hidden;
+}
+
+function setComputeProblem(input, helpID, message, show) {
+  const help = computeEl(helpID);
+  const bad = Boolean(message) && show;
+  input.setAttribute("aria-invalid", bad ? "true" : "false");
+  help.hidden = !bad && helpID !== "disk-help";
+  if (helpID !== "disk-help") {
+    help.textContent = bad ? message : "";
+    help.className = "text-xs text-kx-danger";
+  } else {
+    help.className = bad ? "text-xs text-kx-danger" : "text-xs text-kx-muted";
+  }
+}
+
+function numberProblem(select, input, hidden, whole, label) {
+  if (hidden || select.value !== OTHER) {
+    return "";
+  }
+  const raw = input.value.trim();
+  const value = Number(raw);
+  if (raw === "" || !Number.isFinite(value) || value <= 0) {
+    return "Enter " + label + " greater than zero.";
+  }
+  if (whole && !Number.isInteger(value)) {
+    return "Enter a whole number.";
+  }
+  return "";
+}
+
+function diskProblem() {
+  const raw = computeEl("create-disk").value.trim();
+  if (computeFieldHidden("create-disk") || raw === "") {
+    return "";
+  }
+  const value = Number(raw);
+  return Number.isInteger(value) && value >= 10 && value <= 95 ? "" : "Use a whole number from 10 to 95.";
+}
+
+// checkCompute validates the custom values; show reveals the messages.
+function checkCompute(show) {
+  const cpu = numberProblem(computeEl("create-cpu"), computeEl("create-cpu-other"), computeFieldHidden("create-cpu"), false, "the CPU cores");
+  const memory = numberProblem(computeEl("create-memory"), computeEl("create-memory-other"), computeFieldHidden("create-memory"), true, "the memory in MiB");
+  const disk = diskProblem();
+  setComputeProblem(computeEl("create-cpu-other"), "cpu-help", cpu, show);
+  setComputeProblem(computeEl("create-memory-other"), "memory-help", memory, show);
+  setComputeProblem(computeEl("create-disk"), "disk-help", disk, show);
+  if (cpu) {
+    return computeEl("create-cpu-other");
+  }
+  if (memory) {
+    return computeEl("create-memory-other");
+  }
+  return disk ? computeEl("create-disk") : null;
+}
+
+function computeBody() {
+  const out = {};
+  if (computeEl("compute-fields").hidden) {
+    return out;
+  }
+  const provider = selectedProvider();
+  const sizes = ((provider && provider.compute) || {}).sizes || [];
+  const size = sizes.find((item) => item.key === computeEl("create-size").value);
+  if (!computeEl("size-field").hidden && size) {
+    out.cpu = size.cpu;
+    out.memory_mib = size.memory_mib;
+  }
+  const cpu = computeEl("create-cpu").value;
+  if (!computeEl("cpu-field").hidden && cpu !== "") {
+    out.cpu = Number(cpu === OTHER ? computeEl("create-cpu-other").value : cpu);
+  }
+  const memory = computeEl("create-memory").value;
+  if (!computeEl("memory-field").hidden && memory !== "") {
+    out.memory_mib = Number(memory === OTHER ? computeEl("create-memory-other").value : memory);
+  }
+  const disk = computeEl("create-disk").value.trim();
+  if (!computeEl("disk-field").hidden && disk !== "") {
+    out.disk_percent = Number(disk);
+  }
+  return out;
 }
 
 function syncCreateFields() {
@@ -841,6 +994,7 @@ function syncCreateFields() {
   setCap("public", Boolean(caps.public_url) || (Boolean(caps.public_preview) && apiOn));
   document.querySelector("#sync-extra").hidden = !caps.sync || !syncOn;
   document.querySelector("#api-extra").hidden = !caps.api || !apiOn;
+  syncCompute(provider, caps);
   document.querySelector("#create-submit").disabled = !provider || !provider.available || state.creating;
 }
 
@@ -996,7 +1150,7 @@ function createBody(form) {
     body.api_port = port ? Number(port) : 0;
     body.api_env = String(data.get("api_env") || "").split("\n").map((line) => line.trim()).filter(Boolean);
   }
-  return body;
+  return { ...body, ...computeBody() };
 }
 
 function guardUnload(event) {
@@ -1010,6 +1164,11 @@ async function onCreate(event) {
   hideCreateError();
   if (!checkName(true)) {
     document.querySelector("#create-name").focus();
+    return;
+  }
+  const invalid = checkCompute(true);
+  if (invalid) {
+    invalid.focus();
     return;
   }
   const body = createBody(form);

@@ -103,3 +103,16 @@ func (capable) PublishAPI(context.Context, sandbox.ID, string, int, []string, []
 }
 
 func (capable) SupportsPublicPreview() {}
+
+// sized is a provider that adjusts compute and publishes its choices.
+type sized struct{ capable }
+
+func (sized) SupportsCPU() {}
+
+func (sized) SupportsMemory() {}
+
+func (sized) SupportsDiskPercent() {}
+
+func (sized) ComputeOptions() sandbox.ComputeOptions {
+	return sandbox.ComputeOptions{CPUs: []float64{1, 2}, MemoryMiB: []int{1024}, CustomMemory: true}
+}
