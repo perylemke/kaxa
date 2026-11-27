@@ -142,3 +142,22 @@ func TestOpenLoopbackURLRejectsAndReportsLauncherErrors(t *testing.T) {
 		t.Fatalf("launcher err = %v", err)
 	}
 }
+
+func TestOpenBrowserURLRefusesUnsafeURLs(t *testing.T) {
+	if err := openBrowserURL("http://example.com/"); !errors.Is(err, errUnsafeURL) {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestOpenBrowserURLReportsLauncherFailure(t *testing.T) {
+	restore := SetBrowserExecCommandForTest(func(string, ...string) *exec.Cmd {
+		// #nosec G204 -- test double: a launcher that exits with an error
+		return exec.Command("false")
+	})
+	t.Cleanup(restore)
+
+	err := openBrowserURL("https://example.com/path")
+	if err == nil || !strings.Contains(err.Error(), "open browser") {
+		t.Fatalf("err = %v", err)
+	}
+}

@@ -68,6 +68,23 @@ func (r *Registry) Names() []string {
 	return names
 }
 
+// All returns the registered providers sorted by name.
+func (r *Registry) All() []sandbox.Provider {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	names := make([]string, 0, len(r.providers))
+	for name := range r.providers {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	out := make([]sandbox.Provider, 0, len(names))
+	for _, name := range names {
+		out = append(out, r.providers[name])
+	}
+	return out
+}
+
 // Has reports whether name is registered.
 func (r *Registry) Has(name string) bool {
 	r.mu.RLock()
