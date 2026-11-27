@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -407,9 +408,9 @@ func TestTerminalRefusesWhatItCannotOpen(t *testing.T) {
 }
 
 func TestKeepAlivePingsUntilTheSocketCloses(t *testing.T) {
-	prev := wsPingEvery
-	wsPingEvery = 10 * time.Millisecond
-	t.Cleanup(func() { wsPingEvery = prev })
+	prev := wsPingEvery.Load()
+	wsPingEvery.Store(int64(10 * time.Millisecond))
+	t.Cleanup(func() { wsPingEvery.Store(prev) })
 
 	fp := newShellFake(testProvider)
 	s, stderr := socketServer(t, fp, Options{})
@@ -441,9 +442,9 @@ func TestKeepAlivePingsUntilTheSocketCloses(t *testing.T) {
 }
 
 func TestKeepAliveStopsWhenTheSocketIsGone(t *testing.T) {
-	prev := wsPingEvery
-	wsPingEvery = 5 * time.Millisecond
-	t.Cleanup(func() { wsPingEvery = prev })
+	prev := wsPingEvery.Load()
+	wsPingEvery.Store(int64(5 * time.Millisecond))
+	t.Cleanup(func() { wsPingEvery.Store(prev) })
 
 	// A closed connection makes the next ping fail, which ends keepAlive.
 	local := dialLocal(t)
@@ -608,4 +609,68 @@ func TestTerminalOpensIndependentShellsOnTheSameSandbox(t *testing.T) {
 	_ = first.Close()
 	_ = second.Close()
 	waitForLog(t, stderr, "closed after")
+}
+
+// stubbornShell keeps its shell running after the context ends, until released.
+type stubbornShell struct {
+	*shellFake
+	release chan struct{}
+}
+
+func (f stubbornShell) Exec(_ context.Context, _ sandbox.ID, _ sandbox.ExecOptions) error {
+	<-f.release
+	return nil
+}
+
+// shutdownServer is socketServer with the base context the real server uses.
+func shutdownServer(t *testing.T, p sandbox.Provider) (*Server, *httptest.Server, *syncBuffer, context.CancelFunc) {
+	t.Helper()
+	stderr := &syncBuffer{}
+	s, h := newServer(t, p, Options{Stderr: stderr})
+	ts := httptest.NewUnstartedServer(h)
+	base, cancel := context.WithCancel(context.Background())
+	ts.Config.BaseContext = func(net.Listener) context.Context { return base }
+	s.host = ts.Listener.Addr().String()
+	ts.Start()
+	t.Cleanup(ts.Close)
+	t.Cleanup(cancel)
+	return s, ts, stderr, cancel
+}
+
+func TestShutdownClosesOpenTerminalsGoingAway(t *testing.T) {
+	t.Parallel()
+
+	s, ts, stderr, cancel := shutdownServer(t, newShellFake(testProvider))
+	conn := mustDial(t, s, ticketFor(t, s, map[string]string{}).Ticket, "")
+	_ = conn.WriteMessage(websocket.BinaryMessage, []byte("hi"))
+	readUntil(t, conn, "hi")
+
+	s.shutdown(ts.Config, cancel)
+
+	_ = conn.SetReadDeadline(time.Now().Add(terminalWait))
+	if _, _, err := conn.ReadMessage(); !websocket.IsCloseError(err, websocket.CloseGoingAway) {
+		t.Fatalf("err = %v, want close 1001", err)
+	}
+	log := stderr.String()
+	if !strings.Contains(log, "shutting down, 1 terminal(s) open") || !strings.Contains(log, "shutdown complete") {
+		t.Fatalf("log\n%s", log)
+	}
+}
+
+func TestShutdownGivesUpOnAShellThatDoesNotEnd(t *testing.T) {
+	old := shutdownTTL
+	shutdownTTL = 50 * time.Millisecond
+	t.Cleanup(func() { shutdownTTL = old })
+
+	fp := stubbornShell{shellFake: newShellFake(testProvider), release: make(chan struct{})}
+	s, ts, stderr, cancel := shutdownServer(t, fp)
+	_ = mustDial(t, s, ticketFor(t, s, map[string]string{}).Ticket, "")
+	waitForLog(t, stderr, "opened")
+
+	s.shutdown(ts.Config, cancel)
+	close(fp.release)
+
+	if !strings.Contains(stderr.String(), "shutdown timed out") {
+		t.Fatalf("log\n%s", stderr.String())
+	}
 }

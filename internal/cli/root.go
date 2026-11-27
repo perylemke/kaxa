@@ -2,6 +2,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"os"
 	"strings"
@@ -20,6 +21,9 @@ func Execute(reg *registry.Registry) int {
 	if err := cmd.Execute(); err != nil {
 		if exitErr, ok := errors.AsType[*sandbox.ExitError](err); ok {
 			return remoteExitCode(exitErr.Code)
+		}
+		if errors.Is(err, context.Canceled) {
+			return exitInterrupted
 		}
 		// A load error leaves cfg empty: no provider has credentials, so the
 		// hint names none, and the command error is what the user needs.

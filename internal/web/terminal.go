@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -17,25 +18,28 @@ import (
 )
 
 const (
-	ticketTTL   = 30 * time.Second
-	maxTickets  = 16
-	wsReadLimit = 64 << 10
-	wsDeadAfter = 90 * time.Second
-	wsCloseWait = time.Second
-	wsBuffer    = 4096
-	termRows    = 24
-	termCols    = 80
-	termMaxSize = 500
-	resizeQueue = 8
-	statusError = "error"
-	statusArch  = "archived"
+	ticketTTL     = 30 * time.Second
+	maxTickets    = 16
+	wsReadLimit   = 64 << 10
+	wsDeadAfter   = 90 * time.Second
+	wsCloseWait   = time.Second
+	wsBuffer      = 4096
+	termRows      = 24
+	termCols      = 80
+	termMaxSize   = 500
+	resizeQueue   = 8
+	statusError   = "error"
+	statusArch    = "archived"
+	statusStopped = "stopped"
 )
 
 // terminalTicket lets one WebSocket open a terminal on one sandbox. It is random,
 // single use, and short lived, because a browser cannot send the session headers
 // on a WebSocket.
 // wsPingEvery is how often the page is pinged; tests shorten it.
-var wsPingEvery = 30 * time.Second
+var wsPingEvery atomic.Int64
+
+func init() { wsPingEvery.Store(int64(30 * time.Second)) }
 
 type terminalTicket struct {
 	secret   []byte
@@ -145,6 +149,11 @@ var terminalUpgrader = websocket.Upgrader{
 // terminalSocket upgrades a request that carries a valid ticket and bridges the
 // WebSocket to an interactive bash in the sandbox, the same as kaxa console.
 func (s *Server) terminalSocket(w http.ResponseWriter, r *http.Request) {
+	// Counted before the upgrade, while Shutdown still tracks the connection.
+	s.shells.Add(1)
+	defer s.shells.Done()
+	s.open.Add(1)
+	defer s.open.Add(-1)
 	if r.Header.Get("Origin") != "http://"+s.host {
 		s.reject(w, http.StatusForbidden, "rejected origin", "open the address printed by kaxa ui")
 		return
@@ -212,6 +221,7 @@ type resizeFrame struct {
 }
 
 func (s *Server) bridge(ctx context.Context, conn *websocket.Conn, p sandbox.Provider, id sandbox.ID, size sandbox.TermSize, target string) {
+	parent := ctx
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	stdinR, stdinW := io.Pipe()
@@ -226,12 +236,21 @@ func (s *Server) bridge(ctx context.Context, conn *websocket.Conn, p sandbox.Pro
 		pumpSocket(conn, stdinW, resize)
 	}()
 	go keepAlive(ctx, conn)
+	// A provider that reads stdin without watching ctx still ends with the shell.
+	go func() {
+		<-ctx.Done()
+		_ = stdinR.Close()
+	}()
 
 	err := p.Exec(ctx, id, sandbox.ExecOptions{
 		Command: []string{"bash"}, Stdin: stdinR, Stdout: out, Stderr: out, TTY: true, Size: size, Resize: resize,
 	})
 	s.reportShellEnd(ctx, out, target, err)
-	closing := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
+	code := websocket.CloseNormalClosure
+	if parent.Err() != nil {
+		code = websocket.CloseGoingAway
+	}
+	closing := websocket.FormatCloseMessage(code, "")
 	_ = conn.WriteControl(websocket.CloseMessage, closing, time.Now().Add(wsCloseWait))
 	_ = conn.Close()
 	<-readerDone
@@ -295,7 +314,7 @@ func applyResize(data []byte, resize chan<- sandbox.TermSize) {
 
 // keepAlive pings the page so a closed tab is noticed. The browser answers on its own.
 func keepAlive(ctx context.Context, conn *websocket.Conn) {
-	tick := time.NewTicker(wsPingEvery)
+	tick := time.NewTicker(time.Duration(wsPingEvery.Load()))
 	defer tick.Stop()
 	for {
 		select {

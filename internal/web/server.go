@@ -11,6 +11,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/perylemke/kaxa/internal/config"
@@ -23,8 +25,10 @@ const (
 	headerCSRF    = "X-Kaxa-CSRF"
 	readHeaderTTL = 5 * time.Second
 	idleTTL       = 2 * time.Minute
-	shutdownTTL   = 5 * time.Second
 )
+
+// shutdownTTL is how long shutdown waits for requests and terminals to clean up.
+var shutdownTTL = 30 * time.Second
 
 // Options configures the local UI server.
 type Options struct {
@@ -62,6 +66,9 @@ type Server struct {
 	home       string
 	workDir    string
 	term       terminals
+	// shells counts the terminal sockets, which Shutdown does not wait for.
+	shells sync.WaitGroup
+	open   atomic.Int32
 }
 
 // listen opens the TCP listener; tests replace it to reach the failure paths.
@@ -144,6 +151,10 @@ func ListenAndServe(ctx context.Context, opts Options) error {
 	// kaxa ui is a local page, not the repository's HTTP API.
 	httpSrv := new(http.Server)
 	httpSrv.Handler = srv.Handler()
+	// Requests and terminals end with the signal, so a create cleans up and a shell closes.
+	baseCtx, cancelBase := context.WithCancel(context.WithoutCancel(ctx))
+	defer cancelBase()
+	httpSrv.BaseContext = func(net.Listener) context.Context { return baseCtx }
 	httpSrv.ReadHeaderTimeout = readHeaderTTL
 	httpSrv.IdleTimeout = idleTTL
 	errCh := make(chan error, 1)
@@ -159,13 +170,32 @@ func ListenAndServe(ctx context.Context, opts Options) error {
 	}
 	select {
 	case <-ctx.Done():
-		shutCtx, cancel := context.WithTimeout(context.Background(), shutdownTTL)
-		defer cancel()
-		_ = httpSrv.Shutdown(shutCtx)
+		srv.shutdown(httpSrv, cancelBase)
 		return ctx.Err()
 	case serveErr := <-errCh:
 		// Serve only returns http.ErrServerClosed after Shutdown, which runs in the other case.
 		return serveErr
+	}
+}
+
+// shutdown ends the server: it stops new requests, cancels the running ones and
+// the terminals, and waits for them to clean up, up to shutdownTTL.
+func (s *Server) shutdown(httpSrv *http.Server, cancel context.CancelFunc) {
+	s.log(fmt.Sprintf("shutting down, %d terminal(s) open", s.open.Load()))
+	cancel()
+	shutCtx, stop := context.WithTimeout(context.Background(), shutdownTTL)
+	defer stop()
+	_ = httpSrv.Shutdown(shutCtx)
+	done := make(chan struct{})
+	go func() {
+		s.shells.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		s.log("shutdown complete")
+	case <-shutCtx.Done():
+		s.event(levelWarn, "ui", "", "shutdown timed out, some terminals were left open")
 	}
 }
 

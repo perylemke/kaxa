@@ -3,9 +3,6 @@ package cli
 import (
 	"context"
 	"errors"
-	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/spf13/cobra"
 
@@ -51,7 +48,7 @@ func runUI(cmd *cobra.Command, reg *registry.Registry, port int, noOpen bool) er
 	if err != nil {
 		return err
 	}
-	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := signalContext(cmd.Context(), cmd.ErrOrStderr())
 	defer stop()
 	err = uiServe(ctx, web.Options{
 		Registry: reg,

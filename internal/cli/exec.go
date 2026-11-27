@@ -2,8 +2,6 @@ package cli
 
 import (
 	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/spf13/cobra"
 
@@ -26,7 +24,7 @@ func newExecCmd(reg *registry.Registry) *cobra.Command {
 				Stderr:  cmd.ErrOrStderr(),
 			}
 
-			ctx, stop := signal.NotifyContext(cmd.Context(), syscall.SIGTERM)
+			ctx, stop := signalContext(cmd.Context(), cmd.ErrOrStderr())
 			defer stop()
 
 			p, err := providerFromCmd(cmd, reg)
