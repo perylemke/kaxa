@@ -105,6 +105,11 @@ func (*Provider) SupportsMemory() {}
 // SupportsDiskPercent marks Blaxel as honoring the filesystem share of memory.
 func (*Provider) SupportsDiskPercent() {}
 
+// ComputeOptions lists the memory choices Blaxel offers.
+func (*Provider) ComputeOptions() sandbox.ComputeOptions {
+	return sandbox.ComputeOptions{MemoryMiB: slices.Clone(sandbox.BlaxelMemoryMiB)}
+}
+
 // SupportsPublicPreview marks Blaxel as able to open a public API preview.
 func (*Provider) SupportsPublicPreview() {}
 
@@ -404,7 +409,13 @@ func (p *Provider) waitGone(ctx context.Context, c apiClient, name string) error
 		if err != nil && ctx.Err() == nil {
 			return err
 		}
-		if err := sleep(ctx, interval); err != nil {
+		if sleepErr := sleep(ctx, interval); sleepErr != nil {
+			// Blaxel finishes a delete on its own schedule, sometimes after minutes.
+			// The API accepted it and the record says DELETING, so the destroy
+			// worked; only the name stays reserved until the record goes.
+			if rec.Phase == phaseDeleting {
+				return nil
+			}
 			return fmt.Errorf("sandbox %q still exists after delete", name)
 		}
 	}

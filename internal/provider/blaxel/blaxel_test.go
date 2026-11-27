@@ -3,7 +3,6 @@ package blaxel
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
@@ -322,16 +321,15 @@ func TestDestroyAcceptsTerminatedName(t *testing.T) {
 	}
 }
 
-func TestDestroyReportsNameThatStays(t *testing.T) {
+func TestDestroyAcceptsASlowDelete(t *testing.T) {
 	t.Parallel()
 	api := newFakeAPI()
 	api.lingerAfterDelete = -1
 	p := newTestProvider(t, api)
 	p.SetGoneTimeout(30 * time.Millisecond)
 	api.add(boxName, statusRunning)
-	err := p.Destroy(t.Context(), boxName)
-	if err == nil || !strings.Contains(err.Error(), boxName) || !strings.Contains(err.Error(), "still exists") {
-		t.Fatalf("err = %v", err)
+	if err := p.Destroy(t.Context(), boxName); err != nil {
+		t.Fatalf("a delete still in DELETING is accepted: %v", err)
 	}
 	rec, findErr := api.Find(t.Context(), boxName)
 	if findErr != nil || rec.Phase != phaseDeleting {
