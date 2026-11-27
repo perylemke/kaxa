@@ -146,11 +146,16 @@ type sdkClient struct {
 }
 
 func newSDKClient(apiKey string) (*sdkClient, error) {
+	return newSDKClientAt(apiKey, defaultAPIURL)
+}
+
+// newSDKClientAt is newSDKClient against another API address, for tests.
+func newSDKClientAt(apiKey, apiURL string) (*sdkClient, error) {
 	// Polling is deprecated, but the event stream of the SDK can stall behind
 	// proxies, and kaxa waits on its own timeouts.
 	polling := true
 	c, err := sdk.NewClientWithConfig(&types.DaytonaConfig{
-		APIKey: apiKey, APIUrl: defaultAPIURL,
+		APIKey: apiKey, APIUrl: apiURL,
 		UseDeprecatedPolling: &polling, //nolint:staticcheck // see the comment above
 	})
 	if err != nil {

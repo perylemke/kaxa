@@ -29,7 +29,7 @@ func TestPublishAPIBuildsServiceCommand(t *testing.T) {
 	var got []string
 	client := &fakeSDKClient{
 		run: func(_ context.Context, _ string, argv []string, _ io.Reader, stdout, _ io.Writer) error {
-			if len(argv) >= 3 && argv[2] == "get" {
+			if len(argv) >= 3 && argv[2] == cmdGet {
 				_, _ = io.WriteString(stdout, `{"state":{"status":"running"}}`)
 				return nil
 			}
@@ -45,7 +45,7 @@ func TestPublishAPIBuildsServiceCommand(t *testing.T) {
 		t.Fatalf("PublishAPI: %v", err)
 	}
 	want := []string{
-		"sprite-env", "services", "create", "kaxa-api",
+		"sprite-env", "services", cmdCreate, "kaxa-api",
 		"--cmd", ".venv/bin/uvicorn",
 		"--args", "app.main:app,--host,0.0.0.0,--port,8000",
 		"--dir", "/home/sprite/workspace/api-python",
@@ -68,7 +68,7 @@ func TestPublishAPIAppendsServiceEnv(t *testing.T) {
 	var got []string
 	client := &fakeSDKClient{
 		run: func(_ context.Context, _ string, argv []string, _ io.Reader, stdout, _ io.Writer) error {
-			if len(argv) >= 3 && argv[2] == "get" {
+			if len(argv) >= 3 && argv[2] == cmdGet {
 				_, _ = io.WriteString(stdout, `{"state":{"status":"running"}}`)
 				return nil
 			}
@@ -77,7 +77,7 @@ func TestPublishAPIAppendsServiceEnv(t *testing.T) {
 		},
 	}
 	p := sprites.NewWithClient(client, "token")
-	err := p.PublishAPI(context.Background(), "box", "/home/sprite", 8000, []string{"app"}, []string{
+	err := p.PublishAPI(context.Background(), "box", "/home/sprite", 8000, []string{cmdApp}, []string{
 		"DATABASE_URL=postgres://u:p@db:5432/app", "REDIS_URL=redis://cache:6379/0",
 	})
 	if err != nil {
@@ -103,7 +103,7 @@ func TestPublishAPIEnvOverridesSpriteEnvironment(t *testing.T) {
 	client := &fakeSDKClient{
 		envFile: "MODE=sandbox\nOTHER=keep\n",
 		run: func(_ context.Context, _ string, argv []string, _ io.Reader, stdout, _ io.Writer) error {
-			if len(argv) >= 3 && argv[2] == "get" {
+			if len(argv) >= 3 && argv[2] == cmdGet {
 				_, _ = io.WriteString(stdout, `{"state":{"status":"running"}}`)
 				return nil
 			}
@@ -112,7 +112,7 @@ func TestPublishAPIEnvOverridesSpriteEnvironment(t *testing.T) {
 		},
 	}
 	p := sprites.NewWithClient(client, "token")
-	if err := p.PublishAPI(context.Background(), "box", "/home/sprite", 8000, []string{"app"}, []string{"MODE=api"}); err != nil {
+	if err := p.PublishAPI(context.Background(), "box", "/home/sprite", 8000, []string{cmdApp}, []string{"MODE=api"}); err != nil {
 		t.Fatalf("PublishAPI: %v", err)
 	}
 	env := strings.Split(got[slices.Index(got, "--env")+1], ",")
@@ -126,7 +126,7 @@ func TestPublishAPIRejectsBadEnv(t *testing.T) {
 
 	p := sprites.NewWithClient(&fakeSDKClient{}, "token")
 	for _, env := range [][]string{{"NOEQUALS"}, {"A=b,c"}, {"1X=y"}} {
-		if err := p.PublishAPI(context.Background(), "box", "/home/sprite", 8000, []string{"app"}, env); err == nil {
+		if err := p.PublishAPI(context.Background(), "box", "/home/sprite", 8000, []string{cmdApp}, env); err == nil {
 			t.Fatalf("env %v accepted", env)
 		}
 	}

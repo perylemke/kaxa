@@ -43,7 +43,7 @@ func TestSyncWorkspaceExtractsArchive(t *testing.T) {
 		t.Fatalf("SyncWorkspace: %v", err)
 	}
 	want := [][]string{
-		{"mkdir", "-p", "/home/sprite/workspace"},
+		{cmdMkdir, "-p", "/home/sprite/workspace"},
 		{"tar", "-xzf", "-", "-C", "/home/sprite/workspace"},
 	}
 	if !reflect.DeepEqual(calls, want) {

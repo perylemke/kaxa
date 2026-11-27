@@ -174,7 +174,7 @@ func TestSnapshotStreamError(t *testing.T) {
 		name string
 		run  func(p *sprites.Provider) error
 	}{
-		{"create", func(p *sprites.Provider) error {
+		{cmdCreate, func(p *sprites.Provider) error {
 			_, err := p.Snapshot(context.Background(), spriteName, "")
 			return err
 		}},
