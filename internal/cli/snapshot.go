@@ -160,7 +160,7 @@ func newSnapshotRestoreCmd(reg *registry.Registry) *cobra.Command {
 		Short: "Restore a snapshot",
 		Long: `Restore a snapshot of a sandbox.
 
-Sprites and Blaxel restore the sandbox itself and discard what changed after the
+Sprites, Blaxel, and Vercel restore the sandbox itself and discard what changed after the
 snapshot, so they ask first. Modal, Docker, and Daytona create a new sandbox named by --to
 and keep the source. Standby on Blaxel is not a snapshot restore: the sandbox resumes on the next call.`,
 		Example: `  kaxa snapshot restore my-sprite v3 --provider sprites

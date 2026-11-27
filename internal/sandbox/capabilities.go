@@ -28,6 +28,7 @@ const (
 	FeatureNetworkBlock      Feature = "network block"
 	FeatureDiskPercent       Feature = "disk percent"
 	FeatureUnarchive         Feature = "unarchive"
+	FeatureConsole           Feature = "console"
 )
 
 // UnsupportedError reports that a provider does not offer a feature.

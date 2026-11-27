@@ -1029,7 +1029,7 @@ async function loadTemplates(name) {
   return state.templates[name];
 }
 
-const templateHelp = "Empty keeps the provider default image. Use an image reference such as registry/name:tag.";
+const templateHelp = "Empty keeps the provider default. Use an image reference such as registry/name:tag, or a snapshot ID on Vercel.";
 
 function renderTemplates(list) {
   const select = templateEl("create-template");

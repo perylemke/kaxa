@@ -63,3 +63,11 @@ Fifteen minutes without input closes the terminal, and the sandbox can return to
 ```bash
 kaxa --provider blaxel console my-box
 ```
+
+## Vercel
+
+`kaxa console my-box --provider vercel` (also `kaxa ssh`) opens the same terminal as the Connect tab in the Vercel dashboard. It is not SSH: kaxa asks the Vercel API for a terminal, checks its address, and connects to it over a secure WebSocket, so no key or port is needed. The shell is `bash` (`sh` if bash is missing) as `vercel-sandbox`, in `/vercel/sandbox/workspace` with `--sync` and in `/vercel/sandbox` without it, with the toolchain `PATH` set. The window size is applied at start and resizing is forwarded. `exit` ends the session; the sandbox keeps running and kaxa extends the session while the terminal is open. A stopped sandbox is resumed first, which can take a moment. The connection token stays in memory and is not printed. If the project has no interactive endpoint, kaxa says so and suggests `kaxa exec`.
+
+```bash
+kaxa --provider vercel console my-box
+```

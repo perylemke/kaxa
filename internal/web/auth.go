@@ -44,6 +44,7 @@ func credentialSecrets(cfg config.Config, extra ...string) []string {
 		cfg.Docker.PAT,
 		cfg.Daytona.APIKey,
 		cfg.Blaxel.APIKey,
+		cfg.Vercel.Token,
 	}
 	values = append(values, extra...)
 	out := make([]string, 0, len(values))

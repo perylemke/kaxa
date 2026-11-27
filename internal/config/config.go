@@ -29,6 +29,10 @@ const (
 	envBlaxelRegion     = "KAXA_BLAXEL_REGION"
 	envBlaxelMemory     = "KAXA_BLAXEL_MEMORY"
 	envBlaxelDisk       = "KAXA_BLAXEL_DISK_PERCENT"
+	envVercelToken      = "KAXA_VERCEL_TOKEN" // #nosec G101 -- env var name, not a credential value
+	envVercelProject    = "KAXA_VERCEL_PROJECT"
+	envVercelTeam       = "KAXA_VERCEL_TEAM"
+	envVercelTemplate   = "KAXA_VERCEL_TEMPLATE"
 )
 
 // Config holds resolved CLI settings (secrets are never logged via String).
@@ -43,6 +47,20 @@ type Config struct {
 	Daytona DaytonaConfig
 	// Blaxel configures the blaxel provider.
 	Blaxel BlaxelConfig
+	// Vercel configures the vercel provider.
+	Vercel VercelConfig
+}
+
+// VercelConfig holds the Vercel access token, the project that owns the
+// sandboxes, the team when the token belongs to one, and the default image.
+type VercelConfig struct {
+	Token string
+	// Project is the name or ID of the Vercel project.
+	Project string
+	// Team is the team ID (team_...) or slug. Empty means the personal account.
+	Team string
+	// Template is the image new sandboxes start from. Empty means the Vercel default.
+	Template string
 }
 
 // BlaxelConfig holds the Blaxel API key, workspace, and the defaults for a new sandbox.
@@ -120,6 +138,12 @@ func Load(opts LoadOptions, reg *registry.Registry) (Config, error) {
 		},
 		Daytona: DaytonaConfig{APIKey: os.Getenv(envDaytonaAPIKey), Template: os.Getenv(envDaytonaTemplate)},
 		Blaxel:  BlaxelConfig{APIKey: os.Getenv(envBlaxelAPIKey), Workspace: os.Getenv(envBlaxelWorkspace), Template: os.Getenv(envBlaxelTemplate), Region: os.Getenv(envBlaxelRegion)},
+		Vercel: VercelConfig{
+			Token:    os.Getenv(envVercelToken),
+			Project:  os.Getenv(envVercelProject),
+			Team:     os.Getenv(envVercelTeam),
+			Template: os.Getenv(envVercelTemplate),
+		},
 	}
 	memory, err := blaxelMemory(os.Getenv(envBlaxelMemory))
 	if err != nil {

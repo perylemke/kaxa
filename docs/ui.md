@@ -19,7 +19,7 @@ Create asks for the name and provider, then the running, sync, and API options t
 
 A provider that adjusts compute adds a Resources section with the same choices as the `kaxa create` wizard: Docker offers a size (micro to xl, as fixed CPU and memory pairs), Modal offers CPU and memory with an Other value for a custom number, and Blaxel offers memory plus the disk share of memory (10 to 95 percent). The default option leaves the provider default. A provider without these options shows no Resources section. Network block and sandbox environment variables stay on the `create` command.
 
-A provider that starts from an image (Docker, Blaxel, Daytona, and E2B) adds an Image section. Where the provider publishes a catalog, the page lists it, after Provider default, with **Other** for your own image reference such as `registry/name:tag`. Without a catalog, or when the catalog cannot be loaded, the field is plain text. Empty keeps the provider default image. The catalog is fetched when you pick the provider, and the page logs a warning on stderr if that fails.
+A provider that starts from an image (Docker, Blaxel, Daytona, E2B, and Vercel) adds an Image section. Where the provider publishes a catalog, the page lists it, after Provider default, with **Other** for your own image reference such as `registry/name:tag`. Without a catalog, or when the catalog cannot be loaded, the field is plain text. Empty keeps the provider default image. The catalog is fetched when you pick the provider, and the page logs a warning on stderr if that fails.
 
 The sandbox page has a Shell section. Open terminal opens a new browser tab with a bash shell in the sandbox, the same one `kaxa console` gives you. The tab is the terminal and nothing else: it fills the window, connects on load, follows its size, and ends the shell when you close it. After `exit` or a dropped connection, the terminal says so; press Enter to open a new shell. Each tab is its own shell, with no limit per sandbox. The same section shows the command to copy for your own terminal, such as `kaxa --provider sprites ssh my-sandbox`; see [console](console.md).
 
@@ -66,3 +66,5 @@ Reading the list or one sandbox does not log unless it fails. Requests rejected 
 The folder browser lists names of folders under your home directory, never file contents. Symlinks that leave your home directory are hidden and refused.
 
 Provider tokens stay in the `kaxa ui` process. They are not sent to the browser, written into the address, or included in errors. A request whose `Host` header is not the printed address is rejected.
+
+On Vercel, the Resources section offers vCPUs 1, 2, 4, and 8, plus **Other** for any even number. There is no memory field, because each vCPU includes 2 GB. Your plan caps the vCPUs: 4 on Hobby, 8 on Pro, and 32 on Enterprise. The Image field lists the manual snapshots of the project, newest first, plus **Other** for a snapshot ID.

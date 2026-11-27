@@ -141,3 +141,16 @@ A snapshot copies the whole filesystem. Secrets written inside the sandbox, such
 ## Agents
 
 `kaxa mcp` has the same operations as tools: `create_snapshot`, `list_snapshots`, `restore_snapshot`, and `delete_snapshot`. See [agent](agent.md).
+
+### Vercel
+
+Vercel restores in place: the same sandbox returns to the snapshot state, and what changed after it is lost. `--to` is rejected. A snapshot is a manual Vercel snapshot with no expiry, so it stays until you delete it.
+
+```bash
+kaxa snapshot create my-box --comment "before the migration" --provider vercel
+kaxa snapshot list my-box --provider vercel
+kaxa snapshot restore my-box <snapshot-id> --provider vercel
+kaxa snapshot delete my-box <snapshot-id> --provider vercel
+```
+
+The Vercel API has no comment field. kaxa stores `--comment` in `vercel-snapshots.json` under your user config directory, so a comment is visible only on this machine. Restore stops the sandbox, points it at the snapshot, and resumes it. Running processes do not survive. Vercel restores a snapshot that is not cached more slowly, so the first resume can take several minutes. kaxa waits up to 10 minutes; if it still times out, run `kaxa list --provider vercel` in a minute and retry.

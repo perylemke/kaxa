@@ -12,6 +12,7 @@ import (
 	"github.com/perylemke/kaxa/internal/provider/e2b"
 	"github.com/perylemke/kaxa/internal/provider/modal"
 	"github.com/perylemke/kaxa/internal/provider/sprites"
+	"github.com/perylemke/kaxa/internal/provider/vercel"
 	"github.com/perylemke/kaxa/internal/registry"
 )
 
@@ -27,6 +28,7 @@ func main() {
 		{"docker", func() error { return reg.Register(docker.New()) }},
 		{"daytona", func() error { return reg.Register(daytona.New()) }},
 		{"blaxel", func() error { return reg.Register(blaxel.New()) }},
+		{"vercel", func() error { return reg.Register(vercel.New()) }},
 	} {
 		if err := p.reg(); err != nil {
 			_ = cli.WriteError(os.Stderr, fmt.Errorf("register %s: %w", p.name, err))

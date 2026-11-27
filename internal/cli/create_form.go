@@ -279,7 +279,7 @@ func createOptionsGroup(
 				Value(&result.diskInput).
 				Validate(validateDiskPercentInput)),
 		presetConditionalField(result, genericCPUVisible(capsOf),
-			huh.NewInput().Title("CPU (cores)").Description("Empty means the provider default.").Value(&result.cpuInput).
+			huh.NewInput().Title("CPU (cores)").Description("Empty means the provider default. Vercel takes 1 or an even number.").Value(&result.cpuInput).
 				Validate(validateCreateCPUInput)),
 		presetConditionalField(result, genericMemVisible(capsOf),
 			huh.NewInput().Title("Memory (MiB)").Description("Empty means the provider default.").Value(&result.memoryInput).

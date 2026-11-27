@@ -311,6 +311,59 @@ func TestResolveProviderConfiguresBlaxel(t *testing.T) {
 	}
 }
 
+type vercelProvider struct {
+	basicProvider
+	token, project, team, template string
+	configErr, templateErr         error
+}
+
+func (v *vercelProvider) Name() string { return "vercel" }
+
+func (v *vercelProvider) Configure(token, project, team string) error {
+	v.token, v.project, v.team = token, project, team
+	return v.configErr
+}
+
+func (v *vercelProvider) SetDefaultTemplate(name string) error {
+	v.template = name
+	return v.templateErr
+}
+
+func TestResolveProviderConfiguresVercel(t *testing.T) {
+	t.Parallel()
+
+	p := &vercelProvider{}
+	cfg := config.Config{Vercel: config.VercelConfig{Token: keyFixture, Project: "proj", Team: "team_1", Template: "img"}}
+	if _, err := lifecycle.ResolveProvider(registryWith(t, p), cfg, "vercel"); err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if p.token != keyFixture || p.project != "proj" || p.team != "team_1" || p.template != "img" {
+		t.Fatalf("vercel = %+v", p)
+	}
+}
+
+func TestResolveProviderVercelErrors(t *testing.T) {
+	t.Parallel()
+
+	want := errors.New("failure")
+	for name, p := range map[string]*vercelProvider{
+		"credentials":      {configErr: want},
+		"default template": {templateErr: want},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if _, err := lifecycle.ResolveProvider(registryWith(t, p), config.Config{}, "vercel"); !errors.Is(err, want) {
+				t.Fatalf("err = %v, want %v", err, want)
+			}
+		})
+	}
+
+	reg := registryWith(t, &namedProvider{name: "vercel"})
+	if _, err := lifecycle.ResolveProvider(reg, config.Config{}, "vercel"); err == nil {
+		t.Fatal("vercel provider without Configure accepted")
+	}
+}
+
 func TestResolveProviderBlaxelErrors(t *testing.T) {
 	t.Parallel()
 

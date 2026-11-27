@@ -15,4 +15,4 @@ kaxa upgrade my-sprite
 kaxa upgrade
 ```
 
-Upgrade is not available for Modal, E2B, Docker, Daytona, or Blaxel: none has a per-sandbox platform upgrade. kaxa says so and lists the providers that support it, such as Sprites.
+Upgrade is not available for Modal, E2B, Docker, Daytona, Blaxel, or Vercel: none has a per-sandbox platform upgrade. kaxa says so and lists the providers that support it, such as Sprites.
