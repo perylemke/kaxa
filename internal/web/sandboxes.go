@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/perylemke/kaxa/internal/lifecycle"
@@ -45,6 +46,13 @@ type detailJSON struct {
 
 type okJSON struct {
 	OK bool `json:"ok"`
+}
+
+// destroyJSON answers a destroy. Notice is set when the provider accepted the
+// destroy but still lists the sandbox as stopped, as Blaxel does while it finishes.
+type destroyJSON struct {
+	OK     bool   `json:"ok"`
+	Notice string `json:"notice,omitempty"`
 }
 
 func (s *Server) listSandboxes(w http.ResponseWriter, r *http.Request) {
@@ -202,8 +210,8 @@ func (s *Server) destroySandbox(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.event(levelInfo, "destroy", target, "provider accepted the destroy")
-	s.destroyVerify(r.Context(), p, name, target)
-	s.writeJSON(w, http.StatusOK, okJSON{OK: true})
+	notice := s.destroyVerify(r.Context(), p, name, target)
+	s.writeJSON(w, http.StatusOK, destroyJSON{OK: true, Notice: notice})
 }
 
 // destroyLookup logs what the sandbox is before it goes. A failed lookup does not
@@ -220,21 +228,27 @@ func (s *Server) destroyLookup(ctx context.Context, p sandbox.Provider, name, ta
 }
 
 // destroyVerify asks the provider again and logs whether the sandbox is gone.
-func (s *Server) destroyVerify(ctx context.Context, p sandbox.Provider, name, target string) {
+// It returns a message for the page when the sandbox is still listed as stopped.
+func (s *Server) destroyVerify(ctx context.Context, p sandbox.Provider, name, target string) string {
 	s.event(levelInfo, "destroy", target, "checking that it is gone")
 	infos, err := p.List(ctx)
 	if err != nil {
 		_, message, _ := s.describe(err)
 		s.event(levelWarn, "destroy", target, "could not verify: "+message)
-		return
+		return ""
 	}
 	for _, info := range infos {
 		if string(info.ID) == name {
-			s.event(levelWarn, "destroy", target, "still listed with status "+info.Status+"; the provider may finish removing it")
-			return
+			message := "still listed with status " + info.Status + "; the provider may finish removing it"
+			s.event(levelWarn, "destroy", target, message)
+			if strings.EqualFold(info.Status, statusStopped) {
+				return message
+			}
+			return ""
 		}
 	}
 	s.event(levelInfo, "destroy", target, "gone from "+p.Name())
+	return ""
 }
 
 func (s *Server) sandboxFromPath(w http.ResponseWriter, r *http.Request) (sandbox.Provider, string, bool) {

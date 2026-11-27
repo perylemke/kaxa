@@ -9,11 +9,11 @@ kaxa ui --port 4000
 kaxa ui --provider sprites
 ```
 
-The server listens on `127.0.0.1`. With no `--port`, the operating system picks a free port. The address is printed on stderr and opened in the browser. `--port` chooses the port and fails if it is already in use. `--no-open` skips the browser. Ctrl+C stops the server.
+The server listens on `127.0.0.1`. With no `--port`, the operating system picks a free port. The address is printed on stderr and opened in the browser. `--port` chooses the port and fails if it is already in use. `--no-open` skips the browser. Ctrl+C stops the server gracefully: it closes the open terminals, which ends their shells, cancels the creates in progress so they clean up, and logs what it closed. It waits up to 30 seconds. A second Ctrl+C stops it at once.
 
 `--provider` limits the page to that provider, the same way it limits the other commands. Without it, the page lists every provider. A provider that is not available is shown disabled and cannot create a sandbox. `KAXA_DEFAULT_PROVIDER` selects the default option in the create form. It does not hide the other providers.
 
-The page lists sandboxes and opens one for its details. From the detail view you can restart, upgrade, change URL auth, and destroy, when that provider supports the action. Restart, upgrade, and URL auth stay hidden otherwise. Destroy asks for confirmation on the sandbox page and names the sandbox being deleted.
+The page lists sandboxes and opens one for its details. From the detail view you can restart, upgrade, change URL auth, and destroy, when that provider supports the action. Restart, upgrade, and URL auth stay hidden otherwise. Destroy asks for confirmation on the sandbox page and names the sandbox being deleted. When the provider accepts the destroy but still lists the sandbox as stopped, as Blaxel does while it finishes the delete, the page says so: "still listed with status stopped; the provider may finish removing it".
 
 Create asks for the name and provider, then the running, sync, and API options that provider supports. The name is checked as you type, with the same rule as `kaxa create`. Sync copies one or more Git repositories from this machine. Choose repository opens a folder browser on the page, starting at the working directory of `kaxa ui`; Git repositories are marked, and each one you add appears in a list you can edit. With none chosen, the working directory is copied. The browser only shows folders inside your home directory, and the server refuses any other path. The API command is comma-separated argv, as in `kaxa create --api-cmd`. Validation matches [create](create.md).
 

@@ -2,6 +2,7 @@ package web
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -282,6 +283,34 @@ func TestDestroyLogsEveryStep(t *testing.T) {
 			}
 			if tt.name == "provider refuses" && strings.Contains(log, "provider accepted") {
 				t.Fatalf("a refused destroy logged success\n%s", log)
+			}
+		})
+	}
+}
+
+func TestDestroyTellsThePageWhenTheSandboxIsStillListedAsStopped(t *testing.T) {
+	t.Parallel()
+
+	const stillStopped = "still listed with status stopped; the provider may finish removing it"
+	cases := []struct {
+		name string
+		fp   *fakeProvider
+		want string
+	}{
+		{name: "stopped", fp: &fakeProvider{name: testProvider, list: []sandbox.Info{{ID: testSandbox, Status: "stopped"}}}, want: stillStopped},
+		{name: "other status", fp: &fakeProvider{name: testProvider, list: []sandbox.Info{{ID: testSandbox, Status: "stopping"}}}},
+		{name: "gone", fp: &fakeProvider{name: testProvider}},
+		{name: "list fails", fp: &fakeProvider{name: testProvider, listErr: stringError("list down")}},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			s, h, _ := loggedServer(t, tt.fp, Options{})
+			rec := do(t, h, s, http.MethodPost, "/api/sandboxes/lab/box/destroy", destroyBody{Confirm: testSandbox})
+			var got destroyJSON
+			if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil || !got.OK || got.Notice != tt.want {
+				t.Fatalf("response = %s, want notice %q (%v)", rec.Body, tt.want, err)
 			}
 		})
 	}

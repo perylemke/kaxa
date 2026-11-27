@@ -190,7 +190,7 @@ function clearNotice() {
 
 let toastTimer = null;
 
-function toast(message) {
+function toast(message, ms = 5000) {
   const box = document.querySelector("#toast");
   document.querySelector("#live").textContent = message;
   box.textContent = message;
@@ -198,7 +198,7 @@ function toast(message) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => {
     box.hidden = true;
-  }, 5000);
+  }, ms);
 }
 
 function settle(root) {
@@ -764,10 +764,14 @@ function destroyZone(detail) {
 
 async function onDestroy() {
   const detail = state.detail;
-  await api(sandboxPath(detail, "destroy"), { method: "POST", body: { confirm: detail.id } });
+  const result = await api(sandboxPath(detail, "destroy"), { method: "POST", body: { confirm: detail.id } });
   state.detail = null;
   state.destroyArmed = false;
-  toast(`Destroyed ${detail.id}`);
+  if (result && result.notice) {
+    toast(`Destroyed ${detail.id}: ${result.notice}`, 12000);
+  } else {
+    toast(`Destroyed ${detail.id}`);
+  }
   location.hash = "#/";
 }
 
