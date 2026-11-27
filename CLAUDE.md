@@ -24,6 +24,8 @@ make fmt # golangci-lint fmt (gofmt + gofumpt)
 make lint # golangci-lint
 make vuln # govulncheck
 make gosec # gosec SAST
+make hooks # enable the pre-commit hook (.githooks/pre-commit) once per clone
+make hooks-check # run the pre-commit hook on staged changes
 make ci # everything CI runs
 make next-version SCOPE=minor # print the next final version, tags nothing
 make changelog-release SCOPE=minor # move [Unreleased] into the next version of CHANGELOG.md
@@ -32,6 +34,8 @@ make prerelease SCOPE=minor TYPE=rc # tag and push a test version (alpha|beta|rc
 ```
 
 Run `make test` at minimum, and `make lint` after Go changes, before saying work is done. Report the real result.
+
+The pre-commit hook (`make hooks`) enforces gofmt, vet, lint, `make test`, and the 90% gate; `SKIP_COVERAGE=1` is the documented exception.
 
 Before a commit or push, `make test` and `make coverage` must pass, and every Go package changed in that commit should stay at or above 90% statement coverage; see `.cursor/rules/go-tdd.mdc` and `.cursor/rules/commits.mdc` (mirrored under `.claude/rules/`).
 

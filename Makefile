@@ -30,6 +30,14 @@ help: ## List targets
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make \033[36m<target>\033[0m\n\nTargets:\n"} \
 		/^[a-zA-Z0-9_-]+:.*##/ {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
+.PHONY: hooks
+hooks: ## Enable the pre-commit hook in .githooks (run once per clone)
+	git config core.hooksPath .githooks
+
+.PHONY: hooks-check
+hooks-check: ## Run the pre-commit hook on the staged changes without committing
+	.githooks/pre-commit
+
 .PHONY: build
 build: ## Build binary to ./bin/kaxa (quick local test)
 	@mkdir -p bin

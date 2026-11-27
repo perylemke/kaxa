@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# pre-commit: enforces .cursor/rules/commits.mdc before a commit.
+#
+#   gofmt, go vet and golangci-lint on the Go packages in the commit,
+#   make test, and at least COVERAGE_MIN% statement coverage per changed package.
+#
+# Install once with `make hooks`. SKIP_COVERAGE=1 skips only the coverage gate.
+# `git commit --no-verify` skips the whole hook; use it as an exception.
+set -euo pipefail
+
+COVERAGE_MIN="${COVERAGE_MIN:-90}"
+GO="${GO:-go}"
+
+cd "$(git rev-parse --show-toplevel)"
+
+say() { printf 'pre-commit: %s\n' "$*" >&2; }
+fail() {
+  say "$*"
+  exit 1
+}
+
+need() {
+  command -v "$1" >/dev/null 2>&1 || fail "$1 not found. $2"
+}
+
+# staged_files prints the added, copied, modified, and renamed paths, one per line.
+staged_files() {
+  git diff --cached --name-only --diff-filter=ACMR
+}
+
+# changed_packages prints one ./dir per Go package with a staged .go file.
+# Only cmd, internal, and tools hold packages; test/ is build-tagged and runs in CI.
+changed_packages() {
+  staged_files | while IFS= read -r path; do
+    case "$path" in
+    cmd/*.go | internal/*.go | tools/*.go) printf './%s\n' "$(dirname "$path")" ;;
+    esac
+  done | sort -u
+}
+
+module_changed() {
+  staged_files | grep -qE '^go\.(mod|sum)$'
+}
+
+# check_format fails when a staged Go file is not gofmt-clean.
+check_format() {
+  local unformatted
+  unformatted="$(staged_files | grep -E '\.go$' | xargs gofmt -l 2>/dev/null || true)"
+  if [ -n "$unformatted" ]; then
+    printf '%s\n' "$unformatted" >&2
+    fail "gofmt found the files above. Run 'make fmt' and stage them again."
+  fi
+}
+
+# coverage_of prints the statement coverage (a number) of one package, or nothing
+# when the package has no tests.
+coverage_of() {
+  local out
+  out="$("$GO" test -race -shuffle=on -count=1 -tags=integration -cover "$1" 2>&1)" || {
+    printf '%s\n' "$out" >&2
+    fail "tests failed in $1"
+  }
+  printf '%s\n' "$out" | sed -n 's/.*coverage: \([0-9.]*\)% of statements.*/\1/p' | head -n 1
+}
+
+check_coverage() {
+  local pkg value low=0
+  for pkg in "$@"; do
+    case "$pkg" in ./cmd/*) continue ;; esac
+    value="$(coverage_of "$pkg")"
+    if [ -z "$value" ]; then
+      say "$pkg: no tests, coverage not measured"
+      continue
+    fi
+    if awk -v v="$value" -v m="$COVERAGE_MIN" 'BEGIN { exit !(v < m) }'; then
+      say "$pkg: coverage ${value}% is below ${COVERAGE_MIN}%"
+      low=1
+    else
+      say "$pkg: coverage ${value}%"
+    fi
+  done
+  if [ "$low" -ne 0 ]; then
+    fail "raise coverage (see 'make coverage-html'), or commit with SKIP_COVERAGE=1 as an exception."
+  fi
+}
+
+main() {
+  local packages=()
+  local pkg
+  while IFS= read -r pkg; do
+    [ -n "$pkg" ] && packages+=("$pkg")
+  done < <(changed_packages)
+
+  if module_changed; then
+    packages=("./...")
+  fi
+  if [ "${#packages[@]}" -eq 0 ] && ! module_changed; then
+    say "no Go changes, nothing to check"
+    exit 0
+  fi
+
+  need "$GO" "Install Go."
+  need golangci-lint "Install it from https://golangci-lint.run/welcome/install/."
+
+  say "gofmt"
+  check_format
+  say "go vet ${packages[*]}"
+  "$GO" vet "${packages[@]}"
+  say "golangci-lint ${packages[*]}"
+  golangci-lint run "${packages[@]}"
+  say "make test"
+  local test_out
+  test_out="$(make test 2>&1)" || {
+    printf '%s\n' "$test_out" >&2
+    fail "make test failed"
+  }
+
+  if [ "${SKIP_COVERAGE:-}" = "1" ]; then
+    say "WARNING: SKIP_COVERAGE=1, coverage gate skipped"
+    exit 0
+  fi
+  if [ "${packages[0]}" = "./..." ]; then
+    say "go.mod or go.sum changed: coverage is checked by 'make coverage' in CI"
+    exit 0
+  fi
+  check_coverage "${packages[@]}"
+  say "ok"
+}
+
+main "$@"
