@@ -15,6 +15,8 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 - `kaxa ui` opens a shell in a sandbox in a browser tab that is the whole terminal, the same bash as `kaxa console`, and shows the `kaxa ssh` command to copy for your own terminal.
 - `kaxa ui` serves a local page on 127.0.0.1 to list, create, restart, upgrade, change URL auth, and destroy sandboxes. The port is random unless `--port` is set, and the address is printed on stderr. `--no-open` skips the browser. `--provider` limits the page to one provider. Repositories to copy are chosen in a folder browser limited to your home directory. Each view has its own address, a create shows its steps as they run, and `kaxa ui` logs creates, actions, and provider errors on stderr. The create form sets CPU and memory (and Blaxel disk share) for the providers that allow it, with the same choices as the `kaxa create` wizard. A destroy logs each step on stderr: the confirmation, the lookup, the provider call, and a check that the sandbox is gone.
 
+- The `kaxa ui` create form for `vercel` offers vCPUs (1, 2, 4, 8, or a custom even number) and lists the manual snapshots of the project in the Image field, plus **Other** for a snapshot ID.
+
 ### Changed
 
 - `kaxa ui`, `kaxa list`, and the MCP `list_sandboxes` tool ask the providers at the same time, so the list appears in the time of the slowest provider instead of the sum of all.

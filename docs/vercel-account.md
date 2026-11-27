@@ -42,7 +42,7 @@ An empty project prints `no sandboxes created`. A rejected token prints a messag
 
 ## What works on Vercel
 
-`create` (with `--sync`, `--template`, `--api`, `--cpu`, and `--block-all-network-access`), `list`, `exec`, `console` (also `ssh`), `sync`, `restart`, `snapshot`, `destroy`, and the detail view in `list`. `upgrade`, `url`, `--public`, and `--running` are not available. See [console](console.md#vercel).
+`create` (with `--sync`, `--template`, `--api`, `--cpu`, and `--block-all-network-access`), `list`, `exec`, `console` (also `ssh`), `sync`, `restart`, `snapshot`, `destroy`, and the detail view in `list`. In `kaxa ui` the create form offers vCPUs 1, 2, 4, and 8 plus a custom even number, and an Image list of the manual snapshots of the project. Your plan caps the vCPUs: 4 on Hobby, 8 on Pro, and 32 on Enterprise. `upgrade`, `url`, `--public`, and `--running` are not available. See [console](console.md#vercel).
 
 ## How sandboxes live
 
