@@ -184,7 +184,7 @@ With no sandboxes, `list` prints `no sandboxes created` and exits. In a terminal
 
 ### ui
 
-`ui` serves a page on `127.0.0.1` for the same list, create, restart, upgrade, URL auth, and destroy actions. The port is random unless `--port` is set, and the address is printed on stderr. `--no-open` skips the browser. `--provider` limits the page to one provider; without it, a provider that is not available is shown disabled. See [ui](docs/ui.md).
+`ui` serves a page on `127.0.0.1` for the same list, create, restart, upgrade, URL auth, and destroy actions. The port is random unless `--port` is set, and the address is printed on stderr. `--no-open` skips the browser. `--provider` limits the page to one provider; without it, a provider that is not available is shown disabled. A create shows its steps on the page, and the terminal logs creates, actions, and provider errors. See [ui](docs/ui.md).
 
 ### restart, upgrade, and destroy
 

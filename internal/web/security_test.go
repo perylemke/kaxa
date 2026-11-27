@@ -73,7 +73,7 @@ func TestResponsesHideProviderTokens(t *testing.T) {
 	}
 
 	rec := do(t, h, s, http.MethodPost, "/api/sandboxes", createBody{Name: testSandbox, Provider: testProvider})
-	if rec.Code != http.StatusInternalServerError {
+	if events := createEvents(t, rec); rec.Code != http.StatusOK || events[len(events)-1].Error == "" {
 		t.Fatalf("create = %d %s", rec.Code, rec.Body)
 	}
 	if strings.Contains(rec.Body.String(), secret) || strings.Contains(stderr.String(), secret) {
@@ -82,6 +82,11 @@ func TestResponsesHideProviderTokens(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), "[redacted]") || !strings.Contains(stderr.String(), "[redacted]") {
 		t.Fatalf("token was not redacted\nbody %s\nlog %s", rec.Body, stderr)
 	}
+	requireSecurityHeaders(t, rec)
+}
+
+func requireSecurityHeaders(t *testing.T, rec *httptest.ResponseRecorder) {
+	t.Helper()
 	if rec.Header().Get("Access-Control-Allow-Origin") != "" {
 		t.Fatal("cors header is set")
 	}

@@ -29,11 +29,10 @@ func TestCreateInspectAndDestroy(t *testing.T) {
 	s, h := newServer(t, fp, Options{})
 
 	created := do(t, h, s, http.MethodPost, "/api/sandboxes", createBody{Name: testSandbox, Provider: testProvider})
-	if created.Code != http.StatusCreated {
+	if created.Code != http.StatusOK {
 		t.Fatalf("create = %d %s", created.Code, created.Body)
 	}
-	var out createOut
-	decode(t, created, &out)
+	out := createDone(t, created)
 	if out.ID != testSandbox || out.URL != "https://example.test/box" || fp.created.Name != testSandbox {
 		t.Fatalf("created = %+v spec %+v", out, fp.created)
 	}
@@ -131,7 +130,7 @@ func TestActionsFollowCapabilities(t *testing.T) {
 		t.Fatalf("bad auth = %d %s", bad.Code, bad.Body)
 	}
 	created := do(t, ch, cs, http.MethodPost, "/api/sandboxes", createBody{Name: testSandbox, Provider: testProvider})
-	if created.Code != http.StatusCreated || !bytes.Contains(created.Body.Bytes(), []byte("preview-once")) {
+	if created.Code != http.StatusOK || !bytes.Contains(created.Body.Bytes(), []byte("preview-once")) {
 		t.Fatalf("preview = %d %s", created.Code, created.Body)
 	}
 }
@@ -248,6 +247,33 @@ func do(t *testing.T, h http.Handler, srv *Server, method, path string, body any
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	return rec
+}
+
+func createEvents(t *testing.T, rec *httptest.ResponseRecorder) []createEvent {
+	t.Helper()
+	var events []createEvent
+	dec := json.NewDecoder(bytes.NewReader(rec.Body.Bytes()))
+	for dec.More() {
+		var ev createEvent
+		if err := dec.Decode(&ev); err != nil {
+			t.Fatalf("event: %v body %s", err, rec.Body)
+		}
+		events = append(events, ev)
+	}
+	if len(events) == 0 {
+		t.Fatalf("no events in %q", rec.Body)
+	}
+	return events
+}
+
+func createDone(t *testing.T, rec *httptest.ResponseRecorder) createOut {
+	t.Helper()
+	events := createEvents(t, rec)
+	last := events[len(events)-1]
+	if last.Done == nil {
+		t.Fatalf("create did not finish: %+v", last)
+	}
+	return *last.Done
 }
 
 func decode(t *testing.T, rec *httptest.ResponseRecorder, dst any) {

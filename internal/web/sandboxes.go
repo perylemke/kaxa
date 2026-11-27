@@ -65,6 +65,7 @@ func (s *Server) listSandboxes(w http.ResponseWriter, r *http.Request) {
 	warnings := make([]string, 0, len(failures))
 	for _, failure := range failures {
 		warnings = append(warnings, s.redact(failure.Error()))
+		s.event(levelWarn, "list", "", failure.Error())
 	}
 	s.writeJSON(w, http.StatusOK, struct {
 		Sandboxes []sandboxJSON `json:"sandboxes"`

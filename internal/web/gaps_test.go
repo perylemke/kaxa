@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -16,8 +17,8 @@ func TestCreateSyncAndAPIOptions(t *testing.T) {
 	t.Parallel()
 
 	fp := &fakeProvider{name: testProvider}
-	s, h := newServer(t, capable{fp}, Options{})
 	repo := gitRepo(t)
+	s, h := newServer(t, capable{fp}, Options{Home: filepath.Dir(repo)})
 
 	cases := []struct {
 		name string
@@ -27,12 +28,12 @@ func TestCreateSyncAndAPIOptions(t *testing.T) {
 		{name: "dir without sync", body: createBody{Name: testSandbox, Provider: testProvider, Dir: repo}, want: http.StatusBadRequest},
 		{name: "no install without sync", body: createBody{Name: testSandbox, Provider: testProvider, NoInstall: true}, want: http.StatusBadRequest},
 		{name: "missing repo", body: createBody{Name: testSandbox, Provider: testProvider, Sync: true, Dir: "/no/such/kaxa-ui-repo"}, want: http.StatusBadRequest},
-		{name: "sync", body: createBody{Name: testSandbox, Provider: testProvider, Sync: true, NoInstall: true, Dir: repo}, want: http.StatusCreated},
+		{name: "sync", body: createBody{Name: testSandbox, Provider: testProvider, Sync: true, NoInstall: true, Dir: repo}, want: http.StatusOK},
 		{name: "api command without api", body: createBody{Name: testSandbox, Provider: testProvider, APICmd: []string{"server"}}, want: http.StatusBadRequest},
 		{name: "api port without api", body: createBody{Name: testSandbox, Provider: testProvider, APIPort: 9}, want: http.StatusBadRequest},
 		{name: "api env without api", body: createBody{Name: testSandbox, Provider: testProvider, APIEnv: []string{"MODE=dev"}}, want: http.StatusBadRequest},
 		{name: "reserved api env", body: createBody{Name: testSandbox, Provider: testProvider, API: true, APICmd: []string{"server"}, APIEnv: []string{"KAXA_TOKEN=secret"}}, want: http.StatusBadRequest},
-		{name: "api", body: createBody{Name: testSandbox, Provider: testProvider, API: true, APICmd: []string{"server"}}, want: http.StatusCreated},
+		{name: "api", body: createBody{Name: testSandbox, Provider: testProvider, API: true, APICmd: []string{"server"}}, want: http.StatusOK},
 	}
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
@@ -136,8 +137,8 @@ func TestCreateKeepsTheSandboxWhenInspectFails(t *testing.T) {
 	}
 	s, h := newServer(t, fp, Options{})
 	rec := do(t, h, s, http.MethodPost, "/api/sandboxes", createBody{Name: testSandbox, Provider: testProvider})
-	if rec.Code != http.StatusCreated || strings.Contains(rec.Body.String(), "https://example.test") {
-		t.Fatalf("create = %d %s", rec.Code, rec.Body)
+	if out := createDone(t, rec); rec.Code != http.StatusOK || out.URL != "" || out.ID != testSandbox {
+		t.Fatalf("create = %d %+v", rec.Code, out)
 	}
 
 	fp.inspectErr = nil

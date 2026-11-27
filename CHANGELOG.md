@@ -10,7 +10,7 @@ Add an entry under `[Unreleased]` in every pull request that changes what users 
 
 ### Added
 
-- `kaxa ui` serves a local page on 127.0.0.1 to list, create, restart, upgrade, change URL auth, and destroy sandboxes. The port is random unless `--port` is set, and the address is printed on stderr. `--no-open` skips the browser. `--provider` limits the page to one provider.
+- `kaxa ui` serves a local page on 127.0.0.1 to list, create, restart, upgrade, change URL auth, and destroy sandboxes. The port is random unless `--port` is set, and the address is printed on stderr. `--no-open` skips the browser. `--provider` limits the page to one provider. Repositories to copy are chosen in a folder browser limited to your home directory. Each view has its own address, a create shows its steps as they run, and `kaxa ui` logs creates, actions, and provider errors on stderr.
 
 ## [0.2.1] - 2026-11-14
 

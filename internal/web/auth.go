@@ -12,9 +12,12 @@ import (
 
 const tokenBytes = 32
 
+// randRead fills the token bytes; tests replace it to reach the failure path.
+var randRead = rand.Read
+
 func newToken() (raw []byte, encoded string, err error) {
 	raw = make([]byte, tokenBytes)
-	if _, err = rand.Read(raw); err != nil {
+	if _, err = randRead(raw); err != nil {
 		return nil, "", fmt.Errorf("generate token: %w", err)
 	}
 	return raw, hex.EncodeToString(raw), nil

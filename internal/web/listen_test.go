@@ -86,7 +86,7 @@ func TestListenWarnsWhenTheBrowserFails(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("server did not stop")
 	}
-	if !strings.Contains(stderr.String(), "warning: open browser: browser missing") {
+	if got := stderr.String(); !strings.Contains(got, "warn   ui") || !strings.Contains(got, "open browser: browser missing") {
 		t.Fatalf("stderr = %s", stderr.String())
 	}
 }

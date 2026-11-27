@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"os"
 	"strings"
@@ -11,7 +12,10 @@ import (
 	"github.com/perylemke/kaxa/internal/usererr"
 )
 
-const defaultAPIPort = 8000
+const (
+	defaultAPIPort = 8000
+	contentNDJSON  = "application/x-ndjson"
+)
 
 type createBody struct {
 	Name      string   `json:"name"`
@@ -37,6 +41,20 @@ type createOut struct {
 	PreviewToken    string     `json:"preview_token,omitempty"`
 }
 
+// createEvent is one line of the create response. A response is zero or more
+// steps, then exactly one of done or error.
+type createEvent struct {
+	Step  string     `json:"step,omitempty"`
+	Done  *createOut `json:"done,omitempty"`
+	Error string     `json:"error,omitempty"`
+	Hint  string     `json:"hint,omitempty"`
+	// ID is set on an error when the sandbox was kept.
+	ID string `json:"id,omitempty"`
+}
+
+// createSandbox validates the request before it answers. A refused request is a
+// plain JSON error. An accepted one is a stream of createEvent lines, so the page
+// can show each step of a create that takes minutes.
 func (s *Server) createSandbox(w http.ResponseWriter, r *http.Request) {
 	var body createBody
 	if err := decodeJSON(r, &body); err != nil {
@@ -50,30 +68,55 @@ func (s *Server) createSandbox(w http.ResponseWriter, r *http.Request) {
 		s.writeErr(w, err)
 		return
 	}
+	noteTarget(w, body.Provider+"/"+body.Name)
 	p, err := s.openProvider(body.Provider)
 	if err != nil {
 		s.writeErr(w, err)
 		return
 	}
-	req, err := buildCreateRequest(body)
+	req, err := s.buildCreateRequest(body)
 	if err != nil {
 		s.writeErr(w, err)
 		return
 	}
-	res, err := lifecycle.Create(r.Context(), p, req, s.progress)
-	if err != nil {
+	lifecycle.NormalizeRepoList(&req)
+	if err := lifecycle.Check(p, req); err != nil {
 		s.writeErr(w, err)
 		return
 	}
-	s.writeJSON(w, http.StatusCreated, s.created(r, p, res))
+	s.streamCreate(w, r, p, req)
 }
 
-func (s *Server) progress(ctx context.Context, label string, task func(context.Context) error) error {
-	s.log(label)
-	return task(ctx)
+func (s *Server) streamCreate(w http.ResponseWriter, r *http.Request, p sandbox.Provider, req lifecycle.Request) {
+	target := p.Name() + "/" + req.Name
+	w.Header().Set("Content-Type", contentNDJSON)
+	w.WriteHeader(http.StatusOK)
+	enc := json.NewEncoder(w)
+	flusher := http.NewResponseController(w)
+	send := func(ev createEvent) {
+		_ = enc.Encode(ev)
+		_ = flusher.Flush()
+	}
+	started := s.clock()
+	s.event(levelInfo, "create", target, "started")
+	run := func(ctx context.Context, label string, task func(context.Context) error) error {
+		s.event(levelInfo, "create", target, label)
+		send(createEvent{Step: s.redact(label)})
+		return task(ctx)
+	}
+	res, err := lifecycle.Create(r.Context(), p, req, run)
+	if err != nil {
+		_, message, hint := s.describe(err)
+		s.event(levelError, "create", target, message)
+		send(createEvent{Error: message, Hint: hint, ID: string(res.ID)})
+		return
+	}
+	out := s.created(r, p, res, target)
+	s.event(levelInfo, "create", target, "done in "+elapsed(s.clock().Sub(started)))
+	send(createEvent{Done: &out})
 }
 
-func (s *Server) created(r *http.Request, p sandbox.Provider, res lifecycle.Result) createOut {
+func (s *Server) created(r *http.Request, p sandbox.Provider, res lifecycle.Result, target string) createOut {
 	out := createOut{
 		ID:              string(res.ID),
 		Provider:        p.Name(),
@@ -85,7 +128,7 @@ func (s *Server) created(r *http.Request, p sandbox.Provider, res lifecycle.Resu
 	}
 	detail, err := p.Inspect(r.Context(), res.ID)
 	if err != nil {
-		s.log(err.Error())
+		s.event(levelWarn, "create", target, "inspect: "+err.Error())
 		return out
 	}
 	out.URL = detail.URL
@@ -93,14 +136,14 @@ func (s *Server) created(r *http.Request, p sandbox.Provider, res lifecycle.Resu
 	return out
 }
 
-func buildCreateRequest(body createBody) (lifecycle.Request, error) {
+func (s *Server) buildCreateRequest(body createBody) (lifecycle.Request, error) {
 	req := lifecycle.Request{
 		Name:    body.Name,
 		Running: body.Running,
 		Sync:    body.Sync,
 		Public:  body.Public,
 	}
-	if err := applySync(&req, body); err != nil {
+	if err := s.applySync(&req, body); err != nil {
 		return lifecycle.Request{}, err
 	}
 	if err := applyAPI(&req, body); err != nil {
@@ -109,7 +152,7 @@ func buildCreateRequest(body createBody) (lifecycle.Request, error) {
 	return req, nil
 }
 
-func applySync(req *lifecycle.Request, body createBody) error {
+func (s *Server) applySync(req *lifecycle.Request, body createBody) error {
 	if !body.Sync {
 		if body.Dir != "" {
 			return usererr.New("dir requires sync", "turn on sync to copy that repository")
@@ -118,6 +161,9 @@ func applySync(req *lifecycle.Request, body createBody) error {
 			return usererr.New("no_install requires sync", "turn on sync to copy the repository without installing its dependencies")
 		}
 		return nil
+	}
+	if err := s.checkDirs(body.Dir); err != nil {
+		return err
 	}
 	copies, err := lifecycle.ResolveRepos(body.Dir, body.Dir != "")
 	if err != nil {

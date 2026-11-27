@@ -46,10 +46,15 @@ func (s *Server) writeStatus(w http.ResponseWriter, status int, message, hint st
 	s.writeJSON(w, status, errorBody{Error: s.redact(message), Hint: s.redact(hint)})
 }
 
-func (s *Server) writeErr(w http.ResponseWriter, err error) {
+// describe maps an error to the status, message, and hint the page shows.
+// Both texts are redacted, so no provider token reaches the browser or the log.
+func (s *Server) describe(err error) (int, string, string) {
 	status := http.StatusInternalServerError
 	message := err.Error()
 	hint := ""
+	if errors.Is(err, errOutsideHome) {
+		return http.StatusForbidden, errOutsideHome.Error(), "kaxa ui only copies repositories inside your home directory"
+	}
 	if ue, ok := usererr.As(err); ok {
 		status = http.StatusBadRequest
 		message = ue.Message
@@ -61,11 +66,12 @@ func (s *Server) writeErr(w http.ResponseWriter, err error) {
 	if errors.Is(err, sandbox.ErrUnsupported) {
 		status = http.StatusBadRequest
 	}
-	message = s.redact(message)
-	hint = s.redact(hint)
-	if status == http.StatusInternalServerError {
-		s.log(message)
-	}
+	return status, s.redact(message), s.redact(hint)
+}
+
+func (s *Server) writeErr(w http.ResponseWriter, err error) {
+	status, message, hint := s.describe(err)
+	noteDetail(w, message)
 	s.writeJSON(w, status, errorBody{Error: message, Hint: hint})
 }
 

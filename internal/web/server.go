@@ -8,6 +8,8 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -38,6 +40,10 @@ type Options struct {
 	Stderr io.Writer
 	// Open is called with the local URL. Nil skips the browser.
 	Open func(string) error
+	// Home is the root the repository picker browses. Empty uses the user's home directory.
+	Home string
+	// WorkDir is where the picker starts. Empty uses the working directory.
+	WorkDir string
 }
 
 // Server is the local UI. It binds only to 127.0.0.1.
@@ -52,7 +58,13 @@ type Server struct {
 	sessionHex string
 	csrfHex    string
 	secrets    []string
+	now        func() time.Time
+	home       string
+	workDir    string
 }
+
+// listen opens the TCP listener; tests replace it to reach the failure paths.
+var listen = net.Listen
 
 // New builds a server with a fresh session token and CSRF token.
 func New(opts Options) (*Server, error) {
@@ -80,7 +92,30 @@ func New(opts Options) (*Server, error) {
 		sessionHex: sessionHex,
 		csrfHex:    csrfHex,
 		secrets:    credentialSecrets(opts.Config, sessionHex, csrfHex),
+		home:       resolveHome(opts.Home),
+		workDir:    workDir(opts.WorkDir),
 	}, nil
+}
+
+func workDir(dir string) string {
+	if dir == "" {
+		dir, _ = os.Getwd()
+	}
+	return dir
+}
+
+// resolveHome returns the browsing root with symlinks followed, or "" when it is unknown.
+func resolveHome(home string) string {
+	if home == "" {
+		home, _ = os.UserHomeDir()
+	}
+	if home == "" {
+		return ""
+	}
+	if resolved, err := filepath.EvalSymlinks(home); err == nil {
+		return resolved
+	}
+	return home
 }
 
 // ListenAndServe listens on 127.0.0.1 until ctx is cancelled.
@@ -91,7 +126,7 @@ func ListenAndServe(ctx context.Context, opts Options) error {
 	if err != nil {
 		return err
 	}
-	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", opts.Port))
+	ln, err := listen("tcp", fmt.Sprintf("127.0.0.1:%d", opts.Port))
 	if err != nil {
 		return usererr.New(
 			fmt.Sprintf("could not listen on 127.0.0.1:%d", opts.Port),
@@ -118,7 +153,7 @@ func ListenAndServe(ctx context.Context, opts Options) error {
 	srv.log("kaxa ui listening on " + page)
 	if opts.Open != nil {
 		if openErr := opts.Open(page); openErr != nil {
-			srv.log("warning: open browser: " + openErr.Error())
+			srv.event(levelWarn, "ui", "", "open browser: "+openErr.Error())
 		}
 	}
 	select {
@@ -128,9 +163,7 @@ func ListenAndServe(ctx context.Context, opts Options) error {
 		_ = httpSrv.Shutdown(shutCtx)
 		return ctx.Err()
 	case serveErr := <-errCh:
-		if errors.Is(serveErr, http.ErrServerClosed) {
-			return nil
-		}
+		// Serve only returns http.ErrServerClosed after Shutdown, which runs in the other case.
 		return serveErr
 	}
 }
@@ -153,6 +186,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /app.css", s.serveCSS)
 	mux.HandleFunc("GET /app.js", s.serveJS)
 	mux.HandleFunc("GET /api/providers", s.listProviders)
+	mux.HandleFunc("GET /api/dirs", s.listDirs)
 	mux.HandleFunc("GET /api/sandboxes", s.listSandboxes)
 	mux.HandleFunc("POST /api/sandboxes", s.createSandbox)
 	mux.HandleFunc("GET /api/sandboxes/{provider}/{name}", s.inspectSandbox)
@@ -167,7 +201,7 @@ func (s *Server) protect(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		setSecurityHeaders(w)
 		if r.Host != s.host || s.host == "" {
-			s.writeStatus(w, http.StatusForbidden, "rejected host", "open the address printed by kaxa ui")
+			s.reject(w, http.StatusForbidden, "rejected host", "open the address printed by kaxa ui")
 			return
 		}
 		if !isAPI(r.URL.Path) {
@@ -175,15 +209,25 @@ func (s *Server) protect(next http.Handler) http.Handler {
 			return
 		}
 		if !matchToken(r.Header.Get(headerSession), s.session) {
-			s.writeStatus(w, http.StatusUnauthorized, "missing session", "reload the page printed by kaxa ui")
+			s.reject(w, http.StatusUnauthorized, "missing session", "reload the page printed by kaxa ui")
 			return
 		}
 		if changesState(r.Method) && !matchToken(r.Header.Get(headerCSRF), s.csrf) {
-			s.writeStatus(w, http.StatusForbidden, "missing csrf token", "reload the page printed by kaxa ui")
+			s.reject(w, http.StatusForbidden, "missing csrf token", "reload the page printed by kaxa ui")
 			return
 		}
-		next.ServeHTTP(w, r)
+		started := s.clock()
+		rec := &recorder{ResponseWriter: w}
+		next.ServeHTTP(rec, r)
+		s.audit(r, rec, started)
 	})
+}
+
+// reject answers a request that failed the host, session, or CSRF check and logs it.
+// The log never repeats the Host header or the path, which the caller controls.
+func (s *Server) reject(w http.ResponseWriter, status int, message, hint string) {
+	s.event(levelWarn, "request", "", message)
+	s.writeStatus(w, status, message, hint)
 }
 
 func isAPI(path string) bool {
@@ -197,11 +241,4 @@ func changesState(method string) bool {
 	default:
 		return false
 	}
-}
-
-func (s *Server) log(line string) {
-	if s.stderr == nil || line == "" {
-		return
-	}
-	_, _ = fmt.Fprintln(s.stderr, s.redact(line))
 }

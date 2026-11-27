@@ -27,19 +27,17 @@ func (s *Server) listProviders(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) providerInfos() ([]providerInfo, error) {
-	names := s.reg.Names()
+	providers := s.reg.All()
 	if s.only != "" {
-		if !s.reg.Has(s.only) {
+		p, err := s.reg.Get(s.only)
+		if err != nil {
 			return nil, usererr.New("unknown provider "+s.only, "choose a provider from kaxa ui")
 		}
-		names = []string{s.only}
+		providers = []sandbox.Provider{p}
 	}
-	out := make([]providerInfo, 0, len(names))
-	for _, name := range names {
-		p, err := s.reg.Get(name)
-		if err != nil {
-			return nil, err
-		}
+	out := make([]providerInfo, 0, len(providers))
+	for _, p := range providers {
+		name := p.Name()
 		_, _ = lifecycle.ResolveProvider(s.reg, s.cfg, name)
 		out = append(out, providerInfo{
 			Name:         name,
